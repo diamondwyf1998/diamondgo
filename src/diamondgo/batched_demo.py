@@ -1,0 +1,287 @@
+from __future__ import annotations
+
+import argparse
+import json
+import random
+import time
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+import numpy as np
+import torch
+
+from diamondgo.config import ModelConfig
+from diamondgo.demo_cpu import (
+    action_to_gtp,
+    build_trace,
+    make_rules,
+    train_steps,
+    write_dashboard,
+    write_json,
+    write_overview_svg,
+    write_sgf,
+)
+from diamondgo.mcts import SearchNode, play_search_action, select_child
+from diamondgo.model import PolicyValueNet
+
+
+@dataclass(frozen=True)
+class BatchedConfig:
+    board_size: int = 9
+    komi: float = 0.5
+    channels: int = 32
+    residual_blocks: int = 2
+    simulations: int = 64
+    max_moves: int = 80
+    games: int = 16
+    train_steps: int = 16
+    batch_size: int = 256
+    learning_rate: float = 1e-3
+    c_puct: float = 1.5
+    temperature: float = 1.0
+    seed: int = 1
+    device: str = "cuda"
+    rules_backend: str = "sgfmill"
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run batched 9x9 self-play with GPU leaf evaluation.")
+    parser.add_argument("--games", type=int, default=BatchedConfig.games)
+    parser.add_argument("--simulations", type=int, default=BatchedConfig.simulations)
+    parser.add_argument("--max-moves", type=int, default=BatchedConfig.max_moves)
+    parser.add_argument("--train-steps", type=int, default=BatchedConfig.train_steps)
+    parser.add_argument("--batch-size", type=int, default=BatchedConfig.batch_size)
+    parser.add_argument("--channels", type=int, default=BatchedConfig.channels)
+    parser.add_argument("--residual-blocks", type=int, default=BatchedConfig.residual_blocks)
+    parser.add_argument("--seed", type=int, default=BatchedConfig.seed)
+    parser.add_argument("--device", default=BatchedConfig.device)
+    parser.add_argument("--rules", choices=["simple", "sgfmill"], default=BatchedConfig.rules_backend)
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--sgf", default="artifacts/batched-9x9.sgf")
+    parser.add_argument("--trace", default="artifacts/batched-9x9.json")
+    parser.add_argument("--dashboard", default="artifacts/visualizations/batched-9x9-dashboard.html")
+    parser.add_argument("--overview-svg", default="artifacts/visualizations/batched-9x9-overview.svg")
+    return parser
+
+
+def make_model(config: BatchedConfig) -> PolicyValueNet:
+    model = PolicyValueNet(
+        board_size=config.board_size,
+        config=ModelConfig(channels=config.channels, residual_blocks=config.residual_blocks),
+    )
+    model.to(torch.device(config.device))
+    model.eval()
+    return model
+
+
+def evaluate_batch(
+    model: PolicyValueNet,
+    states: list[object],
+    stats: dict[str, object] | None = None,
+) -> tuple[list[np.ndarray], list[float]]:
+    device = next(model.parameters()).device
+    features = torch.tensor(np.stack([state.encode() for state in states]), dtype=torch.float32).to(device)
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    start = time.perf_counter()
+    with torch.no_grad():
+        logits, values = model(features)
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    elapsed = time.perf_counter() - start
+    if stats is not None:
+        stats["network_calls"] = int(stats.get("network_calls", 0)) + 1
+        stats["network_seconds"] = float(stats.get("network_seconds", 0.0)) + elapsed
+        stats.setdefault("batch_sizes", []).append(len(states))
+    priors = torch.softmax(logits, dim=1).detach().cpu().numpy()
+    return [priors[i] for i in range(len(states))], [float(v) for v in values.detach().cpu().numpy()]
+
+
+def backpropagate(path: list[SearchNode], value: float) -> None:
+    current = float(value)
+    for node in reversed(path):
+        node.visit_count += 1
+        node.value_sum += current
+        current = -current
+
+
+def collect_leaf(state, root: SearchNode, c_puct: float) -> tuple[object, list[SearchNode], SearchNode] | None:
+    simulation_state = state.copy()
+    node = root
+    path = [node]
+    while node.expanded() and not simulation_state.is_terminal():
+        action, child = select_child(node, c_puct)
+        play_search_action(simulation_state, action)
+        node = child
+        path.append(node)
+
+    if simulation_state.is_terminal():
+        backpropagate(path, float(simulation_state.terminal_value()))
+        return None
+    return simulation_state, path, node
+
+
+def run_batched_mcts(
+    model: PolicyValueNet,
+    states: list[object],
+    config: BatchedConfig,
+    stats: dict[str, object],
+) -> list[SearchNode]:
+    roots = [SearchNode(prior=1.0) for _ in states]
+    priors_batch, values = evaluate_batch(model, states, stats)
+    for root, state, priors, value in zip(roots, states, priors_batch, values):
+        root.expand(priors, state.legal_actions())
+        root.visit_count = 1
+        root.value_sum = float(value)
+
+    for _ in range(config.simulations):
+        pending: list[tuple[object, list[SearchNode], SearchNode]] = []
+        for state, root in zip(states, roots):
+            leaf = collect_leaf(state, root, config.c_puct)
+            if leaf is not None:
+                pending.append(leaf)
+        if not pending:
+            continue
+        leaf_states = [item[0] for item in pending]
+        priors_batch, values = evaluate_batch(model, leaf_states, stats)
+        for (_, path, node), priors, value, leaf_state in zip(pending, priors_batch, values, leaf_states):
+            node.expand(priors, leaf_state.legal_actions())
+            backpropagate(path, float(value))
+    return roots
+
+
+def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[list[dict[str, object]], dict[str, object]]:
+    states = [make_rules(config) for _ in range(config.games)]
+    active = [True for _ in states]
+    move_counts = [0 for _ in states]
+    examples: list[dict[str, object]] = []
+    stats: dict[str, object] = {"network_calls": 0, "network_seconds": 0.0, "batch_sizes": []}
+
+    while any(active):
+        active_indices = [
+            index
+            for index, state in enumerate(states)
+            if active[index] and not state.is_terminal() and move_counts[index] < config.max_moves
+        ]
+        if not active_indices:
+            break
+
+        active_states = [states[index] for index in active_indices]
+        roots = run_batched_mcts(model, active_states, config, stats)
+
+        for state_index, root in zip(active_indices, roots):
+            state = states[state_index]
+            player = state.to_play
+            features = state.encode()
+            policy = root.policy_target(state.action_size, config.temperature)
+            action = int(np.random.choice(np.arange(state.action_size), p=policy))
+            move_counts[state_index] += 1
+            examples.append(
+                {
+                    "features": features,
+                    "policy": policy,
+                    "player": player,
+                    "top_actions": root.top_actions(config.board_size),
+                    "root_value": round(root.value, 4),
+                    "chosen_action": action,
+                    "game": state_index + 1,
+                    "move_in_game": move_counts[state_index],
+                    "chosen_move": action_to_gtp(action, config.board_size),
+                }
+            )
+            state.play_action(action)
+            if state.is_terminal() or move_counts[state_index] >= config.max_moves:
+                active[state_index] = False
+
+    terminal_values_by_game = {}
+    for game_index, state in enumerate(states, start=1):
+        value_for_to_play = float(state.terminal_value())
+        terminal_values_by_game[(game_index, state.to_play)] = value_for_to_play
+        terminal_values_by_game[(game_index, "w" if state.to_play == "b" else "b")] = -value_for_to_play
+
+    for example in examples:
+        example["value_target"] = terminal_values_by_game[(int(example["game"]), example["player"])]
+    batch_sizes = list(stats.get("batch_sizes", []))
+    stats["average_batch_size"] = round(float(np.mean(batch_sizes)), 3) if batch_sizes else 0.0
+    stats["max_batch_size"] = int(max(batch_sizes)) if batch_sizes else 0
+    stats["network_seconds"] = round(float(stats.get("network_seconds", 0.0)), 3)
+    return examples, stats
+
+
+def run(config: BatchedConfig, sgf_path: str, trace_path: str, dashboard_path: str, overview_svg_path: str) -> dict[str, object]:
+    total_start = time.perf_counter()
+    random.seed(config.seed)
+    np.random.seed(config.seed)
+    torch.manual_seed(config.seed)
+    torch.set_num_threads(min(8, torch.get_num_threads()))
+    if config.device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("requested CUDA device but CUDA is unavailable")
+
+    model = make_model(config)
+    params = sum(parameter.numel() for parameter in model.parameters())
+    selfplay_start = time.perf_counter()
+    examples, selfplay_stats = play_batched_games(config, model)
+    selfplay_seconds = time.perf_counter() - selfplay_start
+
+    train_start = time.perf_counter()
+    loss_history = train_steps(config, model, examples)
+    train_seconds = time.perf_counter() - train_start
+
+    write_start = time.perf_counter()
+    write_sgf(sgf_path, config, examples)
+    write_json(trace_path, build_trace(config, examples))
+    write_dashboard(dashboard_path, config, params, examples, loss_history, sgf_path, trace_path)
+    write_overview_svg(overview_svg_path, config, params, examples, loss_history)
+    write_seconds = time.perf_counter() - write_start
+    total_seconds = time.perf_counter() - total_start
+
+    first = examples[0]
+    return {
+        "config": asdict(config),
+        "parameters": params,
+        "positions": len(examples),
+        "sgf_path": str(sgf_path),
+        "trace_path": str(trace_path),
+        "dashboard_path": str(dashboard_path),
+        "overview_svg_path": str(overview_svg_path),
+        "first_position": {
+            "root_value": first["root_value"],
+            "top_actions": first["top_actions"],
+            "chosen_action": first["chosen_action"],
+        },
+        "train_metrics": loss_history[-1],
+        "loss_history": loss_history,
+        "timing": {
+            "selfplay_seconds": round(selfplay_seconds, 3),
+            "train_seconds": round(train_seconds, 3),
+            "write_seconds": round(write_seconds, 3),
+            "total_seconds": round(total_seconds, 3),
+            "positions_per_second": round(len(examples) / max(selfplay_seconds, 1e-9), 3),
+            "network_seconds": selfplay_stats["network_seconds"],
+            "network_calls": selfplay_stats["network_calls"],
+            "average_network_batch": selfplay_stats["average_batch_size"],
+            "max_network_batch": selfplay_stats["max_batch_size"],
+        },
+    }
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    config = BatchedConfig(
+        games=args.games,
+        simulations=args.simulations,
+        max_moves=args.max_moves,
+        train_steps=args.train_steps,
+        batch_size=args.batch_size,
+        channels=args.channels,
+        residual_blocks=args.residual_blocks,
+        seed=args.seed,
+        device=args.device,
+        rules_backend=args.rules,
+    )
+    summary = run(config, args.sgf, args.trace, args.dashboard, args.overview_svg)
+    print(json.dumps(summary, indent=2))
+
+
+if __name__ == "__main__":
+    main()

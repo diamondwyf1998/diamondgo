@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+build/
+dist/
+*.egg-info/
+.codex-ssh/
+artifacts/
+tools/
+diamondgo-upload.zip
+diamondgo-source.bundle
+diamondgo-source.tar.gz
