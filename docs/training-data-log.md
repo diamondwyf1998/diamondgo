@@ -357,6 +357,29 @@ Early measured cycles:
 | 1 | 11 | 21 | 34.4% | 65.6% | +3.16 | 71.84 | 27 | 5 |
 | 2 | 19 | 13 | 59.4% | 40.6% | +1.00 | 99.44 | 26 | 6 |
 
+## Unfinished 2-Layer Baseline Questions
+
+The earlier `32 channels x 2 residual blocks` line should not be treated as
+fully explored. It underperformed in the latest continuation experiments, but
+those runs also changed scoring labels midstream and inherited skewed weights.
+
+Open follow-ups:
+
+| Question | Why it matters | Suggested test |
+| --- | --- | --- |
+| Can 2-layer improve with more search? | The current main 2-layer runs used `100` simulations per move; search quality may be the bottleneck rather than capacity. | Fresh 2-layer run with matched rules/input setup and higher MCTS, such as `200` or `400` simulations. |
+| How much do advanced tricks help 2-layer? | If a small model plus better self-play tricks is enough for 9x9 baby cases, it is easier to interpret than a larger model. | Add root noise, late temperature drop, dihedral augmentation, and possibly better replay/eval scheduling to the 2-layer line. |
+| Is 4x64 actually stronger, or just different? | The current 4x64 fresh run changes several variables at once. | PK 2-layer vs 4x64 at matched wall-clock, matched self-play positions, and matched checkpoint intervals. |
+| What should be matched for PK? | Same-time and same-data comparisons answer different questions. | Record both: same training time and same total positions/train steps. |
+
+Planned PK outputs should include:
+
+- win rate by color
+- same checkpoint step tiers as the current eval suite: `50,200,500`
+- at least `20` games per match for quick checks, larger if a candidate looks close
+- two rendered sample games per match for human review
+- root value and top search candidates in the dashboard
+
 ## Center 5x5 Opening Distribution
 
 Center-region definition: 9x9 center 5x5, rows 3-7 and columns C-G in GTP

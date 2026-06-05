@@ -185,6 +185,13 @@ Source labels:
 
 ### Tests Still Needed
 
+- `User observation`: The previous `32 channels x 2 residual blocks` line is
+  not exhausted. It may still improve with higher MCTS search or more advanced
+  training tricks, so it should remain as a live comparison branch rather than
+  being treated as failed.
+  - Follow-up: run a stronger 2-layer baseline with more search, then compare
+    it against the current fresh 4x64 model at matched training budgets.
+  - Data reference: `docs/training-data-log.md#unfinished-2-layer-baseline-questions`
 - Tactical learning checks were started for checkpoints `760-830`.
   - White one-stone capture is learned in this probe: `8/8` top1/top3.
   - Black capture is weak: black one-stone capture is `0/8` top1 and only
