@@ -260,3 +260,93 @@ and should be tested directly before trusting later qualitative conclusions.
 fewer scattered stones, less exposure to being surrounded, and possibly more
 coherent group structure. This is currently based on user visual inspection and
 needs a shape/distribution metric before treating it as a measured result.
+
+## 2026-06-06 Notes
+
+### Fresh No-Komi 4x64 Checkpoint 60
+
+- `Technical operation`: The latest fresh no-komi-input `4x64` checkpoint was
+  pulled for qualitative review and interactive play. The local self-play
+  viewer was generated for `cycle-00060`, and the browser play server was
+  switched to the same checkpoint.
+  - Self-play viewer:
+    `artifacts/selfplay-showcase-fresh-nokomi-4x64-cycle60-20260606/viewer.html`
+  - Human play page:
+    `artifacts/viewers/play-ai.html`
+  - Play server note: the local browser play server was adapted so no-komi
+    checkpoints use a 3-plane input state instead of the old 4-plane komi
+    state.
+  - Data reference:
+    `docs/training-data-log.md#fresh-no-komi-input-4x64-checkpoint-60-showcase`
+- `Agent measurement`: The `cycle-00060` latest self-play trace contains `32`
+  games. In that sample, Black won `26` and White won `6`, so the current
+  fresh run has a visible Black skew in self-play despite using `score_komi=2.5`.
+  This is a sample from one latest cycle, not a final strength estimate.
+  - Data reference:
+    `docs/training-data-log.md#fresh-no-komi-input-4x64-checkpoint-60-showcase`
+
+### Cross-Generation Strength Checks
+
+- `Agent measurement`: The fresh no-komi-input `4x64` `cycle-00040`
+  checkpoint beat early old-generation checkpoints very strongly in quick
+  cross-generation matches. Each match used `10` games with candidate Black
+  `5` times and White `5` times, `100` simulations per move, and the same
+  opening sampling convention as the evaluation dashboard.
+  - Against old checkpoints `40, 50, 80, 200`: results were `10/10`,
+    `10/10`, `9/10`, and `8/10`.
+  - Against old checkpoints `300, 400, 500`: results were `7/10`, `10/10`,
+    and `10/10`.
+  - Important caveat: the `500` opponent comes from
+    `multiworker-9x9-100sims-90min-20260605`, because the earlier
+    `overnight-9x9-20260605` line stops at `cycle-00410`.
+  - Data reference:
+    `docs/training-data-log.md#cross-generation-evaluation-fresh-cycle-40`
+
+### Tactical Skills
+
+- `Agent measurement`: The previous 12-case tactical casebook was rerun for
+  fresh no-komi-input checkpoints `10,20,30,40,50,60`.
+  - Capture and atari-defense probes improved only slightly: by cycle `60`,
+    capture is `1/1 of 4` top1/top3 and atari defense is `0/1 of 4`
+    top1/top3.
+  - Fill-eye remains the clearest bad habit: for every tested checkpoint,
+    `1/2` fill-eye bad moves are still top1/top3.
+  - Self-atari/dead-shape bad moves did not enter top1/top3 in these six
+    checkpoints, though one appears in top10.
+  - Rendered casebook:
+    `artifacts/tactical-fresh-nokomi-4x64-cycle10-60-20260606/casebook.html`
+  - Data reference:
+    `docs/training-data-log.md#tactical-probes-fresh-no-komi-4x64-cycles-10-60`
+
+### Partial Eval Before 200-Sim Continuation
+
+- `User request`: Before the overnight job, run an eval pass, then start a
+  16-hour task with MCTS increased to `200`.
+- `Agent measurement`: The eval pass completed the initial-opponent matches
+  before being stopped to avoid delaying the overnight training launch.
+  - Cycle `40` and `50` both scored `18/20` against the initial net.
+  - Cycle `60` and latest/cycle `66` both scored `9/20`, a visible drop in this
+    quick eval slice.
+  - This is not a full strength conclusion because the previous-opponent tier
+    was not completed.
+  - Data reference:
+    `docs/training-data-log.md#partial-eval-before-200-sim-overnight-continuation`
+
+### 200-Sim Overnight Continuation
+
+- `Technical operation`: The next overnight run continues from the fresh
+  no-komi-input `4x64` latest checkpoint instead of starting over.
+  - Resume source: fresh run latest at cycle `66`.
+  - New training directory:
+    `artifacts/multiworker-9x9-fresh-nokomi-4x64-score2p5-200sims-noise-aug-16h-20260606`
+  - Training self-play search increases from `100` to `200` simulations.
+  - Architecture stays `64` channels x `4` residual blocks, with `316,669`
+    trainable parameters.
+  - Score komi stays `2.5`; input komi stays disabled.
+  - Data reference:
+    `docs/training-data-log.md#200-sim-overnight-continuation-configuration`
+- `Hypothesis`: If the earlier weak tactical/shape behavior is mainly from
+  search being too shallow, the 200-sim continuation should show cleaner
+  self-play shapes and better tactical casebook results without requiring a
+  new architecture. If the problem is mostly value/policy training quality, it
+  may still plateau or oscillate.

@@ -393,6 +393,94 @@ Early measured cycles:
 | 65 | 23 | 9 | 71.9% | 28.1% | +2.31 | 105.12 | 25 | 7 |
 | 66 | 26 | 6 | 81.2% | 18.8% | +1.38 | 105.56 | 24 | 8 |
 
+## Fresh No-Komi-Input 4x64 Checkpoint 60 Showcase
+
+Source artifacts:
+
+- Local self-play viewer:
+  `artifacts/selfplay-showcase-fresh-nokomi-4x64-cycle60-20260606/viewer.html`
+- Local self-play data:
+  `artifacts/selfplay-showcase-fresh-nokomi-4x64-cycle60-20260606/cycle-00060-moves.json`
+- Server source trace:
+  `/root/diamondgo/artifacts/multiworker-9x9-fresh-nokomi-4x64-score2p5-100sims-noise-aug-2h-20260605/latest-cycle-trace.json`
+- Local play checkpoint:
+  `artifacts/play-ai-checkpoints/fresh-nokomi-4x64-cycle-00060.pt`
+- Browser play page:
+  `artifacts/viewers/play-ai.html`
+
+Configuration:
+
+| Field | Value |
+| --- | --- |
+| Checkpoint | `cycle-00060` |
+| Input komi | `false` |
+| Channels / residual blocks | `64 / 4` |
+| Score komi | `2.5` |
+| Self-play simulations | `100` |
+| Max moves | `120` |
+
+Latest trace summary:
+
+| Metric | Value |
+| --- | ---: |
+| Games | `32` |
+| Positions | `3378` |
+| Black wins | `26` |
+| White wins | `6` |
+| Black win rate | `81.2%` |
+
+The local browser play server was updated to read `input_komi` from the
+checkpoint config, so no-komi checkpoints encode positions with 3 input planes.
+The same server currently serves the `cycle-00060` checkpoint on
+`http://127.0.0.1:8787/viewers/play-ai.html`.
+
+## Cross-Generation Evaluation, Fresh Cycle 40
+
+Candidate:
+
+- `fresh-nokomi-4x64-cycle-00040`
+- Server checkpoint:
+  `/root/diamondgo/artifacts/multiworker-9x9-fresh-nokomi-4x64-score2p5-100sims-noise-aug-2h-20260605/checkpoints/cycle-00040.pt`
+
+Evaluation settings:
+
+| Field | Value |
+| --- | --- |
+| Games per match | `10` |
+| Candidate colors | `5` Black games, `5` White games |
+| MCTS simulations | `100` |
+| Max moves | `120` |
+| Opening sampling | first `6` moves sampled from visit distribution, then max-visit |
+| Device | server `cuda` |
+
+Source artifacts:
+
+- `artifacts/crossgen-fresh-nokomi40-vs-overnight-20260606/dashboard.html`
+- `artifacts/crossgen-fresh-nokomi40-vs-overnight-20260606/results.json`
+- `artifacts/crossgen-fresh-nokomi40-vs-old-300-500-20260606/dashboard.html`
+- `artifacts/crossgen-fresh-nokomi40-vs-old-300-500-20260606/results.json`
+
+Results:
+
+| Opponent | Source line | Note | Candidate wins | Black wins | White wins |
+| --- | --- | --- | ---: | ---: | ---: |
+| `cycle-00040` | `overnight-9x9-20260605` | same index | `10/10` | `5/5` | `5/5` |
+| `cycle-00050` | `overnight-9x9-20260605` | nearest available to requested `40 * 1.3 = 52` | `10/10` | `5/5` | `5/5` |
+| `cycle-00080` | `overnight-9x9-20260605` | `40 * 2` | `9/10` | `4/5` | `5/5` |
+| `cycle-00200` | `overnight-9x9-20260605` | `40 * 5` | `8/10` | `4/5` | `4/5` |
+| `cycle-00300` | `overnight-9x9-20260605` | old generation cycle 300 | `7/10` | `4/5` | `3/5` |
+| `cycle-00400` | `overnight-9x9-20260605` | old generation cycle 400 | `10/10` | `5/5` | `5/5` |
+| `cycle-00500` | `multiworker-9x9-100sims-90min-20260605` | overnight line stops at `cycle-00410` | `10/10` | `5/5` | `5/5` |
+
+Interpretation caveats:
+
+- These are quick 10-game matches, useful for orientation but noisy.
+- The candidate differs from the old generation in multiple variables:
+  architecture, input features, root noise, sampling schedule, augmentation,
+  and scoring komi.
+- Because the current fresh run is already Black-skewed in self-play, color
+  split should always be inspected alongside total win rate.
+
 ## Unfinished 2-Layer Baseline Questions
 
 The earlier `32 channels x 2 residual blocks` line should not be treated as
@@ -568,3 +656,127 @@ Per-case summary across the eight checkpoints:
 | `white_avoid_filling_own_eye` | fill eye | bad top1/top3 `1/2 of 8` |
 | `black_avoid_self_atari_edge` | self/dead shape | bad top1/top3 `0/3 of 8` |
 | `white_avoid_self_atari_edge` | self/dead shape | bad top1/top3 `0/0 of 8` |
+
+## Tactical Probes, Fresh No-Komi 4x64 Cycles 10-60
+
+Source artifacts:
+
+- `artifacts/tactical-fresh-nokomi-4x64-cycle10-60-20260606/tactical_results.json`
+- `artifacts/tactical-fresh-nokomi-4x64-cycle10-60-20260606/tactical_report.md`
+- `artifacts/tactical-fresh-nokomi-4x64-cycle10-60-20260606/casebook.html`
+
+Probe settings:
+
+| Field | Value |
+| --- | --- |
+| Checkpoints | `10,20,30,40,50,60` |
+| Simulations | `100` |
+| Cases | `12` from the rendered tactical casebook |
+| Positive categories | `capture`, `atari_defense`; higher top1/top3 is better |
+| Negative categories | `fill_eye`, `self_atari_or_dead`; lower bad top1/top3 is better |
+
+Category summary by checkpoint:
+
+| Cycle | Capture top1/top3 | Atari defense top1/top3 | Fill-eye bad top1/top3 | Self/dead bad top1/top3 |
+| ---: | ---: | ---: | ---: | ---: |
+| 10 | 0/0 of 4 | 0/0 of 4 | 1/1 of 2 | 0/0 of 2 |
+| 20 | 0/0 of 4 | 1/1 of 4 | 1/1 of 2 | 0/0 of 2 |
+| 30 | 1/1 of 4 | 1/1 of 4 | 1/1 of 2 | 0/0 of 2 |
+| 40 | 1/1 of 4 | 1/1 of 4 | 1/1 of 2 | 0/0 of 2 |
+| 50 | 1/1 of 4 | 1/1 of 4 | 1/1 of 2 | 0/0 of 2 |
+| 60 | 1/1 of 4 | 0/1 of 4 | 1/1 of 2 | 0/0 of 2 |
+
+Observed tactical pattern:
+
+- Capture and atari-defense behavior is still weak in this small hand-built
+  probe set. By cycle `60`, only `1/4` capture targets are top1/top3, and
+  `1/4` atari-defense targets are top3 but none are top1.
+- Fill-eye remains a persistent issue: in all tested checkpoints, `1/2`
+  fill-eye bad moves are ranked top1/top3.
+- Self-atari/dead-shape bad moves do not reach top1/top3 in this run, though
+  one appears in top10 in the raw results.
+
+## Partial Eval Before 200-Sim Overnight Continuation
+
+Source artifacts:
+
+- Server eval directory:
+  `/root/diamondgo/artifacts/eval-suite-fresh-nokomi-4x64-score2p5-100sims-paused-20260606`
+- Example dashboard generated before the eval was stopped:
+  `/root/diamondgo/artifacts/eval-suite-fresh-nokomi-4x64-score2p5-100sims-paused-20260606/step-00010-vs-initial/dashboard.html`
+
+Settings:
+
+| Field | Value |
+| --- | --- |
+| Candidate line | fresh no-komi-input `4x64`, paused at cycle `66` |
+| Eval simulations | `100` |
+| Games per match | `20` |
+| Max moves | `120` |
+| Opponent completed before stop | `initial` |
+
+The full standard eval suite was started first, but it was stopped after the
+initial-opponent pass so the 16-hour overnight run could begin. Results below
+are therefore a partial orientation check, not the complete 50/200/500 tier
+suite.
+
+| Candidate | Result vs initial | Candidate Black wins | Candidate White wins | Seconds |
+| --- | ---: | ---: | ---: | ---: |
+| cycle `10` | `16/20` (`80%`) | `10` | `6` | `136.449` |
+| cycle `20` | `12/20` (`60%`) | `7` | `5` | `139.344` |
+| cycle `30` | `13/20` (`65%`) | `8` | `5` | `139.809` |
+| cycle `40` | `18/20` (`90%`) | `9` | `9` | `140.006` |
+| cycle `50` | `18/20` (`90%`) | `8` | `10` | `139.089` |
+| cycle `60` | `9/20` (`45%`) | `2` | `7` | `102.902` |
+| latest/cycle `66` | `9/20` (`45%`) | `1` | `8` | `115.137` |
+
+## 200-Sim Overnight Continuation Configuration
+
+Run directory:
+
+- `/root/diamondgo/artifacts/multiworker-9x9-fresh-nokomi-4x64-score2p5-200sims-noise-aug-16h-20260606`
+
+Resume source:
+
+- `/root/diamondgo/artifacts/multiworker-9x9-fresh-nokomi-4x64-score2p5-100sims-noise-aug-2h-20260605/latest.pt`
+
+Configuration:
+
+| Field | Value |
+| --- | --- |
+| Fresh start | `false` |
+| Resume semantics | model, optimizer, cycle, position, and train-step counters resume; replay buffer is rebuilt in the new output directory |
+| Starting checkpoint | fresh no-komi-input `4x64` latest at cycle `66` |
+| Input komi | `false` |
+| Input planes | `3`: own stones, opponent stones, side-to-play |
+| Komi metadata | `0.5` |
+| Score komi | `2.5` |
+| Channels / residual blocks | `64 / 4` |
+| Trainable parameters | `316,669` |
+| MCTS simulations | `200` for training self-play |
+| Workers | `8` |
+| Games per worker / cycle | `4 / 32` |
+| Max moves | `120` |
+| Train steps per cycle | `64` |
+| Batch size | `256` |
+| Replay size | `100,000` |
+| Optimizer | AdamW, learning rate `0.001`, weight decay `0.0001` |
+| c_puct | `1.5` |
+| Root Dirichlet noise | alpha `0.15`, fraction `0.25` |
+| Root policy temperature | `1.1` |
+| Move temperature | `1.0` through move `16`, then `0.25` |
+| Data augmentation | random dihedral symmetry during training |
+| Checkpoint interval | every `10` cycles |
+| Time limit | `960` minutes (`16` hours) |
+
+Expected interpretation:
+
+- This isolates the MCTS-search increase more than the previous architecture
+  change did: the model is the same fresh no-komi-input `4x64` network, but
+  self-play search doubles from `100` to `200` simulations per move.
+- Because the new output directory does not restore replay, early continuation
+  cycles are trained only on new 200-simulation games, not the old 100-sim
+  replay buffer.
+- The finalizer uses the standard `100`-simulation eval/tactical checks for
+  comparability with earlier dashboards; the training self-play itself is the
+  part changed to `200`.
