@@ -71,6 +71,13 @@ Source labels:
   - Cutoff log:
     `/root/diamondgo/artifacts/multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605/cutoff-after-1h.log`
   - Data reference: `docs/training-data-log.md#score-komi-continuation-cycles-857`
+- `Technical operation`: The `score_komi=6.5` continuation was stopped early
+  after the user flagged that White win rate looked too high. The follow-up
+  run resumes from the stopped latest checkpoint, keeps model-input `komi=0.5`,
+  and changes terminal scoring/value labels to `score_komi=2.5`.
+  - Training script: `tools/server/run_resume_scorekomi25_1h.sh`
+  - Finalizer script: `tools/server/finalize_scorekomi25_1h.sh`
+  - Data reference: `docs/training-data-log.md#score-komi-25-continuation-cycles-1065`
 - `Technical operation`: Built a dedicated single-game viewer for qualitative
   checkpoint inspection:
   - `artifacts/selfplay-showcase-swing-760-830-20260605/viewer.html`
@@ -117,6 +124,13 @@ Source labels:
   about `859` onward. This should be interpreted as a rule-label shock /
   adaptation signal, not as a clean strength improvement.
   - Main checkpoint range so far: `857-871`
+  - Data reference: `docs/training-data-log.md#score-komi-continuation-cycles-857`
+- `User observation`: During the active `score_komi=6.5` continuation, White
+  win rate looked too high. Late-cycle measurements confirmed this: cycles
+  `1059-1064` all had White win rate above `90%`, with cycle `1064` at `31/32`
+  White wins.
+  - Technical response: stop the `score_komi=6.5` run and start a
+    `score_komi=2.5` continuation.
   - Data reference: `docs/training-data-log.md#score-komi-continuation-cycles-857`
 
 ### Tests Still Needed

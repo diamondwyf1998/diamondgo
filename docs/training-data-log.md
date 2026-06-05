@@ -15,6 +15,7 @@ file should reference sections in this file instead of duplicating all numbers.
 | Optimized 120-move run | 700-856 | `multiworker-9x9-100sims-120moves-opt-v2-5h-20260605` | 120 | `komi=0.5` in sampled traces | Main color-swing run. |
 | Komi split work | after source commits `3da7d3a`, `f37bd46` | source tree, smoke artifacts | 120 default | `komi=0.5`, `score_komi=6.5` | Some work done by another agent. Legacy checkpoints may not include `score_komi`. |
 | Score-komi continuation | 857+ | `multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605` | 120 | model-input `komi=0.5`, scoring `score_komi=6.5` | Resumed old 0.5-komi checkpoint weights/optimizer, but rebuilt replay from new self-play. |
+| Reduced score-komi continuation | 1065+ | `multiworker-9x9-resume0p5-score2p5-100sims-120moves-1h-20260605` | 120 | model-input `komi=0.5`, scoring `score_komi=2.5` | Started after `score_komi=6.5` produced persistent White win rate above 90%. |
 
 ## Training Hyperparameters And Runtime Config
 
@@ -60,7 +61,8 @@ Run-specific differences:
 | `multiworker-9x9-100sims-160moves-5h-20260605` | 300 min | continuation from earlier sequence | 160 | `komi=0.5` | Longer-game experiment. |
 | `multiworker-9x9-100sims-120moves-opt-v2-5h-20260605` | 300 min | continuation from earlier sequence | 120 | `komi=0.5` | Main 700-856 color-swing run. |
 | `multiworker-9x9-komi6p5-100sims-120moves-2h-20260605` | 120 min | none | 120 | old style `komi=6.5` | Brief fresh run, stopped after realizing `komi` changes model input. |
-| `multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605` | 120 min, then queued +120 min extension, later cut to about +60 min from 21:42 CST | `multiworker-9x9-100sims-120moves-opt-v2-5h-20260605/latest.pt`; extension resumes the same run's `latest.pt` | 120 | model-input `komi=0.5`, scoring `score_komi=6.5` | Active continuation; old replay buffer is not restored. The extension also rebuilds replay after its resume boundary. |
+| `multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605` | 120 min, then queued +120 min extension, stopped early at about 21:52 CST | `multiworker-9x9-100sims-120moves-opt-v2-5h-20260605/latest.pt`; extension resumes the same run's `latest.pt` | 120 | model-input `komi=0.5`, scoring `score_komi=6.5` | Stopped because White self-play win rate stayed above 90%. Old replay buffer is not restored. The extension also rebuilt replay after its resume boundary. |
+| `multiworker-9x9-resume0p5-score2p5-100sims-120moves-1h-20260605` | 60 min | `multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605/latest.pt` | 120 | model-input `komi=0.5`, scoring `score_komi=2.5` | Follow-up to test whether reducing scoring komi pulls back the White win-rate skew. |
 
 Evaluation and probe defaults:
 
@@ -151,7 +153,8 @@ training PID to finish, resumes the run's latest checkpoint, trains for another
 120 minutes, then runs the final eval suite and tactical probes. After the
 extension started, it had about 91 minutes remaining at 21:41 CST, so a cutoff
 watcher was added at 21:42 CST to stop training about one hour later and run the
-same final eval/tactical probes.
+same final eval/tactical probes. Before that cutoff time, the run was stopped
+manually because White self-play win rate remained above 90%.
 
 Early measured cycles while the run was still active:
 
@@ -174,6 +177,51 @@ Early measured cycles while the run was still active:
 | 871 | 2 | 30 | 6.2% | -16.09 | 7.75% | 94.34 |
 | 872 | 0 | 32 | 0.0% | -17.91 | 8.34% | 91.09 |
 | 873 | 2 | 30 | 6.2% | -15.62 | 8.41% | 94.44 |
+
+Late cycles before stopping the `score_komi=6.5` continuation:
+
+| Cycle | Black wins | White wins | Black win rate | White win rate | Mean Black margin |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1059 | 3 | 29 | 9.4% | 90.6% | -15.50 |
+| 1060 | 2 | 30 | 6.2% | 93.8% | -13.91 |
+| 1061 | 1 | 31 | 3.1% | 96.9% | -12.78 |
+| 1062 | 2 | 30 | 6.2% | 93.8% | -12.75 |
+| 1063 | 3 | 29 | 9.4% | 90.6% | -13.84 |
+| 1064 | 1 | 31 | 3.1% | 96.9% | -14.47 |
+
+## Score-Komi 2.5 Continuation, Cycles 1065+
+
+Source artifacts:
+
+- Training script:
+  `tools/server/run_resume_scorekomi25_1h.sh`
+- Server launcher:
+  `/root/diamondgo/run_resume_scorekomi25_1h.sh`
+- Training run:
+  `/root/diamondgo/artifacts/multiworker-9x9-resume0p5-score2p5-100sims-120moves-1h-20260605`
+- Finalizer script:
+  `tools/server/finalize_scorekomi25_1h.sh`
+- Final evaluation output:
+  `/root/diamondgo/artifacts/eval-suite-resume0p5-score2p5-100sims-120moves-1h-20260605`
+- Final tactical output:
+  `/root/diamondgo/artifacts/tactical-resume0p5-score2p5-100sims-120moves-1h-20260605`
+
+This follow-up resumes the latest weights after stopping the `score_komi=6.5`
+run. It keeps the model-input komi plane at `komi=0.5` and changes only terminal
+scoring/value labels to `score_komi=2.5`.
+
+Initial cycles after the switch still show strong White skew; this is expected
+to be slow to correct because the weights come from the White-favored state.
+
+| Cycle | Black wins | White wins | Black win rate | White win rate | Mean Black margin |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1065 | 1 | 31 | 3.1% | 96.9% | -11.41 |
+| 1066 | 3 | 29 | 9.4% | 90.6% | -10.84 |
+| 1067 | 2 | 30 | 6.2% | 93.8% | -11.66 |
+| 1068 | 5 | 27 | 15.6% | 84.4% | -8.44 |
+| 1069 | 2 | 30 | 6.2% | 93.8% | -12.22 |
+| 1070 | 3 | 29 | 9.4% | 90.6% | -15.22 |
+| 1071 | 1 | 31 | 3.1% | 96.9% | -11.19 |
 
 ## Center 5x5 Opening Distribution
 
