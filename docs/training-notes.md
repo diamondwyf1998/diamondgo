@@ -57,6 +57,13 @@ Source labels:
   - Run reference:
     `artifacts/multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605`
   - Data reference: `docs/training-data-log.md#score-komi-continuation-cycles-857`
+- `Technical operation`: The score-komi continuation was extended by another
+  two hours. The original training Python process is allowed to finish
+  naturally; a watcher then resumes the run's latest checkpoint for another
+  120 minutes and runs the final eval/tactical probes after the extension.
+  - Extension script:
+    `/root/diamondgo/extend_resume_scorekomi65_2h.sh`
+  - Data reference: `docs/training-data-log.md#score-komi-continuation-cycles-857`
 - `Technical operation`: Built a dedicated single-game viewer for qualitative
   checkpoint inspection:
   - `artifacts/selfplay-showcase-swing-760-830-20260605/viewer.html`
