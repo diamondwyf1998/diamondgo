@@ -5,6 +5,20 @@ operations. Keep only important facts, phenomena, and next actions here. Put
 large tables and raw measurements in `docs/training-data-log.md`, then reference
 them from this file.
 
+Human-readable record rule:
+
+- Notes are for people first. They should help a reader understand what
+  happened, why it matters, what to inspect next, and where the supporting data
+  lives.
+- Do not turn this file into a raw dump. Put large tables, metric snapshots,
+  and artifact inventories in `docs/training-data-log.md`.
+- For qualitative claims about games, tests, shapes, tactical probes, or search
+  behavior, prefer a human-inspectable artifact such as an HTML viewer, SGF,
+  rendered board/casebook, screenshot, or dashboard. JSON alone is not enough
+  when a person needs to judge the position.
+- If an artifact is meant to support a visual claim, include the exact
+  checkpoint/cycle and a link/path to the rendered view.
+
 Source labels:
 
 - `User observation`: qualitative reading or hypothesis first raised by the

@@ -24,6 +24,19 @@ This file records coordination notes for Codex agents working on DiamondGo.
 - Training-loop changes, MCTS performance work, and multi-worker training changes are owned by the training agent unless the user explicitly transfers that work.
 - Before editing, run `git status --short` and avoid overwriting uncommitted work from another agent.
 
+## Human-Readable Records
+
+- `docs/training-notes.md` is for people first. Keep it readable: important
+  phenomena, operations, interpretations, next actions, and pointers to evidence.
+- Put raw tables, metric snapshots, artifact inventories, and checkpoint lists in
+  `docs/training-data-log.md`, then reference them from the notes.
+- Visual/qualitative claims should point to human-inspectable artifacts. For
+  games and tactical tests, prefer SGF, HTML viewers, rendered boards/casebooks,
+  screenshots, or dashboards in addition to JSON.
+- When adding a tactical probe or board-reading claim, include the checkpoint or
+  cycle and a rendered artifact path so a human can inspect whether the case is
+  meaningful.
+
 ## Evaluation Dashboard
 
 `src/diamondgo/eval_checkpoints.py` writes these files during evaluation:
