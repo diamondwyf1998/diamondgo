@@ -54,8 +54,8 @@ Planned core settings:
 | Input planes | `3`: own stones, opponent stones, side-to-play plane |
 | `input_komi` | `False`, via `--no-input-komi` |
 | Residual blocks | `4` |
-| Channels | likely `32`, unless the next server budget allows raising to `64` |
-| Scoring komi | still needs an explicit choice before launch |
+| Channels | planned discussion item: `32` depth-only control vs `64` wider model |
+| Scoring komi | planned discussion item; actual launched value was `2.5` |
 | Max moves | likely `120` |
 | MCTS simulations | likely `100` |
 | Workers | tune to new CPU host; expected target `16` workers on a 16-core EPYC host, then benchmark |
@@ -79,6 +79,12 @@ Open launch decisions:
 - Run a short smoke test before committing to a long server run:
   `--residual-blocks 4 --no-input-komi`, a few cycles, then tactical probes and
   a small self-play viewer sample.
+
+Launch deviation to remember:
+
+- The launched run used `channels=64`, not a depth-only `channels=32` control.
+- This should have been reported explicitly in chat before launch because it
+  changes model size by far more than the `2 -> 4` residual-block change alone.
 
 Common self-play/training settings for the main multi-worker server runs:
 
@@ -113,6 +119,25 @@ New experimental knobs added after the komi-skew investigation:
 | `temperature_moves` | Number of opening moves using main sampling temperature | `0` | `16` |
 | `late_temperature` | Sampling temperature after `temperature_moves` | `1.0` | `0.25` |
 | `augment_dihedral` | Random rotations/reflections during replay training | `false` | `true` |
+
+## Model Size Comparison
+
+Parameter counts measured from `PolicyValueNet(9, ModelConfig(...))`:
+
+| Model | Input planes | Channels | Residual blocks | Trainable parameters | Ratio vs old 32x2 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Old main model | 4 | 32 | 2 | `54,461` | `1.00x` |
+| Depth-only control target | 3 | 32 | 4 | about `91k` | about `1.7x` |
+| Current fresh 4x64 | 3 | 64 | 4 | `316,669` | `5.82x` |
+
+Important interpretation:
+
+- The current fresh run changed both depth and width.
+- Channel width increases convolution parameters roughly with `channels^2`, so
+  `32 -> 64` is much larger than a linear `2x` change.
+- The intended depth-only comparison should use `32 channels x 4 residual
+  blocks`, with the same no-komi-input/root-noise/temperature/augmentation
+  tricks, before claiming the benefit of the larger `64x4` network.
 
 Run-specific differences:
 

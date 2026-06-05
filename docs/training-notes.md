@@ -96,6 +96,17 @@ Source labels:
   - Training script:
     `tools/server/run_fresh_nokomi_4x64_score2p5_noise_aug_2h.sh`
   - Data reference: `docs/training-data-log.md#fresh-no-komi-input-4x64-run`
+- `Technical operation`: The `4x64` fresh run changed both depth and width:
+  residual blocks increased `2 -> 4`, and channels increased `32 -> 64`.
+  This raised trainable parameters from `54,461` to `316,669`, about `5.82x`,
+  not the roughly `2x` change expected from increasing depth alone. This should
+  have been reported explicitly before launch.
+  - Communication rule: before future training starts, report every important
+    changed hyperparameter in the chat, especially model size, parameter count,
+    search count, scoring komi, input planes, and exploration/training tricks.
+  - Control follow-up: run a `32 channels x 4 residual blocks` no-komi-input
+    variant with the same non-model tricks to isolate the effect of depth.
+  - Data reference: `docs/training-data-log.md#model-size-comparison`
 - `Technical operation`: We are preparing a fresh retraining run rather than
   another continuation. The intended direction is to make the model a little
   larger and remove komi from the input features.
