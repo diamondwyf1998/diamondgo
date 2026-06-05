@@ -155,6 +155,9 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
     states = [make_rules(config) for _ in range(config.games)]
     active = [True for _ in states]
     move_counts = [0 for _ in states]
+    pass_counts = [0 for _ in states]
+    capture_move_counts = [0 for _ in states]
+    captured_stone_counts = [0 for _ in states]
     examples: list[dict[str, object]] = []
     stats: dict[str, object] = {"network_calls": 0, "network_seconds": 0.0, "batch_sizes": []}
 
@@ -176,7 +179,11 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
             features = state.encode()
             policy = root.policy_target(state.action_size, config.temperature)
             action = int(np.random.choice(np.arange(state.action_size), p=policy))
+            stones_before = _stone_counts(state)
             move_counts[state_index] += 1
+            is_pass = action == state.action_size - 1
+            if is_pass:
+                pass_counts[state_index] += 1
             examples.append(
                 {
                     "features": features,
@@ -188,17 +195,40 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
                     "game": state_index + 1,
                     "move_in_game": move_counts[state_index],
                     "chosen_move": action_to_gtp(action, config.board_size),
+                    "is_pass": is_pass,
                 }
             )
             state.play_action(action)
+            captures = _captures_for_move(player, stones_before, _stone_counts(state))
+            examples[-1]["captures"] = captures
+            if captures > 0:
+                capture_move_counts[state_index] += 1
+                captured_stone_counts[state_index] += captures
             if state.is_terminal() or move_counts[state_index] >= config.max_moves:
                 active[state_index] = False
 
     terminal_values_by_game = {}
+    game_summaries = []
     for game_index, state in enumerate(states, start=1):
         value_for_to_play = float(state.terminal_value())
         terminal_values_by_game[(game_index, state.to_play)] = value_for_to_play
         terminal_values_by_game[(game_index, "w" if state.to_play == "b" else "b")] = -value_for_to_play
+        black_margin = _black_score_margin(state)
+        winner = "b" if black_margin > 0 else "w"
+        ended_by_pass = bool(state.is_terminal())
+        game_summaries.append(
+            {
+                "game": game_index,
+                "moves": move_counts[game_index - 1],
+                "ended_by": "pass" if ended_by_pass else "max_moves",
+                "passes": pass_counts[game_index - 1],
+                "capture_moves": capture_move_counts[game_index - 1],
+                "captured_stones": captured_stone_counts[game_index - 1],
+                "black_score_margin": round(black_margin, 3),
+                "winner": winner,
+                "to_play_at_end": state.to_play,
+            }
+        )
 
     for example in examples:
         example["value_target"] = terminal_values_by_game[(int(example["game"]), example["player"])]
@@ -206,7 +236,42 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
     stats["average_batch_size"] = round(float(np.mean(batch_sizes)), 3) if batch_sizes else 0.0
     stats["max_batch_size"] = int(max(batch_sizes)) if batch_sizes else 0
     stats["network_seconds"] = round(float(stats.get("network_seconds", 0.0)), 3)
+    stats["game_summaries"] = game_summaries
     return examples, stats
+
+
+def _stone_counts(state: object) -> dict[str, int]:
+    board = getattr(state, "board", None)
+    size = int(getattr(state, "size"))
+    counts = {"b": 0, "w": 0}
+    if board is None:
+        return counts
+    get = getattr(board, "get", None)
+    if get is not None:
+        for row in range(size):
+            for col in range(size):
+                colour = get(row, col)
+                if colour in counts:
+                    counts[colour] += 1
+        return counts
+    array = np.asarray(board)
+    counts["b"] = int((array == 1).sum())
+    counts["w"] = int((array == -1).sum())
+    return counts
+
+
+def _captures_for_move(player: str, before: dict[str, int], after: dict[str, int]) -> int:
+    opponent = "w" if player == "b" else "b"
+    return max(0, int(before.get(opponent, 0)) - int(after.get(opponent, 0)))
+
+
+def _black_score_margin(state: object) -> float:
+    board = getattr(state, "board", None)
+    komi = float(getattr(state, "komi"))
+    area_score = getattr(board, "area_score", None)
+    if area_score is not None:
+        return float(area_score()) - komi
+    return float(np.asarray(board).sum()) - komi
 
 
 def run(config: BatchedConfig, sgf_path: str, trace_path: str, dashboard_path: str, overview_svg_path: str) -> dict[str, object]:

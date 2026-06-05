@@ -169,6 +169,11 @@ def summarize_cycle(
 ) -> dict[str, object]:
     policies = [np.asarray(item["policy"], dtype=np.float32) for item in examples]
     entropies = [float(-(policy * np.log(np.clip(policy, 1e-9, 1.0))).sum()) for policy in policies]
+    game_summaries = [
+        game
+        for worker in worker_summaries
+        for game in list(worker["selfplay"].get("game_summaries", []))
+    ]
     network_seconds = sum(float(item["selfplay"].get("network_seconds", 0.0)) for item in worker_summaries)
     network_calls = sum(int(item["selfplay"].get("network_calls", 0)) for item in worker_summaries)
     weighted_batch_total = sum(
@@ -193,6 +198,7 @@ def summarize_cycle(
         "value_target_mean": round(float(np.mean([item["value_target"] for item in examples])), 4)
         if examples
         else 0.0,
+        "game_behavior": summarize_game_behavior(game_summaries, examples),
         "selfplay": {
             "summed_network_seconds": round(network_seconds, 3),
             "summed_network_calls": network_calls,
@@ -212,6 +218,33 @@ def summarize_cycle(
             }
             for item in worker_summaries
         ],
+    }
+
+
+def summarize_game_behavior(
+    game_summaries: list[dict[str, object]], examples: list[dict[str, object]]
+) -> dict[str, object]:
+    moves = [int(item["moves"]) for item in game_summaries]
+    pass_moves = sum(int(item.get("passes", 0)) for item in game_summaries)
+    capture_moves = sum(int(item.get("capture_moves", 0)) for item in game_summaries)
+    captured_stones = sum(int(item.get("captured_stones", 0)) for item in game_summaries)
+    margins = [abs(float(item.get("black_score_margin", 0.0))) for item in game_summaries]
+    black_wins = sum(1 for item in game_summaries if item.get("winner") == "b")
+    return {
+        "games": len(game_summaries),
+        "ended_by_pass": sum(1 for item in game_summaries if item.get("ended_by") == "pass"),
+        "ended_by_max_moves": sum(1 for item in game_summaries if item.get("ended_by") == "max_moves"),
+        "moves_mean": round(float(np.mean(moves)), 3) if moves else 0.0,
+        "moves_max": max(moves) if moves else 0,
+        "pass_moves": pass_moves,
+        "pass_move_fraction": round(pass_moves / max(len(examples), 1), 4),
+        "capture_moves": capture_moves,
+        "captured_stones": captured_stones,
+        "capture_move_fraction": round(capture_moves / max(len(examples), 1), 4),
+        "black_wins": black_wins,
+        "white_wins": len(game_summaries) - black_wins,
+        "abs_score_margin_mean": round(float(np.mean(margins)), 3) if margins else 0.0,
+        "per_game": game_summaries,
     }
 
 

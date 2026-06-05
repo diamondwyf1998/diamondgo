@@ -256,6 +256,8 @@ def build_trace(config: CpuDemoConfig, examples: list[dict[str, object]]) -> dic
                 "value_target": example["value_target"],
                 "policy_entropy": round(entropy, 4),
                 "top_actions": example["top_actions"],
+                "is_pass": bool(example.get("is_pass", False)),
+                "captures": int(example.get("captures", 0)),
             }
         )
     return {"config": asdict(config), "moves": moves}
@@ -287,7 +289,11 @@ def write_sgf(path: str | Path, config: CpuDemoConfig, examples: list[dict[str, 
 
 
 def _format_comment(example: dict[str, object]) -> str:
-    lines = [f"root_value: {example['root_value']}", "top actions:"]
+    lines = [
+        f"root_value: {example['root_value']}",
+        f"captures: {int(example.get('captures', 0))}",
+        "top actions:",
+    ]
     for action in example["top_actions"]:
         lines.append(
             f"- {action['move']}: visits={action['visits']} "
