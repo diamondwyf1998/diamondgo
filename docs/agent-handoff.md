@@ -69,3 +69,19 @@ The latest source migration artifacts on the server are:
 - `/root/autodl-tmp/diamondgo-migration/diamondgo-source.tar.gz`
 
 Regenerate these after important source commits if the user may switch servers.
+
+## Server Expiration Reminder
+
+- The current rented server is expected to expire tomorrow relative to the
+  2026-06-06 overnight run.
+- Before the server expires, upload all source, scripts, notes, and compact
+  result summaries to GitHub.
+- Do not assume large training artifacts are safely stored just because the
+  source is pushed. Checkpoints, generated dashboards, SGFs, JSON traces, and
+  monitor logs should be inventoried and either:
+  - compressed into a migration/download bundle, or
+  - uploaded through an explicit large-artifact path such as Git LFS or GitHub
+    Releases.
+- At minimum, preserve the final `latest.pt`, selected checkpoint snapshots,
+  `train.log`, `metrics.jsonl`, `gpu_monitor.csv`, eval/tactical reports, and
+  the human-readable notes that point to them.
