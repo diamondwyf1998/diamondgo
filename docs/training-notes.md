@@ -84,6 +84,33 @@ Source labels:
   - Preserved server path:
     `/root/diamondgo/artifacts/multiworker-9x9-resume0p5-score2p5-100sims-120moves-1h-20260605`
   - Data reference: `docs/training-data-log.md#score-komi-25-continuation-cycles-1065`
+- `Technical operation`: Started a fresh-from-zero design for the next run
+  after reviewing AlphaGo Zero / Leela Zero / KataGo-style implementation
+  choices. The next run removes the constant komi input plane, increases the
+  network to `64 channels x 4 residual blocks`, adds root Dirichlet exploration
+  noise, uses a late-game temperature drop, and trains with random board
+  symmetries.
+  - Reason: fixed-komi input was acting as a constant feature in our 9x9 setup,
+    while stronger public implementations either use color/history planes or a
+    richer rules/score feature system.
+  - Training script:
+    `tools/server/run_fresh_nokomi_4x64_score2p5_noise_aug_2h.sh`
+  - Data reference: `docs/training-data-log.md#fresh-no-komi-input-4x64-run`
+- `Technical operation`: We are preparing a fresh retraining run rather than
+  another continuation. The intended direction is to make the model a little
+  larger and remove komi from the input features.
+  - Planned model change: `residual_blocks=4`.
+  - Planned input change: use `--no-input-komi`, so the network sees only own
+    stones, opponent stones, and side-to-play.
+  - Important: this cannot resume old checkpoints, because old checkpoints were
+    trained with a 4-plane input stem and `--no-input-komi` changes the stem to
+    3 planes. Start from scratch unless a conversion experiment is deliberately
+    designed.
+  - Current working-tree support: `input_komi` config plumbing exists across
+    rules, self-play, training, eval, and tactical eval; root policy
+    temperature/noise and dihedral augmentation knobs are also being added.
+  - Data reference:
+    `docs/training-data-log.md#planned-fresh-retraining-config`
 - `Technical operation`: Built a dedicated single-game viewer for qualitative
   checkpoint inspection:
   - `artifacts/selfplay-showcase-swing-760-830-20260605/viewer.html`
@@ -144,6 +171,11 @@ Source labels:
   - Interpretation: the inherited policy/value state matters; just changing
     terminal scoring labels midstream is not enough for a quick correction.
   - Data reference: `docs/training-data-log.md#score-komi-25-continuation-cycles-1065`
+- `Hypothesis`: The previous weak behavior may be partly from representation
+  and self-play noise, not only from scoring komi. A constant komi plane gives
+  the network a feature that cannot explain position differences inside a fixed
+  experiment, and `temperature=1.0` for the whole game may keep late-game play
+  too random. The fresh 4x64 run is meant to test this directly.
 
 ### Tests Still Needed
 

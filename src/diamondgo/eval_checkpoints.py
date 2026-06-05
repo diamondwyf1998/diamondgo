@@ -24,6 +24,7 @@ class MatchConfig:
     board_size: int = 9
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
+    input_komi: bool = True
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 32
@@ -69,6 +70,7 @@ def config_from_payload(payload: dict[str, object], device: str, simulations: in
         board_size=int(raw.get("board_size", 9)),
         komi=float(raw.get("komi", DEFAULT_9X9_KOMI)),
         score_komi=float(raw.get("score_komi", raw.get("komi", DEFAULT_9X9_SCORE_KOMI))),
+        input_komi=bool(raw.get("input_komi", True)),
         channels=int(raw.get("channels", 32)),
         residual_blocks=int(raw.get("residual_blocks", 2)),
         simulations=simulations,
@@ -85,6 +87,7 @@ def make_eval_model(config: MatchConfig) -> PolicyValueNet:
     model = PolicyValueNet(
         board_size=config.board_size,
         config=ModelConfig(channels=config.channels, residual_blocks=config.residual_blocks),
+        input_planes=4 if config.input_komi else 3,
     )
     model.to(torch.device(config.device))
     model.eval()
@@ -171,6 +174,7 @@ def batched_config(config: MatchConfig, active_games: int) -> BatchedConfig:
         board_size=config.board_size,
         komi=config.komi,
         score_komi=config.score_komi,
+        input_komi=config.input_komi,
         channels=config.channels,
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,

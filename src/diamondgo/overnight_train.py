@@ -21,6 +21,7 @@ class OvernightConfig:
     board_size: int = 9
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
+    input_komi: bool = True
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 64
@@ -33,6 +34,12 @@ class OvernightConfig:
     weight_decay: float = 1e-4
     c_puct: float = 1.5
     temperature: float = 1.0
+    temperature_moves: int = 0
+    late_temperature: float = 1.0
+    root_dirichlet_alpha: float = 0.0
+    root_noise_fraction: float = 0.0
+    root_policy_temperature: float = 1.0
+    augment_dihedral: bool = False
     seed: int = 1
     device: str = "cuda"
     rules_backend: str = "sgfmill"
@@ -49,6 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--games-per-cycle", type=int, default=OvernightConfig.games_per_cycle)
     parser.add_argument("--komi", type=float, default=OvernightConfig.komi)
     parser.add_argument("--score-komi", type=float, default=OvernightConfig.score_komi)
+    parser.add_argument("--input-komi", action=argparse.BooleanOptionalAction, default=OvernightConfig.input_komi)
     parser.add_argument("--max-moves", type=int, default=OvernightConfig.max_moves)
     parser.add_argument("--simulations", type=int, default=OvernightConfig.simulations)
     parser.add_argument("--train-steps-per-cycle", type=int, default=OvernightConfig.train_steps_per_cycle)
@@ -58,6 +66,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--residual-blocks", type=int, default=OvernightConfig.residual_blocks)
     parser.add_argument("--learning-rate", type=float, default=OvernightConfig.learning_rate)
     parser.add_argument("--weight-decay", type=float, default=OvernightConfig.weight_decay)
+    parser.add_argument("--c-puct", type=float, default=OvernightConfig.c_puct)
+    parser.add_argument("--temperature", type=float, default=OvernightConfig.temperature)
+    parser.add_argument("--root-dirichlet-alpha", type=float, default=OvernightConfig.root_dirichlet_alpha)
+    parser.add_argument("--root-noise-fraction", type=float, default=OvernightConfig.root_noise_fraction)
+    parser.add_argument("--root-policy-temperature", type=float, default=OvernightConfig.root_policy_temperature)
+    parser.add_argument("--temperature-moves", type=int, default=OvernightConfig.temperature_moves)
+    parser.add_argument("--late-temperature", type=float, default=OvernightConfig.late_temperature)
+    parser.add_argument("--augment-dihedral", action="store_true", default=OvernightConfig.augment_dihedral)
     parser.add_argument("--seed", type=int, default=OvernightConfig.seed)
     parser.add_argument("--device", default=OvernightConfig.device)
     parser.add_argument("--rules", choices=["simple", "sgfmill"], default=OvernightConfig.rules_backend)
@@ -72,6 +88,7 @@ def make_selfplay_config(config: OvernightConfig, seed: int) -> BatchedConfig:
         board_size=config.board_size,
         komi=config.komi,
         score_komi=config.score_komi,
+        input_komi=config.input_komi,
         channels=config.channels,
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,
@@ -82,6 +99,11 @@ def make_selfplay_config(config: OvernightConfig, seed: int) -> BatchedConfig:
         learning_rate=config.learning_rate,
         c_puct=config.c_puct,
         temperature=config.temperature,
+        temperature_moves=config.temperature_moves,
+        late_temperature=config.late_temperature,
+        root_dirichlet_alpha=config.root_dirichlet_alpha,
+        root_noise_fraction=config.root_noise_fraction,
+        root_policy_temperature=config.root_policy_temperature,
         seed=seed,
         device=config.device,
         rules_backend=config.rules_backend,
@@ -94,14 +116,16 @@ def train_from_replay(
     replay: list[dict[str, object]],
     steps: int,
     batch_size: int,
+    augment_dihedral: bool = False,
 ) -> list[dict[str, float]]:
     model.train()
     device = next(model.parameters()).device
     history: list[dict[str, float]] = []
     for step in range(1, steps + 1):
         batch = [random.choice(replay) for _ in range(min(batch_size, len(replay)))]
-        features = torch.tensor(np.stack([item["features"] for item in batch]), dtype=torch.float32).to(device)
-        policy_targets = torch.tensor(np.stack([item["policy"] for item in batch]), dtype=torch.float32).to(device)
+        features_np, policies_np = prepare_training_batch(batch, augment_dihedral)
+        features = torch.tensor(features_np, dtype=torch.float32).to(device)
+        policy_targets = torch.tensor(policies_np, dtype=torch.float32).to(device)
         value_targets = torch.tensor([item["value_target"] for item in batch], dtype=torch.float32).to(device)
 
         optimizer.zero_grad(set_to_none=True)
@@ -121,6 +145,45 @@ def train_from_replay(
         )
     model.eval()
     return history
+
+
+def prepare_training_batch(
+    batch: list[dict[str, object]],
+    augment_dihedral: bool,
+) -> tuple[np.ndarray, np.ndarray]:
+    features_rows = []
+    policy_rows = []
+    for item in batch:
+        features = np.asarray(item["features"], dtype=np.float32)
+        policy = np.asarray(item["policy"], dtype=np.float32)
+        if augment_dihedral:
+            transform = random.randrange(8)
+            features, policy = apply_dihedral_transform(features, policy, transform)
+        features_rows.append(features)
+        policy_rows.append(policy)
+    return np.stack(features_rows), np.stack(policy_rows)
+
+
+def apply_dihedral_transform(
+    features: np.ndarray,
+    policy: np.ndarray,
+    transform: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    board_size = int(features.shape[-1])
+    rotations = transform % 4
+    flip = transform >= 4
+
+    transformed_features = np.rot90(features, k=rotations, axes=(-2, -1))
+    board_policy = policy[:-1].reshape(board_size, board_size)
+    transformed_policy_board = np.rot90(board_policy, k=rotations, axes=(0, 1))
+    if flip:
+        transformed_features = np.flip(transformed_features, axis=-1)
+        transformed_policy_board = np.flip(transformed_policy_board, axis=-1)
+
+    transformed_policy = np.concatenate(
+        [transformed_policy_board.reshape(-1), policy[-1:]],
+    ).astype(np.float32)
+    return np.ascontiguousarray(transformed_features), np.ascontiguousarray(transformed_policy)
 
 
 def save_checkpoint(
@@ -244,6 +307,7 @@ def run(config: OvernightConfig, out_dir: Path, resume: str = "") -> dict[str, o
             replay=replay,
             steps=config.train_steps_per_cycle,
             batch_size=config.batch_size,
+            augment_dihedral=config.augment_dihedral,
         )
         total_train_steps += len(train_history)
 
@@ -306,6 +370,7 @@ def main() -> None:
         simulations=args.simulations,
         komi=args.komi,
         score_komi=args.score_komi,
+        input_komi=args.input_komi,
         games_per_cycle=args.games_per_cycle,
         max_moves=args.max_moves,
         train_steps_per_cycle=args.train_steps_per_cycle,
@@ -313,6 +378,14 @@ def main() -> None:
         replay_size=args.replay_size,
         learning_rate=args.learning_rate,
         weight_decay=args.weight_decay,
+        c_puct=args.c_puct,
+        temperature=args.temperature,
+        temperature_moves=args.temperature_moves,
+        late_temperature=args.late_temperature,
+        root_dirichlet_alpha=args.root_dirichlet_alpha,
+        root_noise_fraction=args.root_noise_fraction,
+        root_policy_temperature=args.root_policy_temperature,
+        augment_dihedral=args.augment_dihedral,
         seed=args.seed,
         device=args.device,
         rules_backend=args.rules,

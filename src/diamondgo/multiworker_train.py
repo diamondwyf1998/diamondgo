@@ -29,6 +29,7 @@ class MultiWorkerConfig:
     board_size: int = 9
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
+    input_komi: bool = True
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 100
@@ -42,6 +43,12 @@ class MultiWorkerConfig:
     weight_decay: float = 1e-4
     c_puct: float = 1.5
     temperature: float = 1.0
+    temperature_moves: int = 0
+    late_temperature: float = 1.0
+    root_dirichlet_alpha: float = 0.0
+    root_noise_fraction: float = 0.0
+    root_policy_temperature: float = 1.0
+    augment_dihedral: bool = False
     seed: int = 1
     device: str = "cuda"
     rules_backend: str = "sgfmill"
@@ -60,6 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--games-per-worker", type=int, default=MultiWorkerConfig.games_per_worker)
     parser.add_argument("--komi", type=float, default=MultiWorkerConfig.komi)
     parser.add_argument("--score-komi", type=float, default=MultiWorkerConfig.score_komi)
+    parser.add_argument("--input-komi", action=argparse.BooleanOptionalAction, default=MultiWorkerConfig.input_komi)
     parser.add_argument("--max-moves", type=int, default=MultiWorkerConfig.max_moves)
     parser.add_argument("--simulations", type=int, default=MultiWorkerConfig.simulations)
     parser.add_argument("--train-steps-per-cycle", type=int, default=MultiWorkerConfig.train_steps_per_cycle)
@@ -69,6 +77,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--residual-blocks", type=int, default=MultiWorkerConfig.residual_blocks)
     parser.add_argument("--learning-rate", type=float, default=MultiWorkerConfig.learning_rate)
     parser.add_argument("--weight-decay", type=float, default=MultiWorkerConfig.weight_decay)
+    parser.add_argument("--c-puct", type=float, default=MultiWorkerConfig.c_puct)
+    parser.add_argument("--temperature", type=float, default=MultiWorkerConfig.temperature)
+    parser.add_argument("--root-dirichlet-alpha", type=float, default=MultiWorkerConfig.root_dirichlet_alpha)
+    parser.add_argument("--root-noise-fraction", type=float, default=MultiWorkerConfig.root_noise_fraction)
+    parser.add_argument("--root-policy-temperature", type=float, default=MultiWorkerConfig.root_policy_temperature)
+    parser.add_argument("--temperature-moves", type=int, default=MultiWorkerConfig.temperature_moves)
+    parser.add_argument("--late-temperature", type=float, default=MultiWorkerConfig.late_temperature)
+    parser.add_argument("--augment-dihedral", action="store_true", default=MultiWorkerConfig.augment_dihedral)
     parser.add_argument("--seed", type=int, default=MultiWorkerConfig.seed)
     parser.add_argument("--device", default=MultiWorkerConfig.device)
     parser.add_argument("--rules", choices=["simple", "sgfmill"], default=MultiWorkerConfig.rules_backend)
@@ -82,6 +98,7 @@ def to_overnight_config(config: MultiWorkerConfig) -> OvernightConfig:
         board_size=config.board_size,
         komi=config.komi,
         score_komi=config.score_komi,
+        input_komi=config.input_komi,
         channels=config.channels,
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,
@@ -94,6 +111,12 @@ def to_overnight_config(config: MultiWorkerConfig) -> OvernightConfig:
         weight_decay=config.weight_decay,
         c_puct=config.c_puct,
         temperature=config.temperature,
+        temperature_moves=config.temperature_moves,
+        late_temperature=config.late_temperature,
+        root_dirichlet_alpha=config.root_dirichlet_alpha,
+        root_noise_fraction=config.root_noise_fraction,
+        root_policy_temperature=config.root_policy_temperature,
+        augment_dihedral=config.augment_dihedral,
         seed=config.seed,
         device=config.device,
         rules_backend=config.rules_backend,
@@ -108,6 +131,7 @@ def make_selfplay_config(config: MultiWorkerConfig, seed: int) -> BatchedConfig:
         board_size=config.board_size,
         komi=config.komi,
         score_komi=config.score_komi,
+        input_komi=config.input_komi,
         channels=config.channels,
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,
@@ -118,6 +142,11 @@ def make_selfplay_config(config: MultiWorkerConfig, seed: int) -> BatchedConfig:
         learning_rate=config.learning_rate,
         c_puct=config.c_puct,
         temperature=config.temperature,
+        temperature_moves=config.temperature_moves,
+        late_temperature=config.late_temperature,
+        root_dirichlet_alpha=config.root_dirichlet_alpha,
+        root_noise_fraction=config.root_noise_fraction,
+        root_policy_temperature=config.root_policy_temperature,
         seed=seed,
         device=config.device,
         rules_backend=config.rules_backend,
@@ -382,6 +411,7 @@ def run(config: MultiWorkerConfig, out_dir: Path, resume: str = "") -> dict[str,
             replay=replay,
             steps=config.train_steps_per_cycle,
             batch_size=config.batch_size,
+            augment_dihedral=config.augment_dihedral,
         )
         train_seconds = time.perf_counter() - train_start
         total_train_steps += len(train_history)
@@ -454,6 +484,7 @@ def main() -> None:
         simulations=args.simulations,
         komi=args.komi,
         score_komi=args.score_komi,
+        input_komi=args.input_komi,
         workers=args.workers,
         games_per_worker=args.games_per_worker,
         max_moves=args.max_moves,
@@ -462,6 +493,14 @@ def main() -> None:
         replay_size=args.replay_size,
         learning_rate=args.learning_rate,
         weight_decay=args.weight_decay,
+        c_puct=args.c_puct,
+        temperature=args.temperature,
+        temperature_moves=args.temperature_moves,
+        late_temperature=args.late_temperature,
+        root_dirichlet_alpha=args.root_dirichlet_alpha,
+        root_noise_fraction=args.root_noise_fraction,
+        root_policy_temperature=args.root_policy_temperature,
+        augment_dihedral=args.augment_dihedral,
         seed=args.seed,
         device=args.device,
         rules_backend=args.rules,

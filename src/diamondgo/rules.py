@@ -64,10 +64,12 @@ class SimpleAreaRules:
         size: int = 9,
         komi: float = DEFAULT_9X9_KOMI,
         score_komi: float = DEFAULT_9X9_SCORE_KOMI,
+        input_komi: bool = True,
     ) -> None:
         self.size = size
         self.komi = komi
         self.score_komi = score_komi
+        self.input_komi = input_komi
         self.board = np.zeros((size, size), dtype=np.int8)
         self.to_play = BLACK
         self._passes = 0
@@ -79,7 +81,7 @@ class SimpleAreaRules:
         return self.size * self.size + 1
 
     def copy(self) -> "SimpleAreaRules":
-        clone = SimpleAreaRules(self.size, self.komi, self.score_komi)
+        clone = SimpleAreaRules(self.size, self.komi, self.score_komi, self.input_komi)
         clone.board = self.board.copy()
         clone.to_play = self.to_play
         clone._passes = self._passes
@@ -129,8 +131,10 @@ class SimpleAreaRules:
         own = (self.board == own_value).astype(np.float32)
         opp = (self.board == opp_value).astype(np.float32)
         to_play_plane = np.full((self.size, self.size), 1.0 if self.to_play == BLACK else 0.0)
-        komi_plane = np.full((self.size, self.size), self.komi / 10.0, dtype=np.float32)
-        return np.stack([own, opp, to_play_plane, komi_plane]).astype(np.float32)
+        planes = [own, opp, to_play_plane]
+        if self.input_komi:
+            planes.append(np.full((self.size, self.size), self.komi / 10.0, dtype=np.float32))
+        return np.stack(planes).astype(np.float32)
 
     def is_terminal(self) -> bool:
         return self._passes >= 2 or self._moves >= self.action_size + 1
@@ -149,6 +153,7 @@ class SgfmillRules:
         size: int = 5,
         komi: float = DEFAULT_9X9_KOMI,
         score_komi: float = DEFAULT_9X9_SCORE_KOMI,
+        input_komi: bool = True,
     ) -> None:
         try:
             from sgfmill import boards
@@ -161,6 +166,7 @@ class SgfmillRules:
         self.size = size
         self.komi = komi
         self.score_komi = score_komi
+        self.input_komi = input_komi
         self._boards = boards
         self.board = boards.Board(size)
         self.board_array = np.zeros((size, size), dtype=np.int8)
@@ -174,7 +180,7 @@ class SgfmillRules:
         return self.size * self.size + 1
 
     def copy(self) -> "SgfmillRules":
-        clone = SgfmillRules(self.size, self.komi, self.score_komi)
+        clone = SgfmillRules(self.size, self.komi, self.score_komi, self.input_komi)
         clone.board = self.board.copy()
         clone.board_array = self.board_array.copy()
         clone.to_play = self.to_play
@@ -232,8 +238,10 @@ class SgfmillRules:
         opp = (self.board_array == opp_value).astype(np.float32)
 
         to_play_plane = np.full((self.size, self.size), 1.0 if self.to_play == BLACK else 0.0)
-        komi_plane = np.full((self.size, self.size), self.komi / 10.0, dtype=np.float32)
-        return np.stack([own, opp, to_play_plane, komi_plane]).astype(np.float32)
+        planes = [own, opp, to_play_plane]
+        if self.input_komi:
+            planes.append(np.full((self.size, self.size), self.komi / 10.0, dtype=np.float32))
+        return np.stack(planes).astype(np.float32)
 
     def area_winner_value(self) -> float:
         black_minus_white = self.board.area_score() - self.score_komi

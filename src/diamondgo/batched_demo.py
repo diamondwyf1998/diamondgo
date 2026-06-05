@@ -31,6 +31,7 @@ class BatchedConfig:
     board_size: int = 9
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
+    input_komi: bool = True
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 64
@@ -41,6 +42,11 @@ class BatchedConfig:
     learning_rate: float = 1e-3
     c_puct: float = 1.5
     temperature: float = 1.0
+    temperature_moves: int = 0
+    late_temperature: float = 1.0
+    root_dirichlet_alpha: float = 0.0
+    root_noise_fraction: float = 0.0
+    root_policy_temperature: float = 1.0
     seed: int = 1
     device: str = "cuda"
     rules_backend: str = "sgfmill"
@@ -51,12 +57,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--games", type=int, default=BatchedConfig.games)
     parser.add_argument("--komi", type=float, default=BatchedConfig.komi)
     parser.add_argument("--score-komi", type=float, default=BatchedConfig.score_komi)
+    parser.add_argument("--input-komi", action=argparse.BooleanOptionalAction, default=BatchedConfig.input_komi)
     parser.add_argument("--simulations", type=int, default=BatchedConfig.simulations)
     parser.add_argument("--max-moves", type=int, default=BatchedConfig.max_moves)
     parser.add_argument("--train-steps", type=int, default=BatchedConfig.train_steps)
     parser.add_argument("--batch-size", type=int, default=BatchedConfig.batch_size)
     parser.add_argument("--channels", type=int, default=BatchedConfig.channels)
     parser.add_argument("--residual-blocks", type=int, default=BatchedConfig.residual_blocks)
+    parser.add_argument("--c-puct", type=float, default=BatchedConfig.c_puct)
+    parser.add_argument("--temperature", type=float, default=BatchedConfig.temperature)
+    parser.add_argument("--root-dirichlet-alpha", type=float, default=BatchedConfig.root_dirichlet_alpha)
+    parser.add_argument("--root-noise-fraction", type=float, default=BatchedConfig.root_noise_fraction)
+    parser.add_argument("--root-policy-temperature", type=float, default=BatchedConfig.root_policy_temperature)
+    parser.add_argument("--temperature-moves", type=int, default=BatchedConfig.temperature_moves)
+    parser.add_argument("--late-temperature", type=float, default=BatchedConfig.late_temperature)
     parser.add_argument("--seed", type=int, default=BatchedConfig.seed)
     parser.add_argument("--device", default=BatchedConfig.device)
     parser.add_argument("--rules", choices=["simple", "sgfmill"], default=BatchedConfig.rules_backend)
@@ -72,6 +86,7 @@ def make_model(config: BatchedConfig) -> PolicyValueNet:
     model = PolicyValueNet(
         board_size=config.board_size,
         config=ModelConfig(channels=config.channels, residual_blocks=config.residual_blocks),
+        input_planes=4 if config.input_komi else 3,
     )
     model.to(torch.device(config.device))
     model.eval()
@@ -163,7 +178,8 @@ def run_batched_mcts(
         stats["legal_actions_seconds"] = float(stats.get("legal_actions_seconds", 0.0)) + (
             time.perf_counter() - legal_start
         )
-        root.expand(priors, legal_actions)
+        root.expand(apply_policy_temperature(priors, config.root_policy_temperature), legal_actions)
+        add_root_dirichlet_noise(root, config.root_dirichlet_alpha, config.root_noise_fraction)
         root.visit_count = 1
         root.value_sum = float(value)
 
@@ -186,6 +202,33 @@ def run_batched_mcts(
             node.expand(priors, legal_actions)
             backpropagate(path, float(value))
     return roots
+
+
+def apply_policy_temperature(priors: np.ndarray, temperature: float) -> np.ndarray:
+    if temperature <= 0 or abs(temperature - 1.0) <= 1e-6:
+        return priors
+    adjusted = np.power(np.clip(priors, 1e-12, 1.0), 1.0 / temperature)
+    total = float(adjusted.sum())
+    if total <= 0:
+        return priors
+    return adjusted / total
+
+
+def temperature_for_move(config: BatchedConfig, played_moves: int) -> float:
+    if config.temperature_moves <= 0:
+        return config.temperature
+    return config.temperature if played_moves < config.temperature_moves else config.late_temperature
+
+
+def add_root_dirichlet_noise(root: SearchNode, alpha: float, fraction: float) -> None:
+    if alpha <= 0.0 or fraction <= 0.0 or not root.children:
+        return
+    actions = list(root.children)
+    noise = np.random.dirichlet([alpha] * len(actions))
+    mix = min(max(fraction, 0.0), 1.0)
+    for action, noise_value in zip(actions, noise):
+        child = root.children[action]
+        child.prior = (1.0 - mix) * child.prior + mix * float(noise_value)
 
 
 def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[list[dict[str, object]], dict[str, object]]:
@@ -218,7 +261,7 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
             stats["sample_encode_seconds"] = float(stats.get("sample_encode_seconds", 0.0)) + (
                 time.perf_counter() - encode_start
             )
-            policy = root.policy_target(state.action_size, config.temperature)
+            policy = root.policy_target(state.action_size, temperature_for_move(config, move_counts[state_index]))
             action = int(np.random.choice(np.arange(state.action_size), p=policy))
             stone_start = time.perf_counter()
             stones_before = _stone_counts(state)
@@ -401,12 +444,20 @@ def main() -> None:
         games=args.games,
         komi=args.komi,
         score_komi=args.score_komi,
+        input_komi=args.input_komi,
         simulations=args.simulations,
         max_moves=args.max_moves,
         train_steps=args.train_steps,
         batch_size=args.batch_size,
         channels=args.channels,
         residual_blocks=args.residual_blocks,
+        c_puct=args.c_puct,
+        temperature=args.temperature,
+        temperature_moves=args.temperature_moves,
+        late_temperature=args.late_temperature,
+        root_dirichlet_alpha=args.root_dirichlet_alpha,
+        root_noise_fraction=args.root_noise_fraction,
+        root_policy_temperature=args.root_policy_temperature,
         seed=args.seed,
         device=args.device,
         rules_backend=args.rules,

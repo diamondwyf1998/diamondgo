@@ -24,6 +24,7 @@ class CpuDemoConfig:
     board_size: int = 9
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
+    input_komi: bool = True
     channels: int = 16
     residual_blocks: int = 1
     simulations: int = 8
@@ -44,6 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--games", type=int, default=CpuDemoConfig.games)
     parser.add_argument("--komi", type=float, default=CpuDemoConfig.komi)
     parser.add_argument("--score-komi", type=float, default=CpuDemoConfig.score_komi)
+    parser.add_argument("--input-komi", action=argparse.BooleanOptionalAction, default=CpuDemoConfig.input_komi)
     parser.add_argument("--simulations", type=int, default=CpuDemoConfig.simulations)
     parser.add_argument("--max-moves", type=int, default=CpuDemoConfig.max_moves)
     parser.add_argument("--train-steps", type=int, default=CpuDemoConfig.train_steps)
@@ -79,7 +81,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def make_model(config: CpuDemoConfig) -> PolicyValueNet:
     model_config = ModelConfig(channels=config.channels, residual_blocks=config.residual_blocks)
-    model = PolicyValueNet(config.board_size, model_config)
+    model = PolicyValueNet(
+        config.board_size,
+        model_config,
+        input_planes=4 if config.input_komi else 3,
+    )
     model.to(torch.device(config.device))
     model.eval()
     return model
@@ -96,8 +102,18 @@ def evaluate_with_model(model: PolicyValueNet, state: SimpleAreaRules) -> tuple[
 
 def make_rules(config: CpuDemoConfig):
     if config.rules_backend == "sgfmill":
-        return SgfmillRules(size=config.board_size, komi=config.komi, score_komi=config.score_komi)
-    return SimpleAreaRules(size=config.board_size, komi=config.komi, score_komi=config.score_komi)
+        return SgfmillRules(
+            size=config.board_size,
+            komi=config.komi,
+            score_komi=config.score_komi,
+            input_komi=config.input_komi,
+        )
+    return SimpleAreaRules(
+        size=config.board_size,
+        komi=config.komi,
+        score_komi=config.score_komi,
+        input_komi=config.input_komi,
+    )
 
 
 def play_game(config: CpuDemoConfig, model: PolicyValueNet) -> tuple[list[dict[str, object]], float]:
@@ -986,6 +1002,7 @@ def main() -> None:
         games=args.games,
         komi=args.komi,
         score_komi=args.score_komi,
+        input_komi=args.input_komi,
         simulations=args.simulations,
         max_moves=args.max_moves,
         train_steps=args.train_steps,

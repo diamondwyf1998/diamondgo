@@ -16,6 +16,7 @@ file should reference sections in this file instead of duplicating all numbers.
 | Komi split work | after source commits `3da7d3a`, `f37bd46` | source tree, smoke artifacts | 120 default | `komi=0.5`, `score_komi=6.5` | Some work done by another agent. Legacy checkpoints may not include `score_komi`. |
 | Score-komi continuation | 857+ | `multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605` | 120 | model-input `komi=0.5`, scoring `score_komi=6.5` | Resumed old 0.5-komi checkpoint weights/optimizer, but rebuilt replay from new self-play. |
 | Reduced score-komi continuation | 1065+ | `multiworker-9x9-resume0p5-score2p5-100sims-120moves-1h-20260605` | 120 | model-input `komi=0.5`, scoring `score_komi=2.5` | Started after `score_komi=6.5` produced persistent White win rate above 90%. |
+| Fresh no-komi-input 4x64 | pending | `multiworker-9x9-fresh-nokomi-4x64-score2p5-100sims-noise-aug-2h-20260605` | 120 | no komi input plane, scoring `score_komi=2.5` | Fresh model with deeper/wider net, root noise, late temperature drop, and dihedral augmentation. |
 
 ## Training Hyperparameters And Runtime Config
 
@@ -30,6 +31,54 @@ Common model architecture for the main server runs:
 | Channels | `32` |
 | Policy head | 1x1 conv to 2 channels, batch norm, ReLU, linear to `82` actions including pass |
 | Value head | 1x1 conv to 1 channel, batch norm, ReLU, linear to `channels`, ReLU, linear to scalar, tanh |
+
+## Planned Fresh Retraining Config
+
+This is a planning record, not a completed run.
+
+Reason for fresh retraining:
+
+- Continuing old checkpoints while only changing `score_komi` produced large
+  color skew rather than a clean correction.
+- The next hypothesis is that the model should not receive komi as an input
+  feature on 9x9. If komi is fixed by the experiment, the komi plane may make
+  color/score adaptation harder to interpret.
+- Turning off `input_komi` changes the model input from 4 planes to 3 planes, so
+  this should be a fresh run instead of a checkpoint resume.
+
+Planned core settings:
+
+| Field | Planned value |
+| --- | --- |
+| Board size | `9x9` |
+| Input planes | `3`: own stones, opponent stones, side-to-play plane |
+| `input_komi` | `False`, via `--no-input-komi` |
+| Residual blocks | `4` |
+| Channels | likely `32`, unless the next server budget allows raising to `64` |
+| Scoring komi | still needs an explicit choice before launch |
+| Max moves | likely `120` |
+| MCTS simulations | likely `100` |
+| Workers | tune to new CPU host; expected target `16` workers on a 16-core EPYC host, then benchmark |
+
+Working-tree support currently observed:
+
+| Feature | Status |
+| --- | --- |
+| Optional komi input plane | Added as `input_komi` in rules/config/training/eval paths |
+| 3-plane model stem | `PolicyValueNet(..., input_planes=3)` selected when `input_komi=False` |
+| Residual block count override | Existing CLI flag `--residual-blocks`; planned value must be passed as `4` unless default is changed |
+| Root Dirichlet noise | CLI plumbing added as `--root-dirichlet-alpha` and `--root-noise-fraction` |
+| Root policy temperature | CLI plumbing added as `--root-policy-temperature` |
+| Dihedral augmentation | CLI plumbing added as `--augment-dihedral` |
+
+Open launch decisions:
+
+- Choose scoring komi for the fresh 9x9 run.
+- Decide whether `channels` remains `32` or increases to `64`.
+- Decide root exploration settings. Current defaults keep root noise off.
+- Run a short smoke test before committing to a long server run:
+  `--residual-blocks 4 --no-input-komi`, a few cycles, then tactical probes and
+  a small self-play viewer sample.
 
 Common self-play/training settings for the main multi-worker server runs:
 
@@ -53,6 +102,18 @@ Common self-play/training settings for the main multi-worker server runs:
 | Device | `cuda` |
 | Seed | `1` |
 
+New experimental knobs added after the komi-skew investigation:
+
+| Field | Meaning | Legacy default | Fresh 4x64 setting |
+| --- | --- | ---: | ---: |
+| `input_komi` | Whether `komi / 10.0` is appended as an input plane | `true` | `false` |
+| `root_dirichlet_alpha` | Dirichlet alpha for root exploration noise | `0.0` | `0.15` |
+| `root_noise_fraction` | Fraction of root prior replaced by Dirichlet noise | `0.0` | `0.25` |
+| `root_policy_temperature` | Softens/sharpens raw policy priors before root expansion | `1.0` | `1.1` |
+| `temperature_moves` | Number of opening moves using main sampling temperature | `0` | `16` |
+| `late_temperature` | Sampling temperature after `temperature_moves` | `1.0` | `0.25` |
+| `augment_dihedral` | Random rotations/reflections during replay training | `false` | `true` |
+
 Run-specific differences:
 
 | Run/artifact family | Time limit | Resume | Max moves | Komi/scoring | Notes |
@@ -63,6 +124,7 @@ Run-specific differences:
 | `multiworker-9x9-komi6p5-100sims-120moves-2h-20260605` | 120 min | none | 120 | old style `komi=6.5` | Brief fresh run, stopped after realizing `komi` changes model input. |
 | `multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605` | 120 min, then queued +120 min extension, stopped early at about 21:52 CST | `multiworker-9x9-100sims-120moves-opt-v2-5h-20260605/latest.pt`; extension resumes the same run's `latest.pt` | 120 | model-input `komi=0.5`, scoring `score_komi=6.5` | Stopped because White self-play win rate stayed above 90%. Old replay buffer is not restored. The extension also rebuilt replay after its resume boundary. |
 | `multiworker-9x9-resume0p5-score2p5-100sims-120moves-1h-20260605` | stopped early at cycle 1080 | `multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605/latest.pt` | 120 | model-input `komi=0.5`, scoring `score_komi=2.5` | Follow-up to test whether reducing scoring komi pulls back the White win-rate skew; stopped because the skew remained high. |
+| `multiworker-9x9-fresh-nokomi-4x64-score2p5-100sims-noise-aug-2h-20260605` | 120 min planned | none | 120 | no model-input komi plane, scoring `score_komi=2.5` | Fresh-start diagnostic run; scripts are in `tools/server/`. |
 
 Evaluation and probe defaults:
 
@@ -233,6 +295,52 @@ The run was stopped at cycle `1080`; checkpoints were preserved, including
 | 1078 | 5 | 27 | 15.6% | 84.4% | -9.91 |
 | 1079 | 5 | 27 | 15.6% | 84.4% | -10.19 |
 | 1080 | 2 | 30 | 6.2% | 93.8% | -12.97 |
+
+## Fresh No-Komi-Input 4x64 Run
+
+Source artifacts:
+
+- Training script:
+  `tools/server/run_fresh_nokomi_4x64_score2p5_noise_aug_2h.sh`
+- Finalizer script:
+  `tools/server/finalize_fresh_nokomi_4x64_score2p5_noise_aug_2h.sh`
+- Planned server output:
+  `/root/diamondgo/artifacts/multiworker-9x9-fresh-nokomi-4x64-score2p5-100sims-noise-aug-2h-20260605`
+- Planned eval output:
+  `/root/diamondgo/artifacts/eval-suite-fresh-nokomi-4x64-score2p5-100sims-noise-aug-2h-20260605`
+- Planned tactical output:
+  `/root/diamondgo/artifacts/tactical-fresh-nokomi-4x64-score2p5-100sims-noise-aug-2h-20260605`
+
+Planned config:
+
+| Field | Value |
+| --- | --- |
+| Fresh start | `true` |
+| Board size | `9x9` |
+| Rules backend | `sgfmill` |
+| Model input planes | `3`: own stones, opponent stones, side-to-play |
+| `komi` config value | `0.5`, retained only for metadata because `input_komi=false` |
+| `score_komi` | `2.5` |
+| Channels | `64` |
+| Residual blocks | `4` |
+| Simulations per move | `100` |
+| Workers / games per worker | `8 / 4` |
+| Games per cycle | `32` |
+| Max moves | `120` |
+| Train steps per cycle | `64` |
+| Batch size | `256` |
+| Replay size | `100,000` |
+| Optimizer | `AdamW` |
+| Learning rate | `0.001` |
+| Weight decay | `0.0001` |
+| `c_puct` | `1.5` |
+| Opening temperature | `1.0` for first `16` moves |
+| Late temperature | `0.25` |
+| Root Dirichlet noise | alpha `0.15`, fraction `0.25` |
+| Root policy temperature | `1.1` |
+| Replay augmentation | random dihedral rotations/reflections |
+| Time limit | `120` minutes |
+| Checkpoint interval | every `10` cycles |
 
 ## Center 5x5 Opening Distribution
 
