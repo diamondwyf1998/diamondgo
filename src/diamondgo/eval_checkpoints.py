@@ -14,7 +14,7 @@ import torch
 
 from diamondgo.batched_demo import BatchedConfig, run_batched_mcts
 from diamondgo.config import ModelConfig
-from diamondgo.defaults import DEFAULT_9X9_MAX_MOVES
+from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES
 from diamondgo.demo_cpu import action_to_gtp, make_rules
 from diamondgo.model import PolicyValueNet
 
@@ -22,7 +22,7 @@ from diamondgo.model import PolicyValueNet
 @dataclass(frozen=True)
 class MatchConfig:
     board_size: int = 9
-    komi: float = 0.5
+    komi: float = DEFAULT_9X9_KOMI
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 32
@@ -66,7 +66,7 @@ def config_from_payload(payload: dict[str, object], device: str, simulations: in
     raw = dict(payload["config"])
     return MatchConfig(
         board_size=int(raw.get("board_size", 9)),
-        komi=float(raw.get("komi", 0.5)),
+        komi=float(raw.get("komi", DEFAULT_9X9_KOMI)),
         channels=int(raw.get("channels", 32)),
         residual_blocks=int(raw.get("residual_blocks", 2)),
         simulations=simulations,

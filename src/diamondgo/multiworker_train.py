@@ -14,7 +14,7 @@ import numpy as np
 import torch
 
 from diamondgo.batched_demo import BatchedConfig, make_model, play_batched_games
-from diamondgo.defaults import DEFAULT_9X9_MAX_MOVES
+from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES
 from diamondgo.demo_cpu import build_trace, write_json, write_sgf
 from diamondgo.overnight_train import (
     OvernightConfig,
@@ -27,7 +27,7 @@ from diamondgo.overnight_train import (
 @dataclass(frozen=True)
 class MultiWorkerConfig:
     board_size: int = 9
-    komi: float = 0.5
+    komi: float = DEFAULT_9X9_KOMI
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 100
@@ -57,6 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--time-limit-minutes", type=float, default=MultiWorkerConfig.time_limit_minutes)
     parser.add_argument("--workers", type=int, default=MultiWorkerConfig.workers)
     parser.add_argument("--games-per-worker", type=int, default=MultiWorkerConfig.games_per_worker)
+    parser.add_argument("--komi", type=float, default=MultiWorkerConfig.komi)
     parser.add_argument("--max-moves", type=int, default=MultiWorkerConfig.max_moves)
     parser.add_argument("--simulations", type=int, default=MultiWorkerConfig.simulations)
     parser.add_argument("--train-steps-per-cycle", type=int, default=MultiWorkerConfig.train_steps_per_cycle)
@@ -246,7 +247,10 @@ def summarize_game_behavior(
     pass_moves = sum(int(item.get("passes", 0)) for item in game_summaries)
     capture_moves = sum(int(item.get("capture_moves", 0)) for item in game_summaries)
     captured_stones = sum(int(item.get("captured_stones", 0)) for item in game_summaries)
-    margins = [abs(float(item.get("black_score_margin", 0.0))) for item in game_summaries]
+    signed_margins = [float(item.get("black_score_margin", 0.0)) for item in game_summaries]
+    margins = [abs(margin) for margin in signed_margins]
+    black_win_margins = [margin for margin in signed_margins if margin > 0]
+    white_win_margins = [-margin for margin in signed_margins if margin < 0]
     black_wins = sum(1 for item in game_summaries if item.get("winner") == "b")
     games = len(game_summaries)
     white_wins = games - black_wins
@@ -276,7 +280,16 @@ def summarize_game_behavior(
             else "white" if white_win_rate >= color_bias_alert_threshold
             else ""
         ),
+        "black_score_margin_mean": round(float(np.mean(signed_margins)), 3)
+        if signed_margins
+        else 0.0,
         "abs_score_margin_mean": round(float(np.mean(margins)), 3) if margins else 0.0,
+        "black_win_margin_mean": round(float(np.mean(black_win_margins)), 3)
+        if black_win_margins
+        else 0.0,
+        "white_win_margin_mean": round(float(np.mean(white_win_margins)), 3)
+        if white_win_margins
+        else 0.0,
         "per_game": game_summaries,
     }
 
@@ -435,6 +448,7 @@ def main() -> None:
         channels=args.channels,
         residual_blocks=args.residual_blocks,
         simulations=args.simulations,
+        komi=args.komi,
         workers=args.workers,
         games_per_worker=args.games_per_worker,
         max_moves=args.max_moves,

@@ -38,6 +38,14 @@ Current server dashboard:
 
 `/root/diamondgo/artifacts/eval-every-50-vs-initial/dashboard.html`
 
+## Current Training/Evaluation Defaults
+
+- Default 9x9 komi is `6.5`; old checkpoints keep their serialized `config.komi`.
+- Default 9x9 self-play cap is `120` moves.
+- `src/diamondgo/eval_suite.py` runs standard checkpoint matches at step tiers such as `50,200,500` against `initial` and `previous`.
+- `src/diamondgo/tactical_eval.py` runs fixed capture/atari probes and reports target top-1/top-3/rank.
+- `multiworker_train` behavior metrics include black/white win rates, color-bias alerts, and signed score-margin summaries.
+
 ## Server Migration Artifacts
 
 The latest source migration artifacts on the server are:

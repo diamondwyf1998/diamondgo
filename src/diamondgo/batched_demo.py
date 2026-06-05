@@ -11,7 +11,7 @@ import numpy as np
 import torch
 
 from diamondgo.config import ModelConfig
-from diamondgo.defaults import DEFAULT_9X9_MAX_MOVES
+from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES
 from diamondgo.demo_cpu import (
     action_to_gtp,
     build_trace,
@@ -29,7 +29,7 @@ from diamondgo.model import PolicyValueNet
 @dataclass(frozen=True)
 class BatchedConfig:
     board_size: int = 9
-    komi: float = 0.5
+    komi: float = DEFAULT_9X9_KOMI
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 64
@@ -48,6 +48,7 @@ class BatchedConfig:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run batched 9x9 self-play with GPU leaf evaluation.")
     parser.add_argument("--games", type=int, default=BatchedConfig.games)
+    parser.add_argument("--komi", type=float, default=BatchedConfig.komi)
     parser.add_argument("--simulations", type=int, default=BatchedConfig.simulations)
     parser.add_argument("--max-moves", type=int, default=BatchedConfig.max_moves)
     parser.add_argument("--train-steps", type=int, default=BatchedConfig.train_steps)
@@ -396,6 +397,7 @@ def main() -> None:
     args = build_parser().parse_args()
     config = BatchedConfig(
         games=args.games,
+        komi=args.komi,
         simulations=args.simulations,
         max_moves=args.max_moves,
         train_steps=args.train_steps,

@@ -5,6 +5,8 @@ from typing import Protocol
 
 import numpy as np
 
+from diamondgo.defaults import DEFAULT_9X9_KOMI
+
 
 BLACK = "b"
 WHITE = "w"
@@ -57,7 +59,7 @@ class SimpleAreaRules:
     real rules dependency is installed.
     """
 
-    def __init__(self, size: int = 9, komi: float = 0.5) -> None:
+    def __init__(self, size: int = 9, komi: float = DEFAULT_9X9_KOMI) -> None:
         self.size = size
         self.komi = komi
         self.board = np.zeros((size, size), dtype=np.int8)
@@ -136,7 +138,7 @@ class SimpleAreaRules:
 class SgfmillRules:
     """Thin adapter around sgfmill so rules can be replaced without touching MCTS."""
 
-    def __init__(self, size: int = 5, komi: float = 0.5) -> None:
+    def __init__(self, size: int = 5, komi: float = DEFAULT_9X9_KOMI) -> None:
         try:
             from sgfmill import boards
         except ImportError as exc:

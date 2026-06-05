@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from diamondgo.defaults import DEFAULT_9X9_MAX_MOVES
+from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES
 
 
 @dataclass(frozen=True)
 class BoardConfig:
     size: int = 9
-    komi: float = 0.5
+    komi: float = DEFAULT_9X9_KOMI
     rules_backend: str = "sgfmill"
 
 

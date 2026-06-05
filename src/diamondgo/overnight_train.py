@@ -12,14 +12,14 @@ import torch
 import torch.nn.functional as F
 
 from diamondgo.batched_demo import BatchedConfig, make_model, play_batched_games
-from diamondgo.defaults import DEFAULT_9X9_MAX_MOVES
+from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES
 from diamondgo.demo_cpu import build_trace, write_json, write_sgf
 
 
 @dataclass(frozen=True)
 class OvernightConfig:
     board_size: int = 9
-    komi: float = 0.5
+    komi: float = DEFAULT_9X9_KOMI
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 64
@@ -46,6 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cycles", type=int, default=OvernightConfig.cycles)
     parser.add_argument("--time-limit-minutes", type=float, default=OvernightConfig.time_limit_minutes)
     parser.add_argument("--games-per-cycle", type=int, default=OvernightConfig.games_per_cycle)
+    parser.add_argument("--komi", type=float, default=OvernightConfig.komi)
     parser.add_argument("--max-moves", type=int, default=OvernightConfig.max_moves)
     parser.add_argument("--simulations", type=int, default=OvernightConfig.simulations)
     parser.add_argument("--train-steps-per-cycle", type=int, default=OvernightConfig.train_steps_per_cycle)
@@ -300,6 +301,7 @@ def main() -> None:
         channels=args.channels,
         residual_blocks=args.residual_blocks,
         simulations=args.simulations,
+        komi=args.komi,
         games_per_cycle=args.games_per_cycle,
         max_moves=args.max_moves,
         train_steps_per_cycle=args.train_steps_per_cycle,

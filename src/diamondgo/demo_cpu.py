@@ -13,6 +13,7 @@ import torch
 import torch.nn.functional as F
 
 from diamondgo.config import MCTSConfig, ModelConfig
+from diamondgo.defaults import DEFAULT_9X9_KOMI
 from diamondgo.mcts import run_mcts
 from diamondgo.model import PolicyValueNet
 from diamondgo.rules import SgfmillRules, SimpleAreaRules
@@ -21,7 +22,7 @@ from diamondgo.rules import SgfmillRules, SimpleAreaRules
 @dataclass(frozen=True)
 class CpuDemoConfig:
     board_size: int = 9
-    komi: float = 0.5
+    komi: float = DEFAULT_9X9_KOMI
     channels: int = 16
     residual_blocks: int = 1
     simulations: int = 8
@@ -40,6 +41,7 @@ class CpuDemoConfig:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run a tiny CPU-only 9x9 baby-zero demo.")
     parser.add_argument("--games", type=int, default=CpuDemoConfig.games)
+    parser.add_argument("--komi", type=float, default=CpuDemoConfig.komi)
     parser.add_argument("--simulations", type=int, default=CpuDemoConfig.simulations)
     parser.add_argument("--max-moves", type=int, default=CpuDemoConfig.max_moves)
     parser.add_argument("--train-steps", type=int, default=CpuDemoConfig.train_steps)
@@ -980,6 +982,7 @@ def main() -> None:
     config = replace(
         CpuDemoConfig(),
         games=args.games,
+        komi=args.komi,
         simulations=args.simulations,
         max_moves=args.max_moves,
         train_steps=args.train_steps,
