@@ -171,9 +171,11 @@ class SgfmillRules:
         if self._legal_actions_cache is not None:
             return self._legal_actions_cache.copy()
         legal = np.zeros(self.action_size, dtype=np.bool_)
+        group_ids, group_liberties = self._group_info()
+        opponent = WHITE if self.to_play == BLACK else BLACK
         for row in range(self.size):
             for col in range(self.size):
-                if self._is_legal_point(row, col):
+                if self._is_legal_point(row, col, group_ids, group_liberties, opponent):
                     legal[row * self.size + col] = True
         legal[-1] = True
         self._legal_actions_cache = legal
@@ -184,7 +186,7 @@ class SgfmillRules:
             self._passes += 1
         else:
             row, col = divmod(action, self.size)
-            if not self._is_legal_point(row, col):
+            if not self.legal_actions()[action]:
                 raise ValueError(f"illegal move for {self.to_play}: {(row, col)}")
             self._ko_forbidden = self.board.play(row, col, self.to_play)
             self._passes = 0
@@ -228,17 +230,72 @@ class SgfmillRules:
     def terminal_value(self) -> float:
         return self.area_winner_value()
 
-    def _is_legal_point(self, row: int, col: int) -> bool:
+    def _is_legal_point(
+        self,
+        row: int,
+        col: int,
+        group_ids: np.ndarray,
+        group_liberties: list[set[tuple[int, int]]],
+        opponent: str,
+    ) -> bool:
         if self.board.get(row, col) is not None:
             return False
         if self._ko_forbidden == (row, col):
             return False
-        probe = self.board.copy()
-        try:
-            probe.play(row, col, self.to_play)
-        except (IndexError, ValueError):
-            return False
-        return probe.get(row, col) == self.to_play
+        point = (row, col)
+        has_empty_neighbor = False
+        has_capture = False
+        has_own_group_liberty = False
+        for neighbour_row, neighbour_col in self._neighbors(row, col):
+            colour = self.board.get(neighbour_row, neighbour_col)
+            if colour is None:
+                has_empty_neighbor = True
+                continue
+            group_id = int(group_ids[neighbour_row, neighbour_col])
+            liberties_without_point = group_liberties[group_id] - {point}
+            if colour == opponent and not liberties_without_point:
+                has_capture = True
+            elif colour == self.to_play and liberties_without_point:
+                has_own_group_liberty = True
+        return has_empty_neighbor or has_capture or has_own_group_liberty
+
+    def _neighbors(self, row: int, col: int):
+        if row > 0:
+            yield row - 1, col
+        if row + 1 < self.size:
+            yield row + 1, col
+        if col > 0:
+            yield row, col - 1
+        if col + 1 < self.size:
+            yield row, col + 1
+
+    def _group_info(self) -> tuple[np.ndarray, list[set[tuple[int, int]]]]:
+        group_ids = np.full((self.size, self.size), -1, dtype=np.int16)
+        group_liberties: list[set[tuple[int, int]]] = []
+        group_id = 0
+        for start_row in range(self.size):
+            for start_col in range(self.size):
+                colour = self.board.get(start_row, start_col)
+                if colour is None or group_ids[start_row, start_col] >= 0:
+                    continue
+                stack = [(start_row, start_col)]
+                group_ids[start_row, start_col] = group_id
+                liberties: set[tuple[int, int]] = set()
+                while stack:
+                    row, col = stack.pop()
+                    for neighbour_row, neighbour_col in self._neighbors(row, col):
+                        neighbour_colour = self.board.get(neighbour_row, neighbour_col)
+                        if neighbour_colour is None:
+                            liberties.add((neighbour_row, neighbour_col))
+                        elif (
+                            neighbour_colour == colour
+                            and group_ids[neighbour_row, neighbour_col] < 0
+                        ):
+                            group_ids[neighbour_row, neighbour_col] = group_id
+                            stack.append((neighbour_row, neighbour_col))
+                group_liberties.append(liberties)
+                group_id += 1
+        return group_ids, group_liberties
 
 
 GomillRules = SgfmillRules
