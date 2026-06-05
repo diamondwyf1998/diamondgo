@@ -1,3 +1,3 @@
 from __future__ import annotations
 
-DEFAULT_9X9_MAX_MOVES = 160
+DEFAULT_9X9_MAX_MOVES = 120

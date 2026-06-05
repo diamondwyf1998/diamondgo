@@ -81,7 +81,12 @@ def evaluate_batch(
     stats: dict[str, object] | None = None,
 ) -> tuple[list[np.ndarray], list[float]]:
     device = next(model.parameters()).device
-    features = torch.tensor(np.stack([state.encode() for state in states]), dtype=torch.float32).to(device)
+    encode_start = time.perf_counter()
+    encoded = np.stack([state.encode() for state in states])
+    encode_elapsed = time.perf_counter() - encode_start
+    tensor_start = time.perf_counter()
+    features = torch.tensor(encoded, dtype=torch.float32).to(device)
+    tensor_elapsed = time.perf_counter() - tensor_start
     if device.type == "cuda":
         torch.cuda.synchronize()
     start = time.perf_counter()
@@ -93,6 +98,8 @@ def evaluate_batch(
     if stats is not None:
         stats["network_calls"] = int(stats.get("network_calls", 0)) + 1
         stats["network_seconds"] = float(stats.get("network_seconds", 0.0)) + elapsed
+        stats["encode_seconds"] = float(stats.get("encode_seconds", 0.0)) + encode_elapsed
+        stats["tensor_seconds"] = float(stats.get("tensor_seconds", 0.0)) + tensor_elapsed
         stats.setdefault("batch_sizes", []).append(len(states))
     priors = torch.softmax(logits, dim=1).detach().cpu().numpy()
     return [priors[i] for i in range(len(states))], [float(v) for v in values.detach().cpu().numpy()]
@@ -106,13 +113,30 @@ def backpropagate(path: list[SearchNode], value: float) -> None:
         current = -current
 
 
-def collect_leaf(state, root: SearchNode, c_puct: float) -> tuple[object, list[SearchNode], SearchNode] | None:
+def collect_leaf(
+    state,
+    root: SearchNode,
+    c_puct: float,
+    stats: dict[str, object],
+) -> tuple[object, list[SearchNode], SearchNode] | None:
+    copy_start = time.perf_counter()
     simulation_state = state.copy()
+    stats["state_copy_seconds"] = float(stats.get("state_copy_seconds", 0.0)) + (
+        time.perf_counter() - copy_start
+    )
     node = root
     path = [node]
     while node.expanded() and not simulation_state.is_terminal():
+        select_start = time.perf_counter()
         action, child = select_child(node, c_puct)
+        stats["select_seconds"] = float(stats.get("select_seconds", 0.0)) + (
+            time.perf_counter() - select_start
+        )
+        play_start = time.perf_counter()
         play_search_action(simulation_state, action)
+        stats["play_search_seconds"] = float(stats.get("play_search_seconds", 0.0)) + (
+            time.perf_counter() - play_start
+        )
         node = child
         path.append(node)
 
@@ -131,14 +155,19 @@ def run_batched_mcts(
     roots = [SearchNode(prior=1.0) for _ in states]
     priors_batch, values = evaluate_batch(model, states, stats)
     for root, state, priors, value in zip(roots, states, priors_batch, values):
-        root.expand(priors, state.legal_actions())
+        legal_start = time.perf_counter()
+        legal_actions = state.legal_actions()
+        stats["legal_actions_seconds"] = float(stats.get("legal_actions_seconds", 0.0)) + (
+            time.perf_counter() - legal_start
+        )
+        root.expand(priors, legal_actions)
         root.visit_count = 1
         root.value_sum = float(value)
 
     for _ in range(config.simulations):
         pending: list[tuple[object, list[SearchNode], SearchNode]] = []
         for state, root in zip(states, roots):
-            leaf = collect_leaf(state, root, config.c_puct)
+            leaf = collect_leaf(state, root, config.c_puct, stats)
             if leaf is not None:
                 pending.append(leaf)
         if not pending:
@@ -146,7 +175,12 @@ def run_batched_mcts(
         leaf_states = [item[0] for item in pending]
         priors_batch, values = evaluate_batch(model, leaf_states, stats)
         for (_, path, node), priors, value, leaf_state in zip(pending, priors_batch, values, leaf_states):
-            node.expand(priors, leaf_state.legal_actions())
+            legal_start = time.perf_counter()
+            legal_actions = leaf_state.legal_actions()
+            stats["legal_actions_seconds"] = float(stats.get("legal_actions_seconds", 0.0)) + (
+                time.perf_counter() - legal_start
+            )
+            node.expand(priors, legal_actions)
             backpropagate(path, float(value))
     return roots
 
@@ -176,10 +210,18 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
         for state_index, root in zip(active_indices, roots):
             state = states[state_index]
             player = state.to_play
+            encode_start = time.perf_counter()
             features = state.encode()
+            stats["sample_encode_seconds"] = float(stats.get("sample_encode_seconds", 0.0)) + (
+                time.perf_counter() - encode_start
+            )
             policy = root.policy_target(state.action_size, config.temperature)
             action = int(np.random.choice(np.arange(state.action_size), p=policy))
+            stone_start = time.perf_counter()
             stones_before = _stone_counts(state)
+            stats["stone_count_seconds"] = float(stats.get("stone_count_seconds", 0.0)) + (
+                time.perf_counter() - stone_start
+            )
             move_counts[state_index] += 1
             is_pass = action == state.action_size - 1
             if is_pass:
@@ -199,7 +241,11 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
                 }
             )
             state.play_action(action)
+            stone_start = time.perf_counter()
             captures = _captures_for_move(player, stones_before, _stone_counts(state))
+            stats["stone_count_seconds"] = float(stats.get("stone_count_seconds", 0.0)) + (
+                time.perf_counter() - stone_start
+            )
             examples[-1]["captures"] = captures
             if captures > 0:
                 capture_move_counts[state_index] += 1
@@ -235,12 +281,27 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
     batch_sizes = list(stats.get("batch_sizes", []))
     stats["average_batch_size"] = round(float(np.mean(batch_sizes)), 3) if batch_sizes else 0.0
     stats["max_batch_size"] = int(max(batch_sizes)) if batch_sizes else 0
-    stats["network_seconds"] = round(float(stats.get("network_seconds", 0.0)), 3)
+    for key in [
+        "network_seconds",
+        "encode_seconds",
+        "tensor_seconds",
+        "legal_actions_seconds",
+        "state_copy_seconds",
+        "select_seconds",
+        "play_search_seconds",
+        "sample_encode_seconds",
+        "stone_count_seconds",
+    ]:
+        stats[key] = round(float(stats.get(key, 0.0)), 3)
     stats["game_summaries"] = game_summaries
     return examples, stats
 
 
 def _stone_counts(state: object) -> dict[str, int]:
+    board_array = getattr(state, "board_array", None)
+    if board_array is not None:
+        array = np.asarray(board_array)
+        return {"b": int((array == 1).sum()), "w": int((array == -1).sum())}
     board = getattr(state, "board", None)
     size = int(getattr(state, "size"))
     counts = {"b": 0, "w": 0}

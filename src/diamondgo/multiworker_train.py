@@ -176,6 +176,20 @@ def summarize_cycle(
     ]
     network_seconds = sum(float(item["selfplay"].get("network_seconds", 0.0)) for item in worker_summaries)
     network_calls = sum(int(item["selfplay"].get("network_calls", 0)) for item in worker_summaries)
+    timing_keys = [
+        "encode_seconds",
+        "tensor_seconds",
+        "legal_actions_seconds",
+        "state_copy_seconds",
+        "select_seconds",
+        "play_search_seconds",
+        "sample_encode_seconds",
+        "stone_count_seconds",
+    ]
+    selfplay_timing = {
+        key: round(sum(float(item["selfplay"].get(key, 0.0)) for item in worker_summaries), 3)
+        for key in timing_keys
+    }
     weighted_batch_total = sum(
         float(item["selfplay"].get("average_batch_size", 0.0))
         * int(item["selfplay"].get("network_calls", 0))
@@ -199,6 +213,7 @@ def summarize_cycle(
         if examples
         else 0.0,
         "game_behavior": summarize_game_behavior(game_summaries, examples),
+        "selfplay_timing": selfplay_timing,
         "selfplay": {
             "summed_network_seconds": round(network_seconds, 3),
             "summed_network_calls": network_calls,
@@ -215,6 +230,9 @@ def summarize_cycle(
                 "positions_per_second": item["positions_per_second"],
                 "average_network_batch": item["selfplay"].get("average_batch_size", 0),
                 "max_network_batch": item["selfplay"].get("max_batch_size", 0),
+                "legal_actions_seconds": item["selfplay"].get("legal_actions_seconds", 0),
+                "state_copy_seconds": item["selfplay"].get("state_copy_seconds", 0),
+                "encode_seconds": item["selfplay"].get("encode_seconds", 0),
             }
             for item in worker_summaries
         ],

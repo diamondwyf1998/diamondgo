@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from diamondgo.defaults import DEFAULT_9X9_MAX_MOVES
+
 
 @dataclass(frozen=True)
 class BoardConfig:
@@ -29,7 +31,7 @@ class MCTSConfig:
 @dataclass(frozen=True)
 class SelfPlayConfig:
     games: int = 16
-    max_moves: int = 200
+    max_moves: int = DEFAULT_9X9_MAX_MOVES
 
 
 @dataclass(frozen=True)

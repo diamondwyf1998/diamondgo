@@ -9,6 +9,8 @@ import numpy as np
 BLACK = "b"
 WHITE = "w"
 PASS = None
+BLACK_VALUE = 1
+WHITE_VALUE = -1
 
 
 @dataclass(frozen=True)
@@ -147,6 +149,7 @@ class SgfmillRules:
         self.komi = komi
         self._boards = boards
         self.board = boards.Board(size)
+        self.board_array = np.zeros((size, size), dtype=np.int8)
         self.to_play = BLACK
         self._passes = 0
         self._ko_forbidden: tuple[int, int] | None = None
@@ -159,6 +162,7 @@ class SgfmillRules:
     def copy(self) -> "SgfmillRules":
         clone = SgfmillRules(self.size, self.komi)
         clone.board = self.board.copy()
+        clone.board_array = self.board_array.copy()
         clone.to_play = self.to_play
         clone._passes = self._passes
         clone._ko_forbidden = self._ko_forbidden
@@ -172,10 +176,11 @@ class SgfmillRules:
             return self._legal_actions_cache.copy()
         legal = np.zeros(self.action_size, dtype=np.bool_)
         group_ids, group_liberties = self._group_info()
-        opponent = WHITE if self.to_play == BLACK else BLACK
+        player = self._player_value()
+        opponent = -player
         for row in range(self.size):
             for col in range(self.size):
-                if self._is_legal_point(row, col, group_ids, group_liberties, opponent):
+                if self._is_legal_point(row, col, group_ids, group_liberties, player, opponent):
                     legal[row * self.size + col] = True
         legal[-1] = True
         self._legal_actions_cache = legal
@@ -189,6 +194,7 @@ class SgfmillRules:
             if not self.legal_actions()[action]:
                 raise ValueError(f"illegal move for {self.to_play}: {(row, col)}")
             self._ko_forbidden = self.board.play(row, col, self.to_play)
+            self._sync_board_array()
             self._passes = 0
         self.to_play = WHITE if self.to_play == BLACK else BLACK
         self._legal_actions_cache = None
@@ -200,20 +206,16 @@ class SgfmillRules:
         else:
             row, col = divmod(action, self.size)
             self._ko_forbidden = self.board.play(row, col, self.to_play)
+            self._sync_board_array()
             self._passes = 0
         self.to_play = WHITE if self.to_play == BLACK else BLACK
         self._legal_actions_cache = None
 
     def encode(self) -> np.ndarray:
-        own = np.zeros((self.size, self.size), dtype=np.float32)
-        opp = np.zeros((self.size, self.size), dtype=np.float32)
-        for row in range(self.size):
-            for col in range(self.size):
-                colour = self.board.get(row, col)
-                if colour == self.to_play:
-                    own[row, col] = 1.0
-                elif colour is not None:
-                    opp[row, col] = 1.0
+        own_value = self._player_value()
+        opp_value = -own_value
+        own = (self.board_array == own_value).astype(np.float32)
+        opp = (self.board_array == opp_value).astype(np.float32)
 
         to_play_plane = np.full((self.size, self.size), 1.0 if self.to_play == BLACK else 0.0)
         komi_plane = np.full((self.size, self.size), self.komi / 10.0, dtype=np.float32)
@@ -235,27 +237,28 @@ class SgfmillRules:
         row: int,
         col: int,
         group_ids: np.ndarray,
-        group_liberties: list[set[tuple[int, int]]],
-        opponent: str,
+        group_liberties: list[int],
+        player: int,
+        opponent: int,
     ) -> bool:
-        if self.board.get(row, col) is not None:
+        if self.board_array[row, col] != 0:
             return False
         if self._ko_forbidden == (row, col):
             return False
-        point = (row, col)
+        point_bit = 1 << (row * self.size + col)
         has_empty_neighbor = False
         has_capture = False
         has_own_group_liberty = False
         for neighbour_row, neighbour_col in self._neighbors(row, col):
-            colour = self.board.get(neighbour_row, neighbour_col)
-            if colour is None:
+            colour = int(self.board_array[neighbour_row, neighbour_col])
+            if colour == 0:
                 has_empty_neighbor = True
                 continue
             group_id = int(group_ids[neighbour_row, neighbour_col])
-            liberties_without_point = group_liberties[group_id] - {point}
-            if colour == opponent and not liberties_without_point:
+            liberties_without_point = group_liberties[group_id] & ~point_bit
+            if colour == opponent and liberties_without_point == 0:
                 has_capture = True
-            elif colour == self.to_play and liberties_without_point:
+            elif colour == player and liberties_without_point != 0:
                 has_own_group_liberty = True
         return has_empty_neighbor or has_capture or has_own_group_liberty
 
@@ -269,24 +272,24 @@ class SgfmillRules:
         if col + 1 < self.size:
             yield row, col + 1
 
-    def _group_info(self) -> tuple[np.ndarray, list[set[tuple[int, int]]]]:
+    def _group_info(self) -> tuple[np.ndarray, list[int]]:
         group_ids = np.full((self.size, self.size), -1, dtype=np.int16)
-        group_liberties: list[set[tuple[int, int]]] = []
+        group_liberties: list[int] = []
         group_id = 0
         for start_row in range(self.size):
             for start_col in range(self.size):
-                colour = self.board.get(start_row, start_col)
-                if colour is None or group_ids[start_row, start_col] >= 0:
+                colour = int(self.board_array[start_row, start_col])
+                if colour == 0 or group_ids[start_row, start_col] >= 0:
                     continue
                 stack = [(start_row, start_col)]
                 group_ids[start_row, start_col] = group_id
-                liberties: set[tuple[int, int]] = set()
+                liberties = 0
                 while stack:
                     row, col = stack.pop()
                     for neighbour_row, neighbour_col in self._neighbors(row, col):
-                        neighbour_colour = self.board.get(neighbour_row, neighbour_col)
-                        if neighbour_colour is None:
-                            liberties.add((neighbour_row, neighbour_col))
+                        neighbour_colour = int(self.board_array[neighbour_row, neighbour_col])
+                        if neighbour_colour == 0:
+                            liberties |= 1 << (neighbour_row * self.size + neighbour_col)
                         elif (
                             neighbour_colour == colour
                             and group_ids[neighbour_row, neighbour_col] < 0
@@ -296,6 +299,28 @@ class SgfmillRules:
                 group_liberties.append(liberties)
                 group_id += 1
         return group_ids, group_liberties
+
+    def _player_value(self) -> int:
+        return BLACK_VALUE if self.to_play == BLACK else WHITE_VALUE
+
+    def _sync_board_array(self) -> None:
+        board_rows = getattr(self.board, "board", None)
+        if board_rows is None:
+            for row in range(self.size):
+                for col in range(self.size):
+                    self.board_array[row, col] = self._colour_value(self.board.get(row, col))
+            return
+        for row, row_values in enumerate(board_rows):
+            for col, colour in enumerate(row_values):
+                self.board_array[row, col] = self._colour_value(colour)
+
+    @staticmethod
+    def _colour_value(colour: str | None) -> int:
+        if colour == BLACK:
+            return BLACK_VALUE
+        if colour == WHITE:
+            return WHITE_VALUE
+        return 0
 
 
 GomillRules = SgfmillRules

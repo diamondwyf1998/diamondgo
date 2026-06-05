@@ -33,6 +33,17 @@ def _probe_mask(state: SgfmillRules) -> np.ndarray:
     return legal
 
 
+def _board_counts(state: SgfmillRules) -> tuple[int, int]:
+    black = 0
+    white = 0
+    for row in range(state.size):
+        for col in range(state.size):
+            colour = state.board.get(row, col)
+            black += colour == "b"
+            white += colour == "w"
+    return black, white
+
+
 def test_sgfmill_fast_legal_actions_match_probe_play() -> None:
     random.seed(7)
     state = SgfmillRules(size=9, komi=0.5)
@@ -41,6 +52,10 @@ def test_sgfmill_fast_legal_actions_match_probe_play() -> None:
         state._legal_actions_cache = None
         fast = state.legal_actions()
         assert np.array_equal(fast, _probe_mask(state))
+        assert (
+            int((state.board_array == 1).sum()),
+            int((state.board_array == -1).sum()),
+        ) == _board_counts(state)
         checked_positions += 1
         non_pass_actions = [
             int(action)
