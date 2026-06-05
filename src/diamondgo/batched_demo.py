@@ -11,7 +11,7 @@ import numpy as np
 import torch
 
 from diamondgo.config import ModelConfig
-from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES
+from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES, DEFAULT_9X9_SCORE_KOMI
 from diamondgo.demo_cpu import (
     action_to_gtp,
     build_trace,
@@ -30,6 +30,7 @@ from diamondgo.model import PolicyValueNet
 class BatchedConfig:
     board_size: int = 9
     komi: float = DEFAULT_9X9_KOMI
+    score_komi: float = DEFAULT_9X9_SCORE_KOMI
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 64
@@ -49,6 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run batched 9x9 self-play with GPU leaf evaluation.")
     parser.add_argument("--games", type=int, default=BatchedConfig.games)
     parser.add_argument("--komi", type=float, default=BatchedConfig.komi)
+    parser.add_argument("--score-komi", type=float, default=BatchedConfig.score_komi)
     parser.add_argument("--simulations", type=int, default=BatchedConfig.simulations)
     parser.add_argument("--max-moves", type=int, default=BatchedConfig.max_moves)
     parser.add_argument("--train-steps", type=int, default=BatchedConfig.train_steps)
@@ -329,11 +331,11 @@ def _captures_for_move(player: str, before: dict[str, int], after: dict[str, int
 
 def _black_score_margin(state: object) -> float:
     board = getattr(state, "board", None)
-    komi = float(getattr(state, "komi"))
+    score_komi = float(getattr(state, "score_komi", getattr(state, "komi")))
     area_score = getattr(board, "area_score", None)
     if area_score is not None:
-        return float(area_score()) - komi
-    return float(np.asarray(board).sum()) - komi
+        return float(area_score()) - score_komi
+    return float(np.asarray(board).sum()) - score_komi
 
 
 def run(config: BatchedConfig, sgf_path: str, trace_path: str, dashboard_path: str, overview_svg_path: str) -> dict[str, object]:
@@ -398,6 +400,7 @@ def main() -> None:
     config = BatchedConfig(
         games=args.games,
         komi=args.komi,
+        score_komi=args.score_komi,
         simulations=args.simulations,
         max_moves=args.max_moves,
         train_steps=args.train_steps,

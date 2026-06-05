@@ -8,6 +8,7 @@ from pathlib import Path
 import torch
 
 from diamondgo.batched_demo import BatchedConfig, make_model, run_batched_mcts
+from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_SCORE_KOMI
 from diamondgo.demo_cpu import action_to_gtp
 from diamondgo.overnight_train import load_checkpoint
 from diamondgo.rules import BLACK, WHITE, SgfmillRules
@@ -74,8 +75,8 @@ def action_for(point: tuple[int, int], board_size: int) -> int:
     return row * board_size + col
 
 
-def make_case_state(case: TacticalCase, board_size: int, komi: float) -> SgfmillRules:
-    state = SgfmillRules(size=board_size, komi=komi)
+def make_case_state(case: TacticalCase, board_size: int, komi: float, score_komi: float) -> SgfmillRules:
+    state = SgfmillRules(size=board_size, komi=komi, score_komi=score_komi)
     for row, col in case.black:
         state.board.board[row][col] = BLACK
     for row, col in case.white:
@@ -94,7 +95,8 @@ def load_model_config(checkpoint: Path, device: str) -> tuple[BatchedConfig, tor
     raw = dict(payload["config"])
     config = BatchedConfig(
         board_size=int(raw.get("board_size", 9)),
-        komi=float(raw.get("komi", 6.5)),
+        komi=float(raw.get("komi", DEFAULT_9X9_KOMI)),
+        score_komi=float(raw.get("score_komi", raw.get("komi", DEFAULT_9X9_SCORE_KOMI))),
         channels=int(raw.get("channels", 32)),
         residual_blocks=int(raw.get("residual_blocks", 2)),
         simulations=1,
@@ -129,7 +131,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
     )
     rows = []
     for case in TACTICAL_CASES:
-        state = make_case_state(case, config.board_size, config.komi)
+        state = make_case_state(case, config.board_size, config.komi, config.score_komi)
         root = run_batched_mcts(model, [state], search_config, stats={})[0]
         target_action = action_for(case.target, config.board_size)
         top_actions = root.top_actions(config.board_size, limit=10)
@@ -162,6 +164,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "checkpoint": str(checkpoint),
         "simulations": args.simulations,
         "komi": config.komi,
+        "score_komi": config.score_komi,
         "cases": rows,
         "top1_hits": sum(1 for item in rows if item["top1_hit"]),
         "top3_hits": sum(1 for item in rows if item["top3_hit"]),
@@ -174,6 +177,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         f"- checkpoint: `{checkpoint}`",
         f"- simulations: {args.simulations}",
         f"- komi: {config.komi}",
+        f"- score_komi: {config.score_komi}",
         "",
         "| case | target | top1 | top3 | rank |",
         "|---|---:|---:|---:|---:|",

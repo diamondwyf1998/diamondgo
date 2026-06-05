@@ -13,7 +13,7 @@ import torch
 import torch.nn.functional as F
 
 from diamondgo.config import MCTSConfig, ModelConfig
-from diamondgo.defaults import DEFAULT_9X9_KOMI
+from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_SCORE_KOMI
 from diamondgo.mcts import run_mcts
 from diamondgo.model import PolicyValueNet
 from diamondgo.rules import SgfmillRules, SimpleAreaRules
@@ -23,6 +23,7 @@ from diamondgo.rules import SgfmillRules, SimpleAreaRules
 class CpuDemoConfig:
     board_size: int = 9
     komi: float = DEFAULT_9X9_KOMI
+    score_komi: float = DEFAULT_9X9_SCORE_KOMI
     channels: int = 16
     residual_blocks: int = 1
     simulations: int = 8
@@ -42,6 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run a tiny CPU-only 9x9 baby-zero demo.")
     parser.add_argument("--games", type=int, default=CpuDemoConfig.games)
     parser.add_argument("--komi", type=float, default=CpuDemoConfig.komi)
+    parser.add_argument("--score-komi", type=float, default=CpuDemoConfig.score_komi)
     parser.add_argument("--simulations", type=int, default=CpuDemoConfig.simulations)
     parser.add_argument("--max-moves", type=int, default=CpuDemoConfig.max_moves)
     parser.add_argument("--train-steps", type=int, default=CpuDemoConfig.train_steps)
@@ -94,8 +96,8 @@ def evaluate_with_model(model: PolicyValueNet, state: SimpleAreaRules) -> tuple[
 
 def make_rules(config: CpuDemoConfig):
     if config.rules_backend == "sgfmill":
-        return SgfmillRules(size=config.board_size, komi=config.komi)
-    return SimpleAreaRules(size=config.board_size, komi=config.komi)
+        return SgfmillRules(size=config.board_size, komi=config.komi, score_komi=config.score_komi)
+    return SimpleAreaRules(size=config.board_size, komi=config.komi, score_komi=config.score_komi)
 
 
 def play_game(config: CpuDemoConfig, model: PolicyValueNet) -> tuple[list[dict[str, object]], float]:
@@ -277,7 +279,7 @@ def write_sgf(path: str | Path, config: CpuDemoConfig, examples: list[dict[str, 
     nodes = [
         (
             f"(;GM[1]FF[4]CA[UTF-8]AP[DiamondGo:cpu-demo]"
-            f"SZ[{config.board_size}]KM[{config.komi}]PB[DiamondGo random-init]PW[DiamondGo random-init]"
+            f"SZ[{config.board_size}]KM[{config.score_komi}]PB[DiamondGo random-init]PW[DiamondGo random-init]"
             f"C[{_escape_sgf_text(f'DiamondGo baby-zero demo with {config.rules_backend} rules.')}]"
         )
     ]
@@ -983,6 +985,7 @@ def main() -> None:
         CpuDemoConfig(),
         games=args.games,
         komi=args.komi,
+        score_komi=args.score_komi,
         simulations=args.simulations,
         max_moves=args.max_moves,
         train_steps=args.train_steps,

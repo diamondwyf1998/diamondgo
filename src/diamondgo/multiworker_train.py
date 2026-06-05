@@ -14,7 +14,7 @@ import numpy as np
 import torch
 
 from diamondgo.batched_demo import BatchedConfig, make_model, play_batched_games
-from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES
+from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES, DEFAULT_9X9_SCORE_KOMI
 from diamondgo.demo_cpu import build_trace, write_json, write_sgf
 from diamondgo.overnight_train import (
     OvernightConfig,
@@ -28,6 +28,7 @@ from diamondgo.overnight_train import (
 class MultiWorkerConfig:
     board_size: int = 9
     komi: float = DEFAULT_9X9_KOMI
+    score_komi: float = DEFAULT_9X9_SCORE_KOMI
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 100
@@ -58,6 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--workers", type=int, default=MultiWorkerConfig.workers)
     parser.add_argument("--games-per-worker", type=int, default=MultiWorkerConfig.games_per_worker)
     parser.add_argument("--komi", type=float, default=MultiWorkerConfig.komi)
+    parser.add_argument("--score-komi", type=float, default=MultiWorkerConfig.score_komi)
     parser.add_argument("--max-moves", type=int, default=MultiWorkerConfig.max_moves)
     parser.add_argument("--simulations", type=int, default=MultiWorkerConfig.simulations)
     parser.add_argument("--train-steps-per-cycle", type=int, default=MultiWorkerConfig.train_steps_per_cycle)
@@ -79,6 +81,7 @@ def to_overnight_config(config: MultiWorkerConfig) -> OvernightConfig:
     return OvernightConfig(
         board_size=config.board_size,
         komi=config.komi,
+        score_komi=config.score_komi,
         channels=config.channels,
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,
@@ -104,6 +107,7 @@ def make_selfplay_config(config: MultiWorkerConfig, seed: int) -> BatchedConfig:
     return BatchedConfig(
         board_size=config.board_size,
         komi=config.komi,
+        score_komi=config.score_komi,
         channels=config.channels,
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,
@@ -449,6 +453,7 @@ def main() -> None:
         residual_blocks=args.residual_blocks,
         simulations=args.simulations,
         komi=args.komi,
+        score_komi=args.score_komi,
         workers=args.workers,
         games_per_worker=args.games_per_worker,
         max_moves=args.max_moves,

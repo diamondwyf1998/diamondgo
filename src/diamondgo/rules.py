@@ -5,7 +5,7 @@ from typing import Protocol
 
 import numpy as np
 
-from diamondgo.defaults import DEFAULT_9X9_KOMI
+from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_SCORE_KOMI
 
 
 BLACK = "b"
@@ -59,9 +59,15 @@ class SimpleAreaRules:
     real rules dependency is installed.
     """
 
-    def __init__(self, size: int = 9, komi: float = DEFAULT_9X9_KOMI) -> None:
+    def __init__(
+        self,
+        size: int = 9,
+        komi: float = DEFAULT_9X9_KOMI,
+        score_komi: float = DEFAULT_9X9_SCORE_KOMI,
+    ) -> None:
         self.size = size
         self.komi = komi
+        self.score_komi = score_komi
         self.board = np.zeros((size, size), dtype=np.int8)
         self.to_play = BLACK
         self._passes = 0
@@ -73,7 +79,7 @@ class SimpleAreaRules:
         return self.size * self.size + 1
 
     def copy(self) -> "SimpleAreaRules":
-        clone = SimpleAreaRules(self.size, self.komi)
+        clone = SimpleAreaRules(self.size, self.komi, self.score_komi)
         clone.board = self.board.copy()
         clone.to_play = self.to_play
         clone._passes = self._passes
@@ -130,7 +136,7 @@ class SimpleAreaRules:
         return self._passes >= 2 or self._moves >= self.action_size + 1
 
     def terminal_value(self) -> float:
-        black_minus_white = float(self.board.sum()) - self.komi
+        black_minus_white = float(self.board.sum()) - self.score_komi
         winner = BLACK if black_minus_white > 0 else WHITE
         return 1.0 if winner == self.to_play else -1.0
 
@@ -138,7 +144,12 @@ class SimpleAreaRules:
 class SgfmillRules:
     """Thin adapter around sgfmill so rules can be replaced without touching MCTS."""
 
-    def __init__(self, size: int = 5, komi: float = DEFAULT_9X9_KOMI) -> None:
+    def __init__(
+        self,
+        size: int = 5,
+        komi: float = DEFAULT_9X9_KOMI,
+        score_komi: float = DEFAULT_9X9_SCORE_KOMI,
+    ) -> None:
         try:
             from sgfmill import boards
         except ImportError as exc:
@@ -149,6 +160,7 @@ class SgfmillRules:
 
         self.size = size
         self.komi = komi
+        self.score_komi = score_komi
         self._boards = boards
         self.board = boards.Board(size)
         self.board_array = np.zeros((size, size), dtype=np.int8)
@@ -162,7 +174,7 @@ class SgfmillRules:
         return self.size * self.size + 1
 
     def copy(self) -> "SgfmillRules":
-        clone = SgfmillRules(self.size, self.komi)
+        clone = SgfmillRules(self.size, self.komi, self.score_komi)
         clone.board = self.board.copy()
         clone.board_array = self.board_array.copy()
         clone.to_play = self.to_play
@@ -224,7 +236,7 @@ class SgfmillRules:
         return np.stack([own, opp, to_play_plane, komi_plane]).astype(np.float32)
 
     def area_winner_value(self) -> float:
-        black_minus_white = self.board.area_score() - self.komi
+        black_minus_white = self.board.area_score() - self.score_komi
         winner = BLACK if black_minus_white > 0 else WHITE
         return 1.0 if winner == self.to_play else -1.0
 

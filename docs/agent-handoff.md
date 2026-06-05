@@ -40,7 +40,9 @@ Current server dashboard:
 
 ## Current Training/Evaluation Defaults
 
-- Default 9x9 komi is `6.5`; old checkpoints keep their serialized `config.komi`.
+- Default 9x9 model-input komi is `0.5`; the observation plane still uses `komi / 10.0`.
+- Default 9x9 scoring komi is `6.5`; terminal winner, value targets, score margins, and SGF `KM` use `score_komi`.
+- Old checkpoints that do not include `score_komi` are evaluated with their serialized `config.komi` unless a new run explicitly sets `--score-komi`.
 - Default 9x9 self-play cap is `120` moves.
 - `src/diamondgo/eval_suite.py` runs standard checkpoint matches at step tiers such as `50,200,500` against `initial` and `previous`.
 - `src/diamondgo/tactical_eval.py` runs fixed capture/atari probes and reports target top-1/top-3/rank.
