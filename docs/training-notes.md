@@ -78,6 +78,12 @@ Source labels:
   - Training script: `tools/server/run_resume_scorekomi25_1h.sh`
   - Finalizer script: `tools/server/finalize_scorekomi25_1h.sh`
   - Data reference: `docs/training-data-log.md#score-komi-25-continuation-cycles-1065`
+- `Technical operation`: The `score_komi=2.5` follow-up was also stopped early
+  at cycle `1080` after the White skew persisted. Checkpoints were preserved
+  for later inspection rather than overwritten.
+  - Preserved server path:
+    `/root/diamondgo/artifacts/multiworker-9x9-resume0p5-score2p5-100sims-120moves-1h-20260605`
+  - Data reference: `docs/training-data-log.md#score-komi-25-continuation-cycles-1065`
 - `Technical operation`: Built a dedicated single-game viewer for qualitative
   checkpoint inspection:
   - `artifacts/selfplay-showcase-swing-760-830-20260605/viewer.html`
@@ -132,6 +138,12 @@ Source labels:
   - Technical response: stop the `score_komi=6.5` run and start a
     `score_komi=2.5` continuation.
   - Data reference: `docs/training-data-log.md#score-komi-continuation-cycles-857`
+- `Agent measurement`: Lowering scoring komi to `2.5` did not quickly recover
+  balance when resuming from the White-favored weights. Cycles `1065-1080`
+  still had White win rates between `75.0%` and `96.9%`.
+  - Interpretation: the inherited policy/value state matters; just changing
+    terminal scoring labels midstream is not enough for a quick correction.
+  - Data reference: `docs/training-data-log.md#score-komi-25-continuation-cycles-1065`
 
 ### Tests Still Needed
 

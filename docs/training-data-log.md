@@ -62,7 +62,7 @@ Run-specific differences:
 | `multiworker-9x9-100sims-120moves-opt-v2-5h-20260605` | 300 min | continuation from earlier sequence | 120 | `komi=0.5` | Main 700-856 color-swing run. |
 | `multiworker-9x9-komi6p5-100sims-120moves-2h-20260605` | 120 min | none | 120 | old style `komi=6.5` | Brief fresh run, stopped after realizing `komi` changes model input. |
 | `multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605` | 120 min, then queued +120 min extension, stopped early at about 21:52 CST | `multiworker-9x9-100sims-120moves-opt-v2-5h-20260605/latest.pt`; extension resumes the same run's `latest.pt` | 120 | model-input `komi=0.5`, scoring `score_komi=6.5` | Stopped because White self-play win rate stayed above 90%. Old replay buffer is not restored. The extension also rebuilt replay after its resume boundary. |
-| `multiworker-9x9-resume0p5-score2p5-100sims-120moves-1h-20260605` | 60 min | `multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605/latest.pt` | 120 | model-input `komi=0.5`, scoring `score_komi=2.5` | Follow-up to test whether reducing scoring komi pulls back the White win-rate skew. |
+| `multiworker-9x9-resume0p5-score2p5-100sims-120moves-1h-20260605` | stopped early at cycle 1080 | `multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605/latest.pt` | 120 | model-input `komi=0.5`, scoring `score_komi=2.5` | Follow-up to test whether reducing scoring komi pulls back the White win-rate skew; stopped because the skew remained high. |
 
 Evaluation and probe defaults:
 
@@ -212,6 +212,8 @@ scoring/value labels to `score_komi=2.5`.
 
 Initial cycles after the switch still show strong White skew; this is expected
 to be slow to correct because the weights come from the White-favored state.
+The run was stopped at cycle `1080`; checkpoints were preserved, including
+`cycle-01070.pt`, `cycle-01080.pt`, and `latest.pt`.
 
 | Cycle | Black wins | White wins | Black win rate | White win rate | Mean Black margin |
 | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -222,6 +224,15 @@ to be slow to correct because the weights come from the White-favored state.
 | 1069 | 2 | 30 | 6.2% | 93.8% | -12.22 |
 | 1070 | 3 | 29 | 9.4% | 90.6% | -15.22 |
 | 1071 | 1 | 31 | 3.1% | 96.9% | -11.19 |
+| 1072 | 3 | 29 | 9.4% | 90.6% | -10.25 |
+| 1073 | 1 | 31 | 3.1% | 96.9% | -14.09 |
+| 1074 | 1 | 31 | 3.1% | 96.9% | -12.09 |
+| 1075 | 4 | 28 | 12.5% | 87.5% | -9.06 |
+| 1076 | 2 | 30 | 6.2% | 93.8% | -15.62 |
+| 1077 | 8 | 24 | 25.0% | 75.0% | -6.06 |
+| 1078 | 5 | 27 | 15.6% | 84.4% | -9.91 |
+| 1079 | 5 | 27 | 15.6% | 84.4% | -10.19 |
+| 1080 | 2 | 30 | 6.2% | 93.8% | -12.97 |
 
 ## Center 5x5 Opening Distribution
 
