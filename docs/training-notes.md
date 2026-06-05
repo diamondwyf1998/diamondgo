@@ -193,6 +193,13 @@ Source labels:
   (`19/32` Black wins). This is only an early health check, not a strength
   conclusion.
   - Data reference: `docs/training-data-log.md#fresh-no-komi-input-4x64-run`
+- `Technical operation`: The fresh no-komi-input 4x64 run was paused at about
+  cycle `66` so the user could prepare an overnight deployment. The finalizer
+  was stopped before the training process, so no automatic eval/tactical jobs
+  were launched by this pause.
+  - Preserved checkpoint reference:
+    `artifacts/multiworker-9x9-fresh-nokomi-4x64-score2p5-100sims-noise-aug-2h-20260605/latest.pt`
+  - Data reference: `docs/training-data-log.md#fresh-no-komi-input-4x64-run`
 
 ### Tests Still Needed
 

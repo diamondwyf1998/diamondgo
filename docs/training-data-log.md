@@ -374,6 +374,12 @@ Initial server status:
 - Finalizer PID: `399713`
 - Server scripts were converted to LF line endings before launch because the
   Windows checkout stored them with CRLF.
+- Stopped at about `2026-06-05 23:51 CST` so the user could prepare an
+  overnight training deployment. The finalizer was stopped first, so no
+  automatic eval/tactical probes were launched by this pause.
+- Preserved checkpoints include `cycle-00010.pt`, `cycle-00020.pt`,
+  `cycle-00030.pt`, `cycle-00040.pt`, `cycle-00050.pt`, `cycle-00060.pt`, and
+  `latest.pt`.
 
 Early measured cycles:
 
@@ -381,6 +387,11 @@ Early measured cycles:
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 11 | 21 | 34.4% | 65.6% | +3.16 | 71.84 | 27 | 5 |
 | 2 | 19 | 13 | 59.4% | 40.6% | +1.00 | 99.44 | 26 | 6 |
+| 62 | 24 | 8 | 75.0% | 25.0% | -0.56 | 108.34 | 24 | 8 |
+| 63 | 25 | 7 | 78.1% | 21.9% | +0.97 | 101.12 | 26 | 6 |
+| 64 | 27 | 5 | 84.4% | 15.6% | +3.19 | 103.34 | 25 | 7 |
+| 65 | 23 | 9 | 71.9% | 28.1% | +2.31 | 105.12 | 25 | 7 |
+| 66 | 26 | 6 | 81.2% | 18.8% | +1.38 | 105.56 | 24 | 8 |
 
 ## Unfinished 2-Layer Baseline Questions
 
