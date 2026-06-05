@@ -342,6 +342,21 @@ Planned config:
 | Time limit | `120` minutes |
 | Checkpoint interval | every `10` cycles |
 
+Initial server status:
+
+- Started at about `2026-06-05 22:47 CST`.
+- Training PID: `399061`
+- Finalizer PID: `399713`
+- Server scripts were converted to LF line endings before launch because the
+  Windows checkout stored them with CRLF.
+
+Early measured cycles:
+
+| Cycle | Black wins | White wins | Black win rate | White win rate | Mean Black margin | Mean moves | Ended by pass | Ended by max moves |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 11 | 21 | 34.4% | 65.6% | +3.16 | 71.84 | 27 | 5 |
+| 2 | 19 | 13 | 59.4% | 40.6% | +1.00 | 99.44 | 26 | 6 |
+
 ## Center 5x5 Opening Distribution
 
 Center-region definition: 9x9 center 5x5, rows 3-7 and columns C-G in GTP

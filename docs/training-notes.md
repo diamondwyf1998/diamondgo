@@ -176,6 +176,12 @@ Source labels:
   the network a feature that cannot explain position differences inside a fixed
   experiment, and `temperature=1.0` for the whole game may keep late-game play
   too random. The fresh 4x64 run is meant to test this directly.
+- `Agent measurement`: The fresh no-komi-input 4x64 run did not immediately
+  reproduce the extreme White skew seen in the continuation runs. Cycle `1`
+  was White-favored (`21/32` White wins), while cycle `2` swung to Black
+  (`19/32` Black wins). This is only an early health check, not a strength
+  conclusion.
+  - Data reference: `docs/training-data-log.md#fresh-no-komi-input-4x64-run`
 
 ### Tests Still Needed
 
