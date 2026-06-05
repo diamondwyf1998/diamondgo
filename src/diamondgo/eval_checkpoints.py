@@ -585,6 +585,63 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
       }};
     }}
 
+    function neighbors(action) {{
+      const size = state.boardSize;
+      const row = Math.floor(action / size);
+      const col = action % size;
+      const result = [];
+      if (row > 0) result.push(action - size);
+      if (row + 1 < size) result.push(action + size);
+      if (col > 0) result.push(action - 1);
+      if (col + 1 < size) result.push(action + 1);
+      return result;
+    }}
+
+    function groupAndLiberties(boardState, start) {{
+      const color = boardState[start].color;
+      const stack = [start];
+      const seen = new Set([start]);
+      const liberties = new Set();
+      while (stack.length) {{
+        const action = stack.pop();
+        neighbors(action).forEach((next) => {{
+          const stone = boardState[next];
+          if (!stone) {{
+            liberties.add(next);
+          }} else if (stone.color === color && !seen.has(next)) {{
+            seen.add(next);
+            stack.push(next);
+          }}
+        }});
+      }}
+      return {{ stones: [...seen], liberties: liberties.size }};
+    }}
+
+    function replayBoard(index) {{
+      const boardState = Array(state.boardSize * state.boardSize).fill(null);
+      const game = currentGame();
+      game.moves.slice(0, index + 1).forEach((move) => {{
+        if (move.action >= state.boardSize * state.boardSize) return;
+        boardState[move.action] = {{ color: move.player, moveNumber: move.moveNumber }};
+        const opponent = move.player === "b" ? "w" : "b";
+        const checked = new Set();
+        neighbors(move.action).forEach((next) => {{
+          const stone = boardState[next];
+          if (!stone || stone.color !== opponent || checked.has(next)) return;
+          const group = groupAndLiberties(boardState, next);
+          group.stones.forEach((action) => checked.add(action));
+          if (group.liberties === 0) {{
+            group.stones.forEach((action) => {{ boardState[action] = null; }});
+          }}
+        }});
+        const own = groupAndLiberties(boardState, move.action);
+        if (own.liberties === 0) {{
+          own.stones.forEach((action) => {{ boardState[action] = null; }});
+        }}
+      }});
+      return boardState;
+    }}
+
     function currentMatch() {{
       return state.matches[Number(matchSelect.value)] || state.matches[0];
     }}
@@ -617,8 +674,8 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
 
     function drawBoard(index) {{
       const game = currentGame();
-      const moves = game.moves.slice(0, index + 1).filter((move) => move.action < state.boardSize * state.boardSize);
       const current = game.moves[index];
+      const boardState = replayBoard(index);
       const boardEnd = state.pad + (state.boardSize - 1) * state.cell;
       const viewSize = boardEnd + state.pad;
       board.setAttribute("viewBox", `0 0 ${{viewSize}} ${{viewSize}}`);
@@ -640,9 +697,10 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
           fill: colors[rank]
         }}, String(rank + 1)));
       }});
-      moves.forEach((move) => {{
-        const p = pointFor(move.action);
-        const isBlack = move.player === "b";
+      boardState.forEach((stone, action) => {{
+        if (!stone) return;
+        const p = pointFor(action);
+        const isBlack = stone.color === "b";
         board.appendChild(makeSvg("circle", {{
           cx: p.x, cy: p.y, r: 16, fill: isBlack ? "#161616" : "#f4f1e8",
           stroke: isBlack ? "#161616" : "#7b756c", "stroke-width": 1.5
@@ -650,7 +708,7 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
         board.appendChild(makeSvg("text", {{
           x: p.x, y: p.y + 4, "text-anchor": "middle", "font-size": 12,
           fill: isBlack ? "#fff" : "#111"
-        }}, String(move.moveNumber)));
+        }}, String(stone.moveNumber)));
       }});
     }}
 
