@@ -726,7 +726,12 @@ def run(args: argparse.Namespace) -> dict[str, object]:
     results: list[dict[str, object]] = []
 
     for checkpoint_path in selected:
-        cycle = int(load_checkpoint_payload(checkpoint_path, args.device).get("cycle", cycle_from_path(checkpoint_path)))
+        checkpoint_payload = load_checkpoint_payload(checkpoint_path, args.device)
+        cycle = int(
+            checkpoint_payload["cycle"]
+            if "cycle" in checkpoint_payload
+            else cycle_from_path(checkpoint_path)
+        )
         candidate_name = f"cycle-{cycle:05d}"
         candidate_model = make_checkpoint_model(config, checkpoint_path)
         if args.opponent == "initial":
