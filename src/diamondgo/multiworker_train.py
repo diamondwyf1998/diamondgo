@@ -248,8 +248,13 @@ def summarize_game_behavior(
     captured_stones = sum(int(item.get("captured_stones", 0)) for item in game_summaries)
     margins = [abs(float(item.get("black_score_margin", 0.0))) for item in game_summaries]
     black_wins = sum(1 for item in game_summaries if item.get("winner") == "b")
+    games = len(game_summaries)
+    white_wins = games - black_wins
+    black_win_rate = black_wins / max(games, 1)
+    white_win_rate = white_wins / max(games, 1)
+    color_bias_alert_threshold = 0.70
     return {
-        "games": len(game_summaries),
+        "games": games,
         "ended_by_pass": sum(1 for item in game_summaries if item.get("ended_by") == "pass"),
         "ended_by_max_moves": sum(1 for item in game_summaries if item.get("ended_by") == "max_moves"),
         "moves_mean": round(float(np.mean(moves)), 3) if moves else 0.0,
@@ -260,7 +265,17 @@ def summarize_game_behavior(
         "captured_stones": captured_stones,
         "capture_move_fraction": round(capture_moves / max(len(examples), 1), 4),
         "black_wins": black_wins,
-        "white_wins": len(game_summaries) - black_wins,
+        "white_wins": white_wins,
+        "black_win_rate": round(black_win_rate, 4),
+        "white_win_rate": round(white_win_rate, 4),
+        "black_win_rate_alert": black_win_rate >= color_bias_alert_threshold,
+        "white_win_rate_alert": white_win_rate >= color_bias_alert_threshold,
+        "color_bias_alert_threshold": color_bias_alert_threshold,
+        "color_bias_alert": (
+            "black" if black_win_rate >= color_bias_alert_threshold
+            else "white" if white_win_rate >= color_bias_alert_threshold
+            else ""
+        ),
         "abs_score_margin_mean": round(float(np.mean(margins)), 3) if margins else 0.0,
         "per_game": game_summaries,
     }
