@@ -60,7 +60,7 @@ Run-specific differences:
 | `multiworker-9x9-100sims-160moves-5h-20260605` | 300 min | continuation from earlier sequence | 160 | `komi=0.5` | Longer-game experiment. |
 | `multiworker-9x9-100sims-120moves-opt-v2-5h-20260605` | 300 min | continuation from earlier sequence | 120 | `komi=0.5` | Main 700-856 color-swing run. |
 | `multiworker-9x9-komi6p5-100sims-120moves-2h-20260605` | 120 min | none | 120 | old style `komi=6.5` | Brief fresh run, stopped after realizing `komi` changes model input. |
-| `multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605` | 120 min, then queued +120 min extension | `multiworker-9x9-100sims-120moves-opt-v2-5h-20260605/latest.pt`; extension resumes the same run's `latest.pt` | 120 | model-input `komi=0.5`, scoring `score_komi=6.5` | Active continuation; old replay buffer is not restored. The extension also rebuilds replay after its resume boundary. |
+| `multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605` | 120 min, then queued +120 min extension, later cut to about +60 min from 21:42 CST | `multiworker-9x9-100sims-120moves-opt-v2-5h-20260605/latest.pt`; extension resumes the same run's `latest.pt` | 120 | model-input `komi=0.5`, scoring `score_komi=6.5` | Active continuation; old replay buffer is not restored. The extension also rebuilds replay after its resume boundary. |
 
 Evaluation and probe defaults:
 
@@ -137,6 +137,8 @@ Source artifacts:
   `/root/diamondgo/extend_resume_scorekomi65_2h.sh`
 - Extension log:
   `/root/diamondgo/artifacts/multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605/train-extension-2h.log`
+- Extension cutoff log:
+  `/root/diamondgo/artifacts/multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605/cutoff-after-1h.log`
 - Final extended evaluation output:
   `/root/diamondgo/artifacts/eval-suite-resume0p5-score6p5-100sims-120moves-extended-20260605`
 
@@ -146,7 +148,10 @@ value labels via `score_komi=6.5`. The old replay buffer is not restored because
 checkpoints do not serialize it; replay is rebuilt from new self-play. A
 two-hour extension was queued after the first segment: it waits for the current
 training PID to finish, resumes the run's latest checkpoint, trains for another
-120 minutes, then runs the final eval suite and tactical probes.
+120 minutes, then runs the final eval suite and tactical probes. After the
+extension started, it had about 91 minutes remaining at 21:41 CST, so a cutoff
+watcher was added at 21:42 CST to stop training about one hour later and run the
+same final eval/tactical probes.
 
 Early measured cycles while the run was still active:
 

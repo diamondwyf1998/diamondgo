@@ -64,6 +64,13 @@ Source labels:
   - Extension script:
     `/root/diamondgo/extend_resume_scorekomi65_2h.sh`
   - Data reference: `docs/training-data-log.md#score-komi-continuation-cycles-857`
+- `Technical operation`: After the extension had started, remaining training
+  time was still over one hour, so a cutoff watcher was added at about
+  `21:42 CST`. It should stop the extension training about one hour later and
+  then run the same final eval/tactical probes.
+  - Cutoff log:
+    `/root/diamondgo/artifacts/multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605/cutoff-after-1h.log`
+  - Data reference: `docs/training-data-log.md#score-komi-continuation-cycles-857`
 - `Technical operation`: Built a dedicated single-game viewer for qualitative
   checkpoint inspection:
   - `artifacts/selfplay-showcase-swing-760-830-20260605/viewer.html`
