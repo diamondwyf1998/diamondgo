@@ -275,6 +275,11 @@ def run(config: MultiWorkerConfig, out_dir: Path, resume: str = "") -> dict[str,
         for worker_result in worker_results:
             for example in worker_result["examples"]:
                 example["worker_id"] = worker_result["worker_id"]
+                example["local_game"] = example["game"]
+                example["game"] = (
+                    (int(worker_result["worker_id"]) - 1) * config.games_per_worker
+                    + int(example["local_game"])
+                )
             examples.extend(worker_result["examples"])
         replay.extend(examples)
         if len(replay) > config.replay_size:

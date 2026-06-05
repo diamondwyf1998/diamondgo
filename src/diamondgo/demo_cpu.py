@@ -246,6 +246,8 @@ def build_trace(config: CpuDemoConfig, examples: list[dict[str, object]]) -> dic
             {
                 "move_number": index,
                 "game": int(example.get("game", 1)),
+                "worker_id": int(example.get("worker_id", 1)),
+                "local_game": int(example.get("local_game", example.get("game", 1))),
                 "move_in_game": int(example.get("move_in_game", index)),
                 "player": example["player"],
                 "chosen_action": action,
