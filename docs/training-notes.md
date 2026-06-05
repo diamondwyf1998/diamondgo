@@ -5,28 +5,41 @@ operations. Keep only important facts, phenomena, and next actions here. Put
 large tables and raw measurements in `docs/training-data-log.md`, then reference
 them from this file.
 
+Source labels:
+
+- `User observation`: qualitative reading or hypothesis first raised by the
+  user while reviewing games.
+- `Agent measurement`: aggregate statistics, scripted samples, or generated
+  dashboard/table results.
+- `Technical operation`: code/config/training operation performed by an agent.
+- `Hypothesis`: interpretation that still needs targeted tests.
+
 ## 2026-06-05 Notes
 
 ### Configuration And Operation Changes
 
-- Increased the self-play move cap during the experiment sequence:
+- `Technical operation`: Increased the self-play move cap during the experiment
+  sequence:
   - early runs and first multiworker checkpoints used `max_moves=80`
   - the 630-690 stage used `max_moves=160`
   - the 700+ optimized run used `max_moves=120`
   - Data reference: `docs/training-data-log.md#run-and-config-timeline`
-- Komi handling was changed by recent source work, partly by the other agent:
+- `Technical operation`: Komi handling was changed by recent source work,
+  partly by the other agent:
   - legacy artifacts generally serialize `komi=0.5`
   - current code separates model-input `komi=0.5` from scoring `score_komi=6.5`
   - important intent: do not change the model input plane when continuing old
     checkpoints; change only terminal scoring/value labels via `score_komi`
   - Data reference: `docs/training-data-log.md#run-and-config-timeline`
-- A fresh `komi=6.5` run was briefly started, then stopped after realizing
-  `komi` is part of the model input. The active follow-up run instead resumes
-  the old 0.5-komi model with `komi=0.5` and `score_komi=6.5`.
+- `Technical operation`: A fresh `komi=6.5` run was briefly started, then
+  stopped after realizing `komi` is part of the model input. The active
+  follow-up run instead resumes the old 0.5-komi model with `komi=0.5` and
+  `score_komi=6.5`.
   - Run reference:
     `artifacts/multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605`
   - Data reference: `docs/training-data-log.md#score-komi-continuation-cycles-857`
-- Built a dedicated single-game viewer for qualitative checkpoint inspection:
+- `Technical operation`: Built a dedicated single-game viewer for qualitative
+  checkpoint inspection:
   - `artifacts/selfplay-showcase-swing-760-830-20260605/viewer.html`
   - Reason: older batched self-play dashboards mixed three parallel games into
     one position stream, which is misleading for reading a single game.
@@ -34,47 +47,69 @@ them from this file.
 
 ### Observed Phenomena
 
-- Win-rate asymmetry appeared strongly in the 700+ run. Black was favored around
-  700-759, White became strongly favored around 770-819, and Black became
-  favored again after about 820.
+- `Agent measurement`: Win-rate asymmetry appeared strongly in the 700+ run.
+  Black was favored around 700-759, White became strongly favored around
+  770-819, and Black became favored again after about 820.
   - Main checkpoint range: `700-856`
   - Reversal checkpoints to inspect: `760, 770, 780, 790, 800, 810, 820, 830`
   - Data reference: `docs/training-data-log.md#black-win-rate-and-margin-cycles-700-856`
-- Black tends to prefer the center in several sampled checkpoints. The strongest
-  examples are around `630, 650, 660, 690, 700, 730, 750`, where Black's first
-  20 moves land in the center 5x5 much more often than White's.
+- `Agent measurement`: Black tends to prefer the center in several sampled
+  checkpoints. The strongest examples are around `630, 650, 660, 690, 700,
+  730, 750`, where Black's first 20 moves land in the center 5x5 much more
+  often than White's.
   - Data reference: `docs/training-data-log.md#center-5x5-opening-distribution`
-- Around the color reversal, Black's opening distribution looks less stable.
-  In small samples:
+- `Agent measurement`: Around the color reversal, Black's opening distribution
+  looks less stable. In small samples:
   - `760`: first move fixed at `F4` in all three sampled games
   - `770-800`: White wins most sampled games, and Black is less center-heavy
   - `810`: one sampled game starts with Black `pass`, which is abnormal
   - `830`: first move fixed at `G2` in all three sampled games, and Black wins
     all three sampled games
   - Data reference: `docs/training-data-log.md#single-game-showcase-cycles-760-830`
-- Qualitative board reading: during the White-favored phase, Black stones can
-  look more dispersed and easier for White to surround in large regions. This is
-  an observation from visual inspection, not yet a quantified metric.
+- `User observation`: During the White-favored phase, Black stones can look more
+  dispersed and easier for White to surround in large regions. This is an
+  observation from visual inspection, not yet a quantified metric.
   - Checkpoints to revisit visually: `770, 780, 790, 800, 810`
   - Viewer reference:
     `artifacts/selfplay-showcase-swing-760-830-20260605/viewer.html`
-- After switching only terminal scoring to `score_komi=6.5` while keeping the
-  old model-input `komi=0.5`, the continuation run rapidly swung from a Black
-  advantage at cycle `857` to a strong White advantage from about `859` onward.
-  This should be interpreted as a rule-label shock / adaptation signal, not as a
-  clean strength improvement.
+- `User observation`: When Black's win rate reversed back in the 820+ range,
+  its style looked more stable and less scattered. A plausible qualitative
+  reason is that Black no longer left a large, loose distribution of stones
+  that White could surround.
+  - Checkpoints to compare visually: `800, 810, 820, 830`
+  - Data reference: `docs/training-data-log.md#single-game-showcase-cycles-760-830`
+- `Agent measurement`: After switching only terminal scoring to `score_komi=6.5`
+  while keeping the old model-input `komi=0.5`, the continuation run rapidly
+  swung from a Black advantage at cycle `857` to a strong White advantage from
+  about `859` onward. This should be interpreted as a rule-label shock /
+  adaptation signal, not as a clean strength improvement.
   - Main checkpoint range so far: `857-871`
   - Data reference: `docs/training-data-log.md#score-komi-continuation-cycles-857`
 
 ### Tests Still Needed
 
-- Tactical learning checks:
-  - whether the model has learned to capture
-  - whether the model has learned atari and atari defense
-  - whether the model avoids obvious self-atari or group-death moves
-  - Candidate tool: `src/diamondgo/tactical_eval.py`
-  - Important checkpoints to test: old `850/latest`, score-komi continuation
-    `860/870/latest`, and later finished continuation checkpoints.
+- Tactical learning checks were started for checkpoints `760-830`.
+  - White one-stone capture is learned in this probe: `8/8` top1/top3.
+  - Black capture is weak: black one-stone capture is `0/8` top1 and only
+    `3/8` top3; black two-stone capture is `0/8` top3.
+  - Simple escape-from-atari is not learned in these cases: black and white
+    escape-atari probes are both `0/8` top3.
+  - Capture-to-defend is partly learned: black `6/8` top1 and `7/8` top3,
+    white `2/8` top1 and `3/8` top3.
+  - Filling eyes is a major problem, especially for Black: the bad black
+    fill-eye move is top1 in `6/8` checkpoints and top3 in `8/8`.
+  - Self-atari/dead-shape probes are less catastrophic than fill-eye but still
+    show bad black edge/corner moves in top3 for `3/8` checkpoints.
+  - Data reference: `docs/training-data-log.md#tactical-probes-cycles-760-830`
+- Tactical checks still need broader coverage:
+  - test old `850/latest`, score-komi continuation `860/870/latest`, and later
+    finished continuation checkpoints
+  - test more capture/atari shapes, including ladders, snapbacks, and edge
+    liberties
+  - turn fill-eye into a larger distributional metric instead of two hand-built
+    cases
+  - audit whether these failures are policy-prior failures, MCTS/value failures,
+    or both
 - Opening policy checks:
   - for checkpoints `760, 770, 780, 790, 800, 810, 820, 830`, record empty-board
     top-10 priors and MCTS top candidates
@@ -91,8 +126,13 @@ them from this file.
 
 ### Working Interpretation
 
-The current evidence points to self-play distribution instability rather than a
-smooth monotonic strength increase. The color reversal and fixed first-move
-patterns suggest that the model may periodically collapse into transient
-opening habits. The `810` first-move pass is a special warning sign and should
-be tested directly before trusting later qualitative conclusions.
+`Hypothesis`: The current evidence points to self-play distribution instability
+rather than a smooth monotonic strength increase. The color reversal and fixed
+first-move patterns suggest that the model may periodically collapse into
+transient opening habits. The `810` first-move pass is a special warning sign
+and should be tested directly before trusting later qualitative conclusions.
+
+`Hypothesis`: The 820+ Black recovery may be related to a more stable style:
+fewer scattered stones, less exposure to being surrounded, and possibly more
+coherent group structure. This is currently based on user visual inspection and
+needs a shape/distribution metric before treating it as a measured result.

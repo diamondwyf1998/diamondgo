@@ -171,6 +171,17 @@ Small-sample inspection, 3 games per checkpoint:
 | 820 | B 0 / W 3 | B 32.1% / W 46.7% | E7, A4, B9 |
 | 830 | B 3 / W 0 | B 60.0% / W 33.3% | G2, G2, G2 |
 
+Qualitative observation index:
+
+- User observation: during the White-favored phase around `770-810`, Black's
+  stones can look more scattered and easier for White to surround in large
+  regions.
+- User observation: when Black's win rate recovered around `820+`, Black's
+  style looked more stable and less dispersed. This may explain part of the
+  win-rate reversal, but it has not yet been quantified.
+- Candidate comparison checkpoints for this observation: `800`, `810`, `820`,
+  `830`.
+
 Checkpoint paths:
 
 - `760`: `artifacts/multiworker-9x9-100sims-120moves-opt-v2-5h-20260605/checkpoints/cycle-00760.pt`
@@ -199,3 +210,48 @@ Selected earlier evaluation results:
 | cycle 500 vs initial | 19/20, 95% |
 | cycle 500 vs cycle 450 | 14/20, 70% |
 | cycle 537 vs cycle 500 | 16/20, 80% |
+
+## Tactical Probes, Cycles 760-830
+
+Source artifacts:
+
+- `artifacts/tactical-swing-760-830-20260605/tactical_results.json`
+- `artifacts/tactical-swing-760-830-20260605/tactical_report.md`
+
+Probe interpretation:
+
+- Capture and atari-defense cases are positive tests: higher top1/top3 hit
+  counts are better.
+- Fill-eye and self/dead-shape cases are negative tests: top1/top3 counts mean
+  the model chose or highly ranked a bad move, so lower is better.
+- These probes use 100 MCTS simulations per move.
+
+Category summary by checkpoint:
+
+| Cycle | Capture top1/top3 | Atari defense top1/top3 | Fill-eye bad top1/top3 | Self/dead bad top1/top3 |
+| ---: | ---: | ---: | ---: | ---: |
+| 760 | 1/1 of 4 | 1/1 of 4 | 0/2 of 2 | 0/1 of 2 |
+| 770 | 1/2 of 4 | 1/1 of 4 | 2/2 of 2 | 0/0 of 2 |
+| 780 | 1/2 of 4 | 1/1 of 4 | 1/1 of 2 | 0/0 of 2 |
+| 790 | 1/2 of 4 | 1/1 of 4 | 1/1 of 2 | 0/0 of 2 |
+| 800 | 1/1 of 4 | 1/1 of 4 | 1/1 of 2 | 0/0 of 2 |
+| 810 | 1/1 of 4 | 2/2 of 4 | 1/1 of 2 | 0/0 of 2 |
+| 820 | 1/2 of 4 | 0/1 of 4 | 1/1 of 2 | 0/1 of 2 |
+| 830 | 1/2 of 4 | 1/2 of 4 | 0/1 of 2 | 0/1 of 2 |
+
+Per-case summary across the eight checkpoints:
+
+| Case | Category | Hit count |
+| --- | --- | ---: |
+| `black_capture_one_stone` | capture | good top1/top3 `0/3 of 8` |
+| `white_capture_one_stone` | capture | good top1/top3 `8/8 of 8` |
+| `black_capture_two_stones` | capture | good top1/top3 `0/0 of 8` |
+| `white_capture_two_stones` | capture | good top1/top3 `0/2 of 8` |
+| `black_escape_atari` | atari defense | good top1/top3 `0/0 of 8` |
+| `white_escape_atari` | atari defense | good top1/top3 `0/0 of 8` |
+| `black_capture_to_defend` | atari defense | good top1/top3 `6/7 of 8` |
+| `white_capture_to_defend` | atari defense | good top1/top3 `2/3 of 8` |
+| `black_avoid_filling_own_eye` | fill eye | bad top1/top3 `6/8 of 8` |
+| `white_avoid_filling_own_eye` | fill eye | bad top1/top3 `1/2 of 8` |
+| `black_avoid_self_atari_edge` | self/dead shape | bad top1/top3 `0/3 of 8` |
+| `white_avoid_self_atari_edge` | self/dead shape | bad top1/top3 `0/0 of 8` |
