@@ -18,6 +18,11 @@ Source labels:
 
 ### Configuration And Operation Changes
 
+- `Technical operation`: Main training/evaluation hyperparameters are tracked
+  separately from qualitative notes. This includes model size, workers,
+  simulations, optimizer, replay size, evaluation games, and tactical probe
+  settings.
+  - Data reference: `docs/training-data-log.md#training-hyperparameters-and-runtime-config`
 - `Technical operation`: Increased the self-play move cap during the experiment
   sequence:
   - early runs and first multiworker checkpoints used `max_moves=80`
@@ -100,6 +105,8 @@ Source labels:
     fill-eye move is top1 in `6/8` checkpoints and top3 in `8/8`.
   - Self-atari/dead-shape probes are less catastrophic than fill-eye but still
     show bad black edge/corner moves in top3 for `3/8` checkpoints.
+  - Rendered casebook:
+    `artifacts/tactical-swing-760-830-20260605/casebook.html`
   - Data reference: `docs/training-data-log.md#tactical-probes-cycles-760-830`
 - Tactical checks still need broader coverage:
   - test old `850/latest`, score-komi continuation `860/870/latest`, and later

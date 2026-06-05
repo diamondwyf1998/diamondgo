@@ -16,6 +16,60 @@ file should reference sections in this file instead of duplicating all numbers.
 | Komi split work | after source commits `3da7d3a`, `f37bd46` | source tree, smoke artifacts | 120 default | `komi=0.5`, `score_komi=6.5` | Some work done by another agent. Legacy checkpoints may not include `score_komi`. |
 | Score-komi continuation | 857+ | `multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605` | 120 | model-input `komi=0.5`, scoring `score_komi=6.5` | Resumed old 0.5-komi checkpoint weights/optimizer, but rebuilt replay from new self-play. |
 
+## Training Hyperparameters And Runtime Config
+
+Common model architecture for the main server runs:
+
+| Field | Value |
+| --- | --- |
+| Board size | `9x9` |
+| Input planes | `4`: own stones, opponent stones, side-to-play plane, `komi / 10.0` plane |
+| Trunk | 3x3 conv, batch norm, ReLU, then residual blocks |
+| Residual blocks | `2` |
+| Channels | `32` |
+| Policy head | 1x1 conv to 2 channels, batch norm, ReLU, linear to `82` actions including pass |
+| Value head | 1x1 conv to 1 channel, batch norm, ReLU, linear to `channels`, ReLU, linear to scalar, tanh |
+
+Common self-play/training settings for the main multi-worker server runs:
+
+| Field | Value |
+| --- | --- |
+| Rules backend | `sgfmill` |
+| MCTS simulations per move | `100` |
+| `c_puct` | `1.5` |
+| Move sampling temperature | `1.0` |
+| Root Dirichlet noise | Not used in current batched/multiworker self-play |
+| Workers | `8` |
+| Games per worker per cycle | `4` |
+| Games per cycle | `32` |
+| Train steps per cycle | `64` |
+| Batch size | `256` |
+| Replay buffer cap | `50,000` positions |
+| Optimizer | `AdamW` |
+| Learning rate | `0.001` |
+| Weight decay | `0.0001` |
+| Checkpoint interval | every `10` cycles |
+| Device | `cuda` |
+| Seed | `1` |
+
+Run-specific differences:
+
+| Run/artifact family | Time limit | Resume | Max moves | Komi/scoring | Notes |
+| --- | ---: | --- | ---: | --- | --- |
+| `multiworker-9x9-100sims-90min-20260605` | 90 min | none | 80 | `komi=0.5` | First main multiworker run. |
+| `multiworker-9x9-100sims-160moves-5h-20260605` | 300 min | continuation from earlier sequence | 160 | `komi=0.5` | Longer-game experiment. |
+| `multiworker-9x9-100sims-120moves-opt-v2-5h-20260605` | 300 min | continuation from earlier sequence | 120 | `komi=0.5` | Main 700-856 color-swing run. |
+| `multiworker-9x9-komi6p5-100sims-120moves-2h-20260605` | 120 min | none | 120 | old style `komi=6.5` | Brief fresh run, stopped after realizing `komi` changes model input. |
+| `multiworker-9x9-resume0p5-score6p5-100sims-120moves-2h-20260605` | 120 min | `multiworker-9x9-100sims-120moves-opt-v2-5h-20260605/latest.pt` | 120 | model-input `komi=0.5`, scoring `score_komi=6.5` | Active continuation; old replay buffer is not restored. |
+
+Evaluation and probe defaults:
+
+| Tool | Main settings |
+| --- | --- |
+| `eval_suite.py` | checkpoint step tiers `50,200,500`; opponents `initial,previous`; `20` games per match; `100` MCTS simulations; `max_moves=120`; `2` sample SGFs per match; device `cuda` |
+| `eval_checkpoints.py` | alternates candidate color, opening sampling for first `6` moves, then visit-count argmax; uses checkpoint serialized config unless command-line overrides apply |
+| `tactical_eval.py` | fixed tactical probes; usually `100` MCTS simulations; reports target top1/top3/rank |
+
 Relevant source commits:
 
 - `82a2357 Use longer default self-play games`
@@ -217,6 +271,7 @@ Source artifacts:
 
 - `artifacts/tactical-swing-760-830-20260605/tactical_results.json`
 - `artifacts/tactical-swing-760-830-20260605/tactical_report.md`
+- `artifacts/tactical-swing-760-830-20260605/casebook.html`
 
 Probe interpretation:
 
@@ -225,6 +280,9 @@ Probe interpretation:
 - Fill-eye and self/dead-shape cases are negative tests: top1/top3 counts mean
   the model chose or highly ranked a bad move, so lower is better.
 - These probes use 100 MCTS simulations per move.
+- The rendered casebook is the visual source of truth for the probe positions.
+  Use it when checking whether a hand-built case is reasonable before trusting
+  aggregate statistics.
 
 Category summary by checkpoint:
 
