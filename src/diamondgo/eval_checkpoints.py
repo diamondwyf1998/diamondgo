@@ -14,6 +14,7 @@ import torch
 
 from diamondgo.batched_demo import BatchedConfig, run_batched_mcts
 from diamondgo.config import ModelConfig
+from diamondgo.defaults import DEFAULT_9X9_MAX_MOVES
 from diamondgo.demo_cpu import action_to_gtp, make_rules
 from diamondgo.model import PolicyValueNet
 
@@ -26,7 +27,7 @@ class MatchConfig:
     residual_blocks: int = 2
     simulations: int = 32
     games: int = 20
-    max_moves: int = 80
+    max_moves: int = DEFAULT_9X9_MAX_MOVES
     c_puct: float = 1.5
     opening_temperature_moves: int = 6
     seed: int = 20260605
@@ -41,7 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--step", type=int, default=50)
     parser.add_argument("--games", type=int, default=20)
     parser.add_argument("--simulations", type=int, default=32)
-    parser.add_argument("--max-moves", type=int, default=80)
+    parser.add_argument("--max-moves", type=int, default=DEFAULT_9X9_MAX_MOVES)
     parser.add_argument("--sample-games", type=int, default=2)
     parser.add_argument("--opponent", choices=["initial", "previous"], default="initial")
     parser.add_argument("--include-latest", default="")

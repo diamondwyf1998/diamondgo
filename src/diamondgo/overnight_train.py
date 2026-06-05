@@ -12,6 +12,7 @@ import torch
 import torch.nn.functional as F
 
 from diamondgo.batched_demo import BatchedConfig, make_model, play_batched_games
+from diamondgo.defaults import DEFAULT_9X9_MAX_MOVES
 from diamondgo.demo_cpu import build_trace, write_json, write_sgf
 
 
@@ -23,7 +24,7 @@ class OvernightConfig:
     residual_blocks: int = 2
     simulations: int = 64
     games_per_cycle: int = 16
-    max_moves: int = 80
+    max_moves: int = DEFAULT_9X9_MAX_MOVES
     train_steps_per_cycle: int = 64
     batch_size: int = 256
     replay_size: int = 50_000

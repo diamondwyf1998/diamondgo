@@ -14,6 +14,7 @@ import numpy as np
 import torch
 
 from diamondgo.batched_demo import BatchedConfig, make_model, play_batched_games
+from diamondgo.defaults import DEFAULT_9X9_MAX_MOVES
 from diamondgo.demo_cpu import build_trace, write_json, write_sgf
 from diamondgo.overnight_train import (
     OvernightConfig,
@@ -32,7 +33,7 @@ class MultiWorkerConfig:
     simulations: int = 100
     workers: int = 8
     games_per_worker: int = 4
-    max_moves: int = 80
+    max_moves: int = DEFAULT_9X9_MAX_MOVES
     train_steps_per_cycle: int = 64
     batch_size: int = 256
     replay_size: int = 50_000

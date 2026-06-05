@@ -11,6 +11,7 @@ import numpy as np
 import torch
 
 from diamondgo.config import ModelConfig
+from diamondgo.defaults import DEFAULT_9X9_MAX_MOVES
 from diamondgo.demo_cpu import (
     action_to_gtp,
     build_trace,
@@ -32,7 +33,7 @@ class BatchedConfig:
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 64
-    max_moves: int = 80
+    max_moves: int = DEFAULT_9X9_MAX_MOVES
     games: int = 16
     train_steps: int = 16
     batch_size: int = 256
