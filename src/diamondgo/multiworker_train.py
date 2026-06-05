@@ -325,11 +325,16 @@ def run(config: MultiWorkerConfig, out_dir: Path, resume: str = "") -> dict[str,
 
         examples: list[dict[str, object]] = []
         for worker_result in worker_results:
+            worker_id = int(worker_result["worker_id"])
+            for summary in worker_result["selfplay"].get("game_summaries", []):
+                summary["worker_id"] = worker_id
+                summary["local_game"] = int(summary["game"])
+                summary["game"] = (worker_id - 1) * config.games_per_worker + int(summary["local_game"])
             for example in worker_result["examples"]:
-                example["worker_id"] = worker_result["worker_id"]
+                example["worker_id"] = worker_id
                 example["local_game"] = example["game"]
                 example["game"] = (
-                    (int(worker_result["worker_id"]) - 1) * config.games_per_worker
+                    (worker_id - 1) * config.games_per_worker
                     + int(example["local_game"])
                 )
             examples.extend(worker_result["examples"])
