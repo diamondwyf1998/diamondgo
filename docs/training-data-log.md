@@ -730,6 +730,36 @@ suite.
 | cycle `60` | `9/20` (`45%`) | `2` | `7` | `102.902` |
 | latest/cycle `66` | `9/20` (`45%`) | `1` | `8` | `115.137` |
 
+Interpretation update:
+
+- The low `cycle 60` and `latest/cycle 66` scores against the initial model are
+  not evidence that the new model is weaker than the initial net in ordinary
+  play.
+- Manual/user inspection identified the failed games as early-pass / premature
+  termination failures. A quick parse of `results.json` confirms that losing
+  games include candidate passes around the early middle game, commonly in the
+  `20s-40s` move range, followed by an opponent pass that ends the game.
+- For `cycle 60`, all `11` losses include pass sequences; examples include
+  candidate Black passing at moves `25,27,29,31,33`, and candidate White passing
+  at moves such as `22,24,26,32`.
+- For latest/cycle `66`, all `11` losses also include pass sequences; examples
+  include candidate Black passing at moves `29,31,33,35,39`, and candidate
+  White passing repeatedly in several losses.
+- Read this eval as a pass-policy / termination pathology. It should not be
+  used as a clean strength ranking unless early pass is disabled, pass is
+  heavily filtered before a minimum move count, or the eval rules handle
+  premature pass more robustly.
+
+Instrumentation added before the overnight run:
+
+- Training `game_behavior` metrics now include first-pass, second-pass,
+  terminal double-pass, pass-by-color, first-pass `<=20/40/60`, and an
+  `early_pass_alert` field.
+- Evaluation reports and dashboards now display first-pass median,
+  first-pass `<=40`, terminal double-pass median, and an early-pass alert.
+- This is an observation change only: legal moves, terminal rules, scoring, and
+  value targets are unchanged.
+
 ## 200-Sim Overnight Continuation Configuration
 
 Run directory:

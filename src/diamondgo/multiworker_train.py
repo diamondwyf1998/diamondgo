@@ -278,6 +278,23 @@ def summarize_game_behavior(
 ) -> dict[str, object]:
     moves = [int(item["moves"]) for item in game_summaries]
     pass_moves = sum(int(item.get("passes", 0)) for item in game_summaries)
+    pass_moves_black = sum(1 for item in examples if item.get("is_pass") and item.get("player") == "b")
+    pass_moves_white = sum(1 for item in examples if item.get("is_pass") and item.get("player") == "w")
+    first_pass_moves = [
+        int(item["first_pass_move"])
+        for item in game_summaries
+        if item.get("first_pass_move") is not None
+    ]
+    second_pass_moves = [
+        int(item["second_pass_move"])
+        for item in game_summaries
+        if item.get("second_pass_move") is not None
+    ]
+    terminal_double_pass_moves = [
+        int(item["terminal_double_pass_move"])
+        for item in game_summaries
+        if item.get("terminal_double_pass_move") is not None
+    ]
     capture_moves = sum(int(item.get("capture_moves", 0)) for item in game_summaries)
     captured_stones = sum(int(item.get("captured_stones", 0)) for item in game_summaries)
     signed_margins = [float(item.get("black_score_margin", 0.0)) for item in game_summaries]
@@ -290,6 +307,9 @@ def summarize_game_behavior(
     black_win_rate = black_wins / max(games, 1)
     white_win_rate = white_wins / max(games, 1)
     color_bias_alert_threshold = 0.70
+    early_pass_alert_threshold = 0.50
+    early_first_pass_games_40 = sum(1 for move in first_pass_moves if move <= 40)
+    early_first_pass_rate_40 = early_first_pass_games_40 / max(games, 1)
     return {
         "games": games,
         "ended_by_pass": sum(1 for item in game_summaries if item.get("ended_by") == "pass"),
@@ -297,7 +317,31 @@ def summarize_game_behavior(
         "moves_mean": round(float(np.mean(moves)), 3) if moves else 0.0,
         "moves_max": max(moves) if moves else 0,
         "pass_moves": pass_moves,
+        "pass_moves_black": pass_moves_black,
+        "pass_moves_white": pass_moves_white,
         "pass_move_fraction": round(pass_moves / max(len(examples), 1), 4),
+        "first_pass_games": len(first_pass_moves),
+        "first_pass_move_min": min(first_pass_moves) if first_pass_moves else 0,
+        "first_pass_move_mean": round(float(np.mean(first_pass_moves)), 3) if first_pass_moves else 0.0,
+        "first_pass_move_median": round(float(np.median(first_pass_moves)), 3) if first_pass_moves else 0.0,
+        "second_pass_games": len(second_pass_moves),
+        "second_pass_move_min": min(second_pass_moves) if second_pass_moves else 0,
+        "second_pass_move_mean": round(float(np.mean(second_pass_moves)), 3) if second_pass_moves else 0.0,
+        "second_pass_move_median": round(float(np.median(second_pass_moves)), 3) if second_pass_moves else 0.0,
+        "terminal_double_pass_games": len(terminal_double_pass_moves),
+        "terminal_double_pass_move_min": min(terminal_double_pass_moves) if terminal_double_pass_moves else 0,
+        "terminal_double_pass_move_mean": round(float(np.mean(terminal_double_pass_moves)), 3)
+        if terminal_double_pass_moves
+        else 0.0,
+        "terminal_double_pass_move_median": round(float(np.median(terminal_double_pass_moves)), 3)
+        if terminal_double_pass_moves
+        else 0.0,
+        "early_first_pass_games_20": sum(1 for move in first_pass_moves if move <= 20),
+        "early_first_pass_games_40": early_first_pass_games_40,
+        "early_first_pass_games_60": sum(1 for move in first_pass_moves if move <= 60),
+        "early_first_pass_rate_40": round(early_first_pass_rate_40, 4),
+        "early_pass_alert_threshold": early_pass_alert_threshold,
+        "early_pass_alert": early_first_pass_rate_40 >= early_pass_alert_threshold,
         "capture_moves": capture_moves,
         "captured_stones": captured_stones,
         "capture_move_fraction": round(capture_moves / max(len(examples), 1), 4),

@@ -296,8 +296,58 @@ def play_match(
         "candidate_white_games": sum(1 for color in candidate_colors if color == "w"),
         "seconds": round(elapsed, 3),
         "games_per_second": round(config.games / max(elapsed, 1e-9), 3),
+        "pass_behavior": summarize_pass_behavior(game_records),
         "sample_sgf_dir": str(out_dir / "sample-sgf"),
         "games_detail": game_records,
+    }
+
+
+def summarize_pass_behavior(game_records: list[dict[str, object]]) -> dict[str, object]:
+    first_pass_moves = []
+    second_pass_moves = []
+    terminal_double_pass_moves = []
+    pass_moves_black = 0
+    pass_moves_white = 0
+    for record in game_records:
+        pass_moves = [
+            int(move["move_number"])
+            for move in record["moves"]
+            if move["move"] == "pass"
+        ]
+        pass_moves_black += sum(
+            1 for move in record["moves"] if move["move"] == "pass" and move["player"] == "b"
+        )
+        pass_moves_white += sum(
+            1 for move in record["moves"] if move["move"] == "pass" and move["player"] == "w"
+        )
+        if pass_moves:
+            first_pass_moves.append(pass_moves[0])
+        if len(pass_moves) >= 2:
+            second_pass_moves.append(pass_moves[1])
+        if len(record["moves"]) >= 2:
+            last_two = record["moves"][-2:]
+            if last_two[0]["move"] == "pass" and last_two[1]["move"] == "pass":
+                terminal_double_pass_moves.append(int(last_two[1]["move_number"]))
+
+    games = len(game_records)
+    early_first_pass_games_40 = sum(1 for move in first_pass_moves if move <= 40)
+    return {
+        "pass_moves_black": pass_moves_black,
+        "pass_moves_white": pass_moves_white,
+        "first_pass_games": len(first_pass_moves),
+        "first_pass_move_min": min(first_pass_moves) if first_pass_moves else 0,
+        "first_pass_move_median": round(float(np.median(first_pass_moves)), 3) if first_pass_moves else 0.0,
+        "second_pass_games": len(second_pass_moves),
+        "second_pass_move_median": round(float(np.median(second_pass_moves)), 3) if second_pass_moves else 0.0,
+        "terminal_double_pass_games": len(terminal_double_pass_moves),
+        "terminal_double_pass_move_median": round(float(np.median(terminal_double_pass_moves)), 3)
+        if terminal_double_pass_moves
+        else 0.0,
+        "early_first_pass_games_20": sum(1 for move in first_pass_moves if move <= 20),
+        "early_first_pass_games_40": early_first_pass_games_40,
+        "early_first_pass_games_60": sum(1 for move in first_pass_moves if move <= 60),
+        "early_first_pass_rate_40": round(early_first_pass_games_40 / max(games, 1), 4),
+        "early_pass_alert": early_first_pass_games_40 / max(games, 1) >= 0.50,
     }
 
 
@@ -305,18 +355,23 @@ def markdown_report(results: list[dict[str, object]]) -> str:
     lines = [
         "# DiamondGo checkpoint evaluation",
         "",
-        "| candidate | opponent | games | win rate | wins | black wins | white wins | seconds |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| candidate | opponent | games | win rate | wins | black wins | white wins | first pass median | first pass <=40 | terminal double pass median | seconds |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for item in results:
+        pass_behavior = item.get("pass_behavior", {})
         lines.append(
             f"| {item['candidate']} | {item['opponent']} | {item['games']} | "
             f"{100 * float(item['win_rate']):.1f}% | {item['candidate_wins']} | "
             f"{item['candidate_black_wins']}/{item['candidate_black_games']} | "
-            f"{item['candidate_white_wins']}/{item['candidate_white_games']} | {item['seconds']} |"
+            f"{item['candidate_white_wins']}/{item['candidate_white_games']} | "
+            f"{pass_behavior.get('first_pass_move_median', 0)} | "
+            f"{pass_behavior.get('early_first_pass_games_40', 0)}/{item['games']} | "
+            f"{pass_behavior.get('terminal_double_pass_move_median', 0)} | {item['seconds']} |"
         )
     lines.append("")
     lines.append("Each match alternates candidate colors. The first six moves are sampled from MCTS visits; later moves are max-visit.")
+    lines.append("Pass metrics are included because early pass behavior can create misleading win-rate swings.")
     return "\n".join(lines) + "\n"
 
 
@@ -364,6 +419,7 @@ def dashboard_state(results: list[dict[str, object]], board_size: int) -> dict[s
                 "candidateWins": int(result["candidate_wins"]),
                 "candidateLosses": int(result["candidate_losses"]),
                 "winRate": float(result["win_rate"]),
+                "passBehavior": result.get("pass_behavior", {}),
                 "seconds": float(result["seconds"]),
                 "gamesDetail": games,
             }
@@ -391,6 +447,10 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
         f"<td>{item['candidate_wins']}</td>"
         f"<td>{item['candidate_black_wins']}/{item['candidate_black_games']}</td>"
         f"<td>{item['candidate_white_wins']}/{item['candidate_white_games']}</td>"
+        f"<td>{item.get('pass_behavior', {}).get('first_pass_move_median', 0)}</td>"
+        f"<td>{item.get('pass_behavior', {}).get('early_first_pass_games_40', 0)}/{item['games']}</td>"
+        f"<td>{item.get('pass_behavior', {}).get('terminal_double_pass_move_median', 0)}</td>"
+        f"<td>{'yes' if item.get('pass_behavior', {}).get('early_pass_alert') else ''}</td>"
         f"<td>{item['seconds']}</td>"
         "</tr>"
         for item in results
@@ -529,7 +589,7 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     <section>
       <h2>Match Summary</h2>
       <table class="summary">
-        <thead><tr><th>candidate</th><th>opponent</th><th>games</th><th>win rate</th><th>wins</th><th>black wins</th><th>white wins</th><th>seconds</th></tr></thead>
+        <thead><tr><th>candidate</th><th>opponent</th><th>games</th><th>win rate</th><th>wins</th><th>black wins</th><th>white wins</th><th>first pass med</th><th>first pass <=40</th><th>double pass med</th><th>early pass alert</th><th>seconds</th></tr></thead>
         <tbody>{rows}</tbody>
       </table>
     </section>

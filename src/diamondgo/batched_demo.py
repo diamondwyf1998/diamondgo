@@ -236,6 +236,10 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
     active = [True for _ in states]
     move_counts = [0 for _ in states]
     pass_counts = [0 for _ in states]
+    first_pass_moves: list[int | None] = [None for _ in states]
+    second_pass_moves: list[int | None] = [None for _ in states]
+    terminal_double_pass_moves: list[int | None] = [None for _ in states]
+    previous_move_was_pass = [False for _ in states]
     capture_move_counts = [0 for _ in states]
     captured_stone_counts = [0 for _ in states]
     examples: list[dict[str, object]] = []
@@ -270,8 +274,13 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
             )
             move_counts[state_index] += 1
             is_pass = action == state.action_size - 1
+            move_number = move_counts[state_index]
             if is_pass:
                 pass_counts[state_index] += 1
+                if first_pass_moves[state_index] is None:
+                    first_pass_moves[state_index] = move_number
+                elif second_pass_moves[state_index] is None:
+                    second_pass_moves[state_index] = move_number
             examples.append(
                 {
                     "features": features,
@@ -281,12 +290,14 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
                     "root_value": round(root.value, 4),
                     "chosen_action": action,
                     "game": state_index + 1,
-                    "move_in_game": move_counts[state_index],
+                    "move_in_game": move_number,
                     "chosen_move": action_to_gtp(action, config.board_size),
                     "is_pass": is_pass,
                 }
             )
+            was_consecutive_pass = is_pass and previous_move_was_pass[state_index]
             state.play_action(action)
+            previous_move_was_pass[state_index] = is_pass
             stone_start = time.perf_counter()
             captures = _captures_for_move(player, stones_before, _stone_counts(state))
             stats["stone_count_seconds"] = float(stats.get("stone_count_seconds", 0.0)) + (
@@ -297,6 +308,8 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
                 capture_move_counts[state_index] += 1
                 captured_stone_counts[state_index] += captures
             if state.is_terminal() or move_counts[state_index] >= config.max_moves:
+                if was_consecutive_pass:
+                    terminal_double_pass_moves[state_index] = move_number
                 active[state_index] = False
 
     terminal_values_by_game = {}
@@ -314,6 +327,9 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
                 "moves": move_counts[game_index - 1],
                 "ended_by": "pass" if ended_by_pass else "max_moves",
                 "passes": pass_counts[game_index - 1],
+                "first_pass_move": first_pass_moves[game_index - 1],
+                "second_pass_move": second_pass_moves[game_index - 1],
+                "terminal_double_pass_move": terminal_double_pass_moves[game_index - 1],
                 "capture_moves": capture_move_counts[game_index - 1],
                 "captured_stones": captured_stone_counts[game_index - 1],
                 "black_score_margin": round(black_margin, 3),

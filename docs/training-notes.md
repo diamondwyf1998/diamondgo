@@ -327,10 +327,19 @@ needs a shape/distribution metric before treating it as a measured result.
   - Cycle `40` and `50` both scored `18/20` against the initial net.
   - Cycle `60` and latest/cycle `66` both scored `9/20`, a visible drop in this
     quick eval slice.
+  - Important interpretation update: the `cycle 60/66` losses were caused by
+    triggering early `pass` and premature game endings, not by the new model
+    being weaker than the initial net in normal play. Treat these losses as an
+    evaluation/termination pathology and a pass-policy problem.
   - This is not a full strength conclusion because the previous-opponent tier
-    was not completed.
+    was not completed and the completed tier is contaminated by early-pass
+    failures.
   - Data reference:
     `docs/training-data-log.md#partial-eval-before-200-sim-overnight-continuation`
+- `Technical operation`: Training metrics and eval dashboards now include
+  first-pass, second-pass, terminal double-pass, pass-by-color, and early-pass
+  alert fields. This does not change rules or training targets; it makes the
+  pass pathology visible during the overnight run.
 
 ### 200-Sim Overnight Continuation
 
