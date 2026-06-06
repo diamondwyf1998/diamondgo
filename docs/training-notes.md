@@ -359,3 +359,36 @@ needs a shape/distribution metric before treating it as a measured result.
   self-play shapes and better tactical casebook results without requiring a
   new architecture. If the problem is mostly value/policy training quality, it
   may still plateau or oscillate.
+- `Agent measurement`: The 200-sim continuation has now reached metrics/trace
+  cycle `403`; the newest numbered checkpoint file pulled locally is
+  `cycle-00400.pt`.
+  - Latest self-play sample: `32` games, Black `26`, White `6`, Black win rate
+    `81.25%`, mean Black score margin `+2.406`.
+  - Loss has fallen to `1.3428`, with policy entropy `0.5819` and throughput
+    around `28.68` positions/sec.
+  - Early pass is improved versus the pathological eval losses but not gone:
+    latest cycle has early first-pass `<40` rate `21.88%`.
+  - Data reference:
+    `docs/training-data-log.md#200-sim-continuation-cycle-403-snapshot`
+
+### Score-Komi 4.5 Continuation
+
+- `User observation/request`: The 200-sim continuation still looks too
+  Black-favored, so the next continuation should raise the scoring komi to
+  `4.5`.
+- `Technical operation`: The `score_komi=2.5` 200-sim run was stopped and
+  preserved at cycle `410`; its old finalizer was stopped before it spent GPU
+  time evaluating a superseded configuration.
+  - Stop snapshot: Black `29`, White `3`, Black win rate `90.62%`.
+  - First-pass median was `65.0`; early first-pass `<=40` was `6/32`, so this
+    snapshot was Black-skewed even though the early-pass alert was not firing.
+- `Technical operation`: A new continuation starts from the preserved
+  `score_komi=2.5` latest checkpoint but changes terminal scoring/value labels
+  to `score_komi=4.5`.
+  - Model input remains no-komi: `input_komi=false`, `komi_metadata=0.5`.
+  - Architecture and search are unchanged: `4x64`, `316,669` parameters,
+    `200` MCTS simulations, `8` workers, `32` games/cycle.
+  - Runtime is set to `6` hours so it can finish and run eval before the
+    rented server expires.
+  - Data reference:
+    `docs/training-data-log.md#score-komi-45-continuation-configuration`

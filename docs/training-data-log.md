@@ -810,3 +810,127 @@ Expected interpretation:
 - The finalizer uses the standard `100`-simulation eval/tactical checks for
   comparability with earlier dashboards; the training self-play itself is the
   part changed to `200`.
+
+## 200-Sim Continuation Cycle 403 Snapshot
+
+Source artifacts:
+
+- Server training directory:
+  `/root/diamondgo/artifacts/multiworker-9x9-fresh-nokomi-4x64-score2p5-200sims-noise-aug-16h-20260606`
+- Local rendered self-play and curves:
+  `artifacts/selfplay-showcase-fresh-nokomi-4x64-200sims-cycle400-20260606/`
+- Main curve dashboard:
+  `artifacts/selfplay-showcase-fresh-nokomi-4x64-200sims-cycle400-20260606/training-curves.html`
+- Replay viewer:
+  `artifacts/selfplay-showcase-fresh-nokomi-4x64-200sims-cycle400-20260606/viewer.html?cycle=403&game=1`
+
+Checkpoint/version note:
+
+- `latest-cycle-trace.json` and `metrics.jsonl` are at cycle `403`.
+- The newest numbered checkpoint file pulled locally is
+  `cycle-00400.pt`; interpret the rendered self-play as the latest trace,
+  not necessarily as the exact numbered checkpoint file.
+
+Latest cycle metrics:
+
+| Field | Value |
+| --- | ---: |
+| Cycle | `403` |
+| Games | `32` |
+| Black wins / White wins | `26 / 6` |
+| Black win rate | `81.25%` |
+| Mean Black score margin | `+2.406` |
+| Mean absolute score margin | `3.844` |
+| Mean moves | `98.875` |
+| Ended by pass / max moves | `29 / 3` |
+| Early first-pass `<40` | `7/32` (`21.88%`) |
+| Pass move fraction | `11.13%` |
+| Capture move fraction | `11.47%` |
+| Captured stones | `693` |
+| Loss / policy / value | `1.3428 / 1.1660 / 0.1768` |
+| Policy entropy mean | `0.5819` |
+| Positions/sec | `28.682` |
+
+Observed interpretation:
+
+- Search is deeper (`200` sims) and the training losses are much lower than
+  the early fresh run, but the self-play color distribution remains strongly
+  Black-skewed in this latest snapshot.
+- The previous early-pass failure mode is still visible as a behavior to
+  monitor, though this cycle is not dominated by immediate premature endings:
+  the latest early first-pass `<40` rate is `21.88%`, below the alert threshold.
+- Timing curves continue to show legal-action generation and tree selection as
+  major CPU-side costs during self-play.
+
+## Score-Komi 4.5 Continuation Configuration
+
+Reason for change:
+
+- The `score_komi=2.5` 200-simulation continuation remained strongly
+  Black-skewed.
+- At stop time, the latest available cycle was `410`.
+
+Stopped source run:
+
+- Directory:
+  `/root/diamondgo/artifacts/multiworker-9x9-fresh-nokomi-4x64-score2p5-200sims-noise-aug-16h-20260606`
+- Latest checkpoint:
+  `/root/diamondgo/artifacts/multiworker-9x9-fresh-nokomi-4x64-score2p5-200sims-noise-aug-16h-20260606/latest.pt`
+- The old finalizer for this `score_komi=2.5` run was stopped before it could
+  consume GPU time on the superseded eval.
+
+Stop snapshot:
+
+| Field | Value |
+| --- | ---: |
+| Cycle | `410` |
+| Total positions | `1,314,430` |
+| Total train steps | `26,240` |
+| Black wins / White wins | `29 / 3` |
+| Black win rate | `90.62%` |
+| Mean moves | `94.781` |
+| First-pass median | `65.0` |
+| Early first-pass `<=40` | `6/32` |
+| Early-pass alert | `false` |
+
+New run directory:
+
+- `/root/diamondgo/artifacts/multiworker-9x9-fresh-nokomi-4x64-score4p5-200sims-noise-aug-6h-20260606`
+
+Configuration:
+
+| Field | Value |
+| --- | --- |
+| Fresh start | `false` |
+| Resume source | previous `score_komi=2.5` 200-sim latest checkpoint at cycle `410` |
+| Resume semantics | model, optimizer, cycle, position, and train-step counters resume; replay buffer is rebuilt |
+| Input komi | `false` |
+| Input planes | `3`: own stones, opponent stones, side-to-play |
+| Komi metadata | `0.5` |
+| Score komi | `4.5` |
+| Channels / residual blocks | `64 / 4` |
+| Trainable parameters | `316,669` |
+| MCTS simulations | `200` for training self-play |
+| Workers | `8` |
+| Games per worker / cycle | `4 / 32` |
+| Max moves | `120` |
+| Train steps per cycle | `64` |
+| Batch size | `256` |
+| Replay size | `100,000` |
+| Optimizer | AdamW, learning rate `0.001`, weight decay `0.0001` |
+| c_puct | `1.5` |
+| Root Dirichlet noise | alpha `0.15`, fraction `0.25` |
+| Root policy temperature | `1.1` |
+| Move temperature | `1.0` through move `16`, then `0.25` |
+| Data augmentation | random dihedral symmetry during training |
+| Checkpoint interval | every `10` cycles |
+| Time limit | `360` minutes (`6` hours) |
+
+Expected interpretation:
+
+- This is primarily a color-balance/terminal-label experiment. The network
+  architecture and self-play search are unchanged from the previous 200-sim
+  line.
+- Because replay is rebuilt after the resume boundary, the model weights start
+  from cycle `410`, but training examples come from new `score_komi=4.5`
+  self-play.
