@@ -862,6 +862,53 @@ Observed interpretation:
 - Timing curves continue to show legal-action generation and tree selection as
   major CPU-side costs during self-play.
 
+## Tactical Probes, 200-Sim Continuation Cycles 100-400
+
+Source artifacts:
+
+- Server output:
+  `/root/diamondgo/artifacts/tactical-fresh-nokomi-4x64-200sims-cycle100-400-20260606`
+- Local rendered casebook:
+  `artifacts/tactical-fresh-nokomi-4x64-200sims-cycle100-400-20260606/casebook.html`
+- Raw results:
+  `artifacts/tactical-fresh-nokomi-4x64-200sims-cycle100-400-20260606/tactical_results.json`
+
+Settings:
+
+| Field | Value |
+| --- | --- |
+| Checkpoint line | `score_komi=2.5`, no-komi-input `4x64`, 200-sim continuation |
+| Tested checkpoints | `100, 150, 200, 250, 300, 350, 400` |
+| Tactical cases | `12` rendered casebook probes |
+| Probe simulations | `100` |
+| Positive categories | `capture`, `atari_defense`; higher top1/top3 is better |
+| Negative categories | `fill_eye`, `self_atari_or_dead`; lower bad top1/top3 is better |
+
+Summary:
+
+| Cycle | Capture top1/top3 | Atari defense top1/top3 | Fill-eye bad top1/top3 | Self/dead bad top1/top3 |
+| ---: | ---: | ---: | ---: | ---: |
+| `100` | `1/1 of 4` | `0/1 of 4` | `0/0 of 2` | `0/0 of 2` |
+| `150` | `0/2 of 4` | `1/3 of 4` | `0/0 of 2` | `0/0 of 2` |
+| `200` | `0/1 of 4` | `3/4 of 4` | `0/0 of 2` | `0/0 of 2` |
+| `250` | `0/1 of 4` | `4/4 of 4` | `1/1 of 2` | `0/1 of 2` |
+| `300` | `0/1 of 4` | `4/4 of 4` | `0/0 of 2` | `0/1 of 2` |
+| `350` | `1/1 of 4` | `4/4 of 4` | `0/0 of 2` | `0/1 of 2` |
+| `400` | `0/1 of 4` | `4/4 of 4` | `0/0 of 2` | `1/1 of 2` |
+
+Observed interpretation:
+
+- The model appears to have learned basic atari defense by the middle of this
+  200-sim run. From cycle `250` onward, all four atari-defense targets are
+  top1/top3.
+- The earlier fill-eye habit is much reduced in this fixed probe set. The only
+  recurrence among tested checkpoints is cycle `250`.
+- Active capture is still not reliably learned. The model often prefers center
+  or pass-like policy mass over immediate capture, especially in the two-stone
+  capture probes.
+- Self-atari/dead-shape avoidance is not monotonic: it is clean at cycles
+  `100-200`, but the bad black edge/corner move is top1 again at cycle `400`.
+
 ## Score-Komi 4.5 Continuation Configuration
 
 Reason for change:

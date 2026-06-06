@@ -370,6 +370,22 @@ needs a shape/distribution metric before treating it as a measured result.
     latest cycle has early first-pass `<40` rate `21.88%`.
   - Data reference:
     `docs/training-data-log.md#200-sim-continuation-cycle-403-snapshot`
+- `Agent measurement`: The 12-case tactical casebook was rerun every `50`
+  cycles for the 200-sim continuation, using checkpoints
+  `100,150,200,250,300,350,400`.
+  - Atari-defense becomes the clearest improvement: from `0/1 of 4` top1/top3
+    at cycle `100` to `4/4 of 4` top1/top3 from cycle `250` onward.
+  - Fill-eye is mostly fixed in this probe set: bad fill-eye moves are
+    `0/0 of 2` top1/top3 for all tested cycles except cycle `250`, which is
+    `1/1 of 2`.
+  - Active capture remains weak: capture targets stay around `0-1` top1 hits
+    and only `1-2` top3 hits out of `4`.
+  - Self-atari/dead-shape avoidance is mostly clean early, but the bad black
+    edge/corner move returns by cycle `400` as `1/1 of 2` bad top1/top3.
+  - Rendered casebook:
+    `artifacts/tactical-fresh-nokomi-4x64-200sims-cycle100-400-20260606/casebook.html`
+  - Data reference:
+    `docs/training-data-log.md#tactical-probes-200-sim-continuation-cycles-100-400`
 
 ### Score-Komi 4.5 Continuation
 
