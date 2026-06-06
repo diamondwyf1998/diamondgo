@@ -44,3 +44,4 @@ This is a continuation run, not a fresh start. It should resume from the latest 
   `sign(score_margin) * (2/5 + min(abs(score_margin) ** 0.25 / 5 * scale, 3/5))`.
 - With `scale=0.2`, the margin term is intentionally small for this first run.
 - Terminal dead-stone cleanup remains off for safety, so any result change can be attributed mainly to scoring komi, MCTS count, max-move limit, and the bounded margin target.
+- Server launch is queued behind any existing score-komi 6.5 finalizer/eval or `pairwise_50cycle_extra6` process. Do not kill those eval jobs; the 5.5 run should start only after they finish.
