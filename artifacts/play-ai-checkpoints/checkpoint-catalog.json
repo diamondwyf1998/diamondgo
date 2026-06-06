@@ -1,0 +1,209 @@
+[
+  {
+    "id": "cycle-00020",
+    "cycle": 20,
+    "label": "cycle-00020 | score2p5 100sims",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score2p5-100sims-cycle-00020.pt",
+    "filename": "fresh-nokomi-4x64-score2p5-100sims-cycle-00020.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score2p5-100sims-noise-aug-2h-20260605",
+    "score_komi": 2.5
+  },
+  {
+    "id": "cycle-00040",
+    "cycle": 40,
+    "label": "cycle-00040 | score2p5 100sims",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score2p5-100sims-cycle-00040.pt",
+    "filename": "fresh-nokomi-4x64-score2p5-100sims-cycle-00040.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score2p5-100sims-noise-aug-2h-20260605",
+    "score_komi": 2.5
+  },
+  {
+    "id": "cycle-00060",
+    "cycle": 60,
+    "label": "cycle-00060 | score2p5 100sims",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score2p5-100sims-cycle-00060.pt",
+    "filename": "fresh-nokomi-4x64-score2p5-100sims-cycle-00060.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score2p5-100sims-noise-aug-2h-20260605",
+    "score_komi": 2.5
+  },
+  {
+    "id": "cycle-00080",
+    "cycle": 80,
+    "label": "cycle-00080 | score2p5 200sims",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score2p5-200sims-cycle-00080.pt",
+    "filename": "fresh-nokomi-4x64-score2p5-200sims-cycle-00080.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score2p5-200sims-noise-aug-16h-20260606",
+    "score_komi": 2.5
+  },
+  {
+    "id": "cycle-00100",
+    "cycle": 100,
+    "label": "cycle-00100 | score2p5 200sims",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score2p5-200sims-cycle-00100.pt",
+    "filename": "fresh-nokomi-4x64-score2p5-200sims-cycle-00100.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score2p5-200sims-noise-aug-16h-20260606",
+    "score_komi": 2.5
+  },
+  {
+    "id": "cycle-00150",
+    "cycle": 150,
+    "label": "cycle-00150 | score2p5 200sims",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score2p5-200sims-cycle-00150.pt",
+    "filename": "fresh-nokomi-4x64-score2p5-200sims-cycle-00150.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score2p5-200sims-noise-aug-16h-20260606",
+    "score_komi": 2.5
+  },
+  {
+    "id": "cycle-00200",
+    "cycle": 200,
+    "label": "cycle-00200 | score2p5 200sims",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score2p5-200sims-cycle-00200.pt",
+    "filename": "fresh-nokomi-4x64-score2p5-200sims-cycle-00200.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score2p5-200sims-noise-aug-16h-20260606",
+    "score_komi": 2.5
+  },
+  {
+    "id": "cycle-00250",
+    "cycle": 250,
+    "label": "cycle-00250 | score2p5 200sims",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score2p5-200sims-cycle-00250.pt",
+    "filename": "fresh-nokomi-4x64-score2p5-200sims-cycle-00250.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score2p5-200sims-noise-aug-16h-20260606",
+    "score_komi": 2.5
+  },
+  {
+    "id": "cycle-00300",
+    "cycle": 300,
+    "label": "cycle-00300 | score2p5 200sims",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score2p5-200sims-cycle-00300.pt",
+    "filename": "fresh-nokomi-4x64-score2p5-200sims-cycle-00300.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score2p5-200sims-noise-aug-16h-20260606",
+    "score_komi": 2.5
+  },
+  {
+    "id": "cycle-00350",
+    "cycle": 350,
+    "label": "cycle-00350 | score2p5 200sims",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score2p5-200sims-cycle-00350.pt",
+    "filename": "fresh-nokomi-4x64-score2p5-200sims-cycle-00350.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score2p5-200sims-noise-aug-16h-20260606",
+    "score_komi": 2.5
+  },
+  {
+    "id": "cycle-00400",
+    "cycle": 400,
+    "label": "cycle-00400 | score2p5 200sims",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score2p5-200sims-cycle-00400.pt",
+    "filename": "fresh-nokomi-4x64-score2p5-200sims-cycle-00400.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score2p5-200sims-noise-aug-16h-20260606",
+    "score_komi": 2.5
+  },
+  {
+    "id": "cycle-00430",
+    "cycle": 430,
+    "label": "cycle-00430 | score4p5 200sims",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score4p5-200sims-cycle-00430.pt",
+    "filename": "fresh-nokomi-4x64-score4p5-200sims-cycle-00430.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score4p5-200sims-noise-aug-6h-20260606",
+    "score_komi": 4.5
+  },
+  {
+    "id": "cycle-00435",
+    "cycle": 435,
+    "label": "cycle-00435 | score4p5 200sims latest",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score4p5-200sims-latest-cycle-00435.pt",
+    "filename": "fresh-nokomi-4x64-score4p5-200sims-latest-cycle-00435.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score4p5-200sims-noise-aug-6h-20260606",
+    "score_komi": 4.5
+  },
+  {
+    "id": "score6p5-cycle-00500",
+    "cycle": 500,
+    "label": "cycle-00500 | score6p5 200sims",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score6p5-200sims-cycle-00500.pt",
+    "filename": "fresh-nokomi-4x64-score6p5-200sims-cycle-00500.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score6p5-200sims-noise-aug-5h-20260606",
+    "score_komi": 6.5
+  },
+  {
+    "id": "score6p5-cycle-00520",
+    "cycle": 520,
+    "label": "cycle-00520 | score6p5 200sims",
+    "checkpoint": "artifacts/play-ai-checkpoints/fresh-nokomi-4x64-score6p5-200sims-cycle-00520.pt",
+    "filename": "fresh-nokomi-4x64-score6p5-200sims-cycle-00520.pt",
+    "run": "multiworker-9x9-fresh-nokomi-4x64-score6p5-200sims-noise-aug-5h-20260606",
+    "score_komi": 6.5
+  },
+  {
+    "id": "cont-cycle-00530",
+    "cycle": 530,
+    "label": "cycle-00530 | cont score5p5 300sims max150",
+    "checkpoint": "artifacts/play-ai-checkpoints/cont-nokomi-4x64-score5p5-margin0p2-300sims-cycle-00530.pt",
+    "filename": "cont-nokomi-4x64-score5p5-margin0p2-300sims-cycle-00530.pt",
+    "run": "multiworker-9x9-cont-nokomi-4x64-score5p5-margin0p2-300sims-max150-6h-20260606",
+    "score_komi": 5.5
+  },
+  {
+    "id": "cont-cycle-00560",
+    "cycle": 560,
+    "label": "cycle-00560 | cont score5p5 300sims max150",
+    "checkpoint": "artifacts/play-ai-checkpoints/cont-nokomi-4x64-score5p5-margin0p2-300sims-cycle-00560.pt",
+    "filename": "cont-nokomi-4x64-score5p5-margin0p2-300sims-cycle-00560.pt",
+    "run": "multiworker-9x9-cont-nokomi-4x64-score5p5-margin0p2-300sims-max150-6h-20260606",
+    "score_komi": 5.5
+  },
+  {
+    "id": "cont-cycle-00590",
+    "cycle": 590,
+    "label": "cycle-00590 | cont score5p5 300sims max150",
+    "checkpoint": "artifacts/play-ai-checkpoints/cont-nokomi-4x64-score5p5-margin0p2-300sims-cycle-00590.pt",
+    "filename": "cont-nokomi-4x64-score5p5-margin0p2-300sims-cycle-00590.pt",
+    "run": "multiworker-9x9-cont-nokomi-4x64-score5p5-margin0p2-300sims-max150-6h-20260606",
+    "score_komi": 5.5
+  },
+  {
+    "id": "cont-cycle-00620",
+    "cycle": 620,
+    "label": "cycle-00620 | cont score5p5 300sims max150",
+    "checkpoint": "artifacts/play-ai-checkpoints/cont-nokomi-4x64-score5p5-margin0p2-300sims-cycle-00620.pt",
+    "filename": "cont-nokomi-4x64-score5p5-margin0p2-300sims-cycle-00620.pt",
+    "run": "multiworker-9x9-cont-nokomi-4x64-score5p5-margin0p2-300sims-max150-6h-20260606",
+    "score_komi": 5.5
+  },
+  {
+    "id": "cont-cycle-00650",
+    "cycle": 650,
+    "label": "cycle-00650 | cont score5p5 300sims max150",
+    "checkpoint": "artifacts/play-ai-checkpoints/cont-nokomi-4x64-score5p5-margin0p2-300sims-cycle-00650.pt",
+    "filename": "cont-nokomi-4x64-score5p5-margin0p2-300sims-cycle-00650.pt",
+    "run": "multiworker-9x9-cont-nokomi-4x64-score5p5-margin0p2-300sims-max150-6h-20260606",
+    "score_komi": 5.5
+  },
+  {
+    "id": "cycle-00660",
+    "cycle": 660,
+    "label": "cycle-00660 | cont score5p5 300sims max150",
+    "checkpoint": "artifacts/play-ai-checkpoints/cont-nokomi-4x64-score5p5-margin0p2-300sims-cycle-00660.pt",
+    "filename": "cont-nokomi-4x64-score5p5-margin0p2-300sims-cycle-00660.pt",
+    "run": "multiworker-9x9-cont-nokomi-4x64-score5p5-margin0p2-300sims-max150-6h-20260606",
+    "score_komi": 5.5
+  },
+  {
+    "id": "cycle-00663",
+    "cycle": 663,
+    "label": "cycle-00663 | cont score5p5 300sims latest",
+    "checkpoint": "artifacts/play-ai-checkpoints/cont-nokomi-4x64-score5p5-margin0p2-300sims-latest-cycle-00663.pt",
+    "filename": "cont-nokomi-4x64-score5p5-margin0p2-300sims-latest-cycle-00663.pt",
+    "run": "multiworker-9x9-cont-nokomi-4x64-score5p5-margin0p2-300sims-max150-6h-20260606",
+    "score_komi": 5.5
+  },
+  {
+    "id": "cycle-00666",
+    "cycle": 666,
+    "label": "cycle-00666 | cont score5p5 300sims latest",
+    "checkpoint": "artifacts/play-ai-checkpoints/cont-nokomi-4x64-score5p5-margin0p2-300sims-latest-cycle-00666.pt",
+    "filename": "cont-nokomi-4x64-score5p5-margin0p2-300sims-latest-cycle-00666.pt",
+    "run": "multiworker-9x9-cont-nokomi-4x64-score5p5-margin0p2-300sims-max150-6h-20260606",
+    "score_komi": 5.5
+  }
+]
