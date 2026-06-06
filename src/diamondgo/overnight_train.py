@@ -343,8 +343,13 @@ def run(config: OvernightConfig, out_dir: Path, resume: str = "") -> dict[str, o
             handle.write(json.dumps(metrics) + "\n")
             handle.flush()
 
+        cycle_trace = build_trace(selfplay_config, examples)
         write_sgf(out_dir / "latest-cycle.sgf", selfplay_config, examples)
-        write_json(out_dir / "latest-cycle-trace.json", build_trace(selfplay_config, examples))
+        write_json(out_dir / "latest-cycle-trace.json", cycle_trace)
+        if cycle % 10 == 0:
+            records_dir = out_dir / "cycle-records"
+            write_sgf(records_dir / f"cycle-{cycle:05d}.sgf", selfplay_config, examples)
+            write_json(records_dir / f"cycle-{cycle:05d}-trace.json", cycle_trace)
         save_checkpoint(
             out_dir / "latest.pt",
             config,
@@ -376,6 +381,7 @@ def run(config: OvernightConfig, out_dir: Path, resume: str = "") -> dict[str, o
         "latest_metrics": last_metrics,
         "checkpoint": str(out_dir / "latest.pt"),
         "metrics_path": str(metrics_path),
+        "cycle_records_dir": str(out_dir / "cycle-records"),
     }
 
 

@@ -310,20 +310,32 @@ def write_json(path: str | Path, payload: dict[str, object]) -> None:
 def write_sgf(path: str | Path, config: CpuDemoConfig, examples: list[dict[str, object]]) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    nodes = [
-        (
-            f"(;GM[1]FF[4]CA[UTF-8]AP[DiamondGo:cpu-demo]"
-            f"SZ[{config.board_size}]KM[{config.score_komi}]PB[DiamondGo random-init]PW[DiamondGo random-init]"
-            f"C[{_escape_sgf_text(f'DiamondGo baby-zero demo with {config.rules_backend} rules.')}]"
-        )
-    ]
+    groups: dict[int, list[dict[str, object]]] = {}
     for example in examples:
-        color = "B" if example["player"] == "b" else "W"
-        move = _action_to_sgf(int(example["chosen_action"]), config.board_size)
-        comment = _format_comment(example)
-        nodes.append(f";{color}[{move}]C[{_escape_sgf_text(comment)}]")
-    nodes.append(")")
-    path.write_text("".join(nodes), encoding="utf-8")
+        groups.setdefault(int(example.get("game", 1)), []).append(example)
+
+    trees = []
+    for game_id, game_examples in sorted(groups.items()):
+        game_examples.sort(key=lambda item: int(item.get("move_in_game", 0)))
+        comment = f"DiamondGo baby-zero demo with {config.rules_backend} rules."
+        if len(groups) > 1:
+            comment = f"{comment} Game {game_id} in this SGF collection."
+        nodes = [
+            (
+                f"(;GM[1]FF[4]CA[UTF-8]AP[DiamondGo:cpu-demo]"
+                f"SZ[{config.board_size}]KM[{config.score_komi}]"
+                f"PB[DiamondGo random-init]PW[DiamondGo random-init]"
+                f"C[{_escape_sgf_text(comment)}]"
+            )
+        ]
+        for example in game_examples:
+            color = "B" if example["player"] == "b" else "W"
+            move = _action_to_sgf(int(example["chosen_action"]), config.board_size)
+            comment = _format_comment(example)
+            nodes.append(f";{color}[{move}]C[{_escape_sgf_text(comment)}]")
+        nodes.append(")")
+        trees.append("".join(nodes))
+    path.write_text("".join(trees), encoding="utf-8")
 
 
 def _format_comment(example: dict[str, object]) -> str:

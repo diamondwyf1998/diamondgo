@@ -489,8 +489,13 @@ def run(config: MultiWorkerConfig, out_dir: Path, resume: str = "") -> dict[str,
 
         write_start = time.perf_counter()
         first_worker_config = make_selfplay_config(config, config.seed + cycle * 10_000 + 1)
+        cycle_trace = build_trace(first_worker_config, examples)
         write_sgf(out_dir / "latest-cycle.sgf", first_worker_config, examples)
-        write_json(out_dir / "latest-cycle-trace.json", build_trace(first_worker_config, examples))
+        write_json(out_dir / "latest-cycle-trace.json", cycle_trace)
+        if cycle % 10 == 0:
+            records_dir = out_dir / "cycle-records"
+            write_sgf(records_dir / f"cycle-{cycle:05d}.sgf", first_worker_config, examples)
+            write_json(records_dir / f"cycle-{cycle:05d}-trace.json", cycle_trace)
         write_seconds = time.perf_counter() - write_start
         total_seconds = time.perf_counter() - cycle_start
 
@@ -544,6 +549,7 @@ def run(config: MultiWorkerConfig, out_dir: Path, resume: str = "") -> dict[str,
         "latest_metrics": last_metrics,
         "checkpoint": str(out_dir / "latest.pt"),
         "metrics_path": str(metrics_path),
+        "cycle_records_dir": str(out_dir / "cycle-records"),
     }
 
 
