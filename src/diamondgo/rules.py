@@ -13,6 +13,8 @@ WHITE = "w"
 PASS = None
 BLACK_VALUE = 1
 WHITE_VALUE = -1
+VALUE_WIN_LOSS_BASE_WITH_MARGIN_REWARD = 2.0 / 5.0
+VALUE_MARGIN_REWARD_LIMIT = 3.0 / 5.0
 
 
 @dataclass(frozen=True)
@@ -405,11 +407,16 @@ def _terminal_value_from_margin(
     to_play: str,
     score_margin_reward_scale: float,
 ) -> float:
-    winner = BLACK if black_score_margin > 0 else WHITE
-    black_value = 1.0 if winner == BLACK else -1.0
-    if score_margin_reward_scale > 0.0 and black_score_margin != 0.0:
-        bonus = (abs(float(black_score_margin)) ** 0.25) / 5.0
-        black_value += float(score_margin_reward_scale) * np.sign(black_score_margin) * bonus
+    margin_sign = 1.0 if black_score_margin > 0 else -1.0
+    if score_margin_reward_scale > 0.0:
+        raw_bonus = (abs(float(black_score_margin)) ** 0.25) / 5.0
+        bonus = min(
+            raw_bonus * float(score_margin_reward_scale),
+            VALUE_MARGIN_REWARD_LIMIT,
+        )
+        black_value = margin_sign * (VALUE_WIN_LOSS_BASE_WITH_MARGIN_REWARD + bonus)
+    else:
+        black_value = margin_sign
     return float(black_value if to_play == BLACK else -black_value)
 
 

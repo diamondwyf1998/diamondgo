@@ -58,7 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--score-margin-reward-scale",
         type=float,
         default=CpuDemoConfig.score_margin_reward_scale,
-        help="Scale for signed abs(score_margin)**0.25/5 added to the +/-1 value target.",
+        help="Scale for the capped +/-0.6 score-margin component; enabled targets use +/-0.4 win/loss base.",
     )
     parser.add_argument("--simulations", type=int, default=CpuDemoConfig.simulations)
     parser.add_argument("--max-moves", type=int, default=CpuDemoConfig.max_moves)

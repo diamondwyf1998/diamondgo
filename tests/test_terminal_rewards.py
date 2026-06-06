@@ -47,8 +47,16 @@ def test_score_margin_reward_adds_signed_fourth_root_bonus() -> None:
     state.board[:4, :4] = 1
 
     assert np.isclose(state.terminal_score_margin(), 16.0)
-    assert np.isclose(state.terminal_value(), 1.4)
+    assert np.isclose(state.terminal_value(), 0.8)
 
     state.to_play = WHITE
 
-    assert np.isclose(state.terminal_value(), -1.4)
+    assert np.isclose(state.terminal_value(), -0.8)
+
+
+def test_score_margin_reward_caps_targets_to_one() -> None:
+    state = SimpleAreaRules(size=9, score_komi=0.0, score_margin_reward_scale=2.0)
+    state.board[:, :] = 1
+
+    assert np.isclose(state.terminal_score_margin(), 81.0)
+    assert np.isclose(state.terminal_value(), 1.0)
