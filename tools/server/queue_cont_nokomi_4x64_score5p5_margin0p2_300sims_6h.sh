@@ -4,8 +4,8 @@ cd /root/diamondgo
 
 TRAIN_OUT="artifacts/multiworker-9x9-cont-nokomi-4x64-score5p5-margin0p2-300sims-max150-6h-20260606"
 QUEUE_LOG="$TRAIN_OUT/queue.log"
-RUN_SCRIPT="/root/diamondgo/run_cont_nokomi_4x64_score5p5_margin0p2_300sims_6h.sh"
-FINALIZE_SCRIPT="/root/diamondgo/finalize_cont_nokomi_4x64_score5p5_margin0p2_300sims_6h.sh"
+RUN_SCRIPT="/root/diamondgo/tools/server/run_cont_nokomi_4x64_score5p5_margin0p2_300sims_6h.sh"
+FINALIZE_SCRIPT="/root/diamondgo/tools/server/finalize_cont_nokomi_4x64_score5p5_margin0p2_300sims_6h.sh"
 
 mkdir -p "$TRAIN_OUT"
 {
