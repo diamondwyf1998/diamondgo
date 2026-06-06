@@ -153,3 +153,80 @@ Initial read:
   a likely bottleneck: per cycle, summed legal-action time is still large.
 - Early-pass behavior is still visible in fresh-start cycle 1, but it improved
   quickly during this short run. This should be monitored in any longer run.
+
+## 18-Hour Score-4.5 / 250-Sim Run
+
+Run date: 2026-06-07.
+
+This is a fresh-start long run, not a resume from the 20-minute check. The goal
+is to keep the 2-layer comparison clean after changing both scoring komi and
+self-play MCTS simulations.
+
+Planned output paths:
+
+- Train:
+  `/root/diamondgo/artifacts/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607`
+- Eval:
+  `/root/diamondgo/artifacts/eval-suite-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-train-100sims-eval-18h-20260607`
+- Tactical:
+  `/root/diamondgo/artifacts/tactical-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-train-100sims-eval-18h-20260607`
+
+Important differences from the 20-minute throughput check:
+
+| item | 20-minute check | 18-hour run |
+|---|---:|---:|
+| score komi | `5.5` | `4.5` |
+| self-play simulations | `300` | `250` |
+| time limit | `20 min` | `1080 min` |
+| SGF/trace archive cadence | `10 cycles` | `5 cycles` |
+
+The complete planned training config is:
+
+| item | value |
+|---|---:|
+| board | `9x9` |
+| rules backend | `sgfmill` |
+| fresh start | `true` |
+| model residual blocks | `2` |
+| model channels | `96` |
+| trainable params | `356,957` |
+| input komi plane | `false` |
+| komi metadata | `0.5` |
+| scoring komi | `4.5` |
+| terminal dead-stone cleanup | `false` |
+| score-margin reward scale | `0.2` |
+| self-play simulations | `250` |
+| max moves | `150` |
+| workers | `12` |
+| games per worker | `8` |
+| games per cycle | `96` |
+| trainer device | `cuda:0` |
+| self-play devices | `cuda:0,cuda:1` |
+| train steps per cycle | `64` |
+| train batch size | `256` |
+| replay size | `100000` |
+| learning rate | `0.001` |
+| weight decay | `0.0001` |
+| c_puct | `1.5` |
+| temperature | `1.0` |
+| temperature moves | `16` |
+| late temperature | `0.25` |
+| root Dirichlet alpha | `0.15` |
+| root noise fraction | `0.25` |
+| root policy temperature | `1.1` |
+| dihedral augmentation | `true` |
+| checkpoint cadence | every `5` cycles through cycle `50`, then every `10` cycles |
+| SGF/trace archive cadence | every `5` cycles |
+| planned training time | `18h` |
+
+Finalizer plan after training:
+
+| item | value |
+|---|---:|
+| eval checkpoint steps | `50,200,500` |
+| eval opponents | `initial,previous` |
+| eval games per match | `20` |
+| eval simulations | `100` |
+| eval max moves | `150` |
+| sample SGFs per match | `2` |
+| tactical simulations | `100` |

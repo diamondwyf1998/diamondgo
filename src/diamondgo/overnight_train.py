@@ -50,6 +50,7 @@ class OvernightConfig:
     checkpoint_every: int = 10
     early_checkpoint_cycles: int = 50
     early_checkpoint_every: int = 5
+    record_every: int = 10
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -96,6 +97,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--checkpoint-every", type=int, default=OvernightConfig.checkpoint_every)
     parser.add_argument("--early-checkpoint-cycles", type=int, default=OvernightConfig.early_checkpoint_cycles)
     parser.add_argument("--early-checkpoint-every", type=int, default=OvernightConfig.early_checkpoint_every)
+    parser.add_argument("--record-every", type=int, default=OvernightConfig.record_every)
     parser.add_argument("--resume", default="")
     parser.add_argument("--json", action="store_true")
     return parser
@@ -366,7 +368,7 @@ def run(config: OvernightConfig, out_dir: Path, resume: str = "") -> dict[str, o
         cycle_trace = build_trace(selfplay_config, examples)
         write_sgf(out_dir / "latest-cycle.sgf", selfplay_config, examples)
         write_json(out_dir / "latest-cycle-trace.json", cycle_trace)
-        if cycle % 10 == 0:
+        if config.record_every > 0 and cycle % config.record_every == 0:
             records_dir = out_dir / "cycle-records"
             write_sgf(records_dir / f"cycle-{cycle:05d}.sgf", selfplay_config, examples)
             write_json(records_dir / f"cycle-{cycle:05d}-trace.json", cycle_trace)
@@ -407,6 +409,7 @@ def run(config: OvernightConfig, out_dir: Path, resume: str = "") -> dict[str, o
         "checkpoint": str(out_dir / "latest.pt"),
         "metrics_path": str(metrics_path),
         "cycle_records_dir": str(out_dir / "cycle-records"),
+        "cycle_record_every": config.record_every,
     }
 
 
@@ -444,6 +447,7 @@ def main() -> None:
         checkpoint_every=args.checkpoint_every,
         early_checkpoint_cycles=args.early_checkpoint_cycles,
         early_checkpoint_every=args.early_checkpoint_every,
+        record_every=args.record_every,
     )
     summary = run(config, Path(args.out_dir), args.resume)
     if args.json:
