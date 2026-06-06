@@ -92,3 +92,64 @@ both GPUs separately. The target diagnostic numbers are:
 - legal-actions seconds
 - state-copy seconds
 - early pass rate and color-bias alerts
+
+## 20-Minute Throughput Check
+
+Run date: 2026-06-07.
+
+Output paths:
+
+- Server:
+  `/root/diamondgo/artifacts/multiworker-9x9-fresh-dualgpu-2x96-score5p5-margin0p2-300sims-max150-20m-20260607`
+- Local copy:
+  `artifacts/server-runs/20260607-dualgpu-2x96-20m`
+
+This was a fresh-start throughput check with the planned dual-GPU 2x96 config.
+The nominal time limit was `20` minutes, but the training loop only checks the
+limit between cycles. Cycle 6 had already started near the time boundary, so the
+run naturally finished after 6 full cycles.
+
+Summary:
+
+| item | value |
+|---|---:|
+| completed cycles | `6` |
+| games per cycle | `96` |
+| total self-play games | `576` |
+| total positions | `50,479` |
+| total train steps | `384` |
+| average cycle seconds | `232.617` |
+| average self-play throughput | `36.454 positions/s` |
+| average network batch | `5.547` |
+| max network batch | `8` |
+| GPU0 utilization mean / median / max | `48.7% / 47.0% / 94.0%` |
+| GPU1 utilization mean / median / max | `43.4% / 45.0% / 85.0%` |
+| GPU0 memory mean / max | `3.89 GiB / 4.02 GiB` |
+| GPU1 memory mean / max | `1.95 GiB / 1.99 GiB` |
+
+Per-cycle summary:
+
+| cycle | seconds | positions | pos/s | avg batch | B win rate | W win rate | first pass <=40 | max-move games | mean moves |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `1` | `251.916` | `8,197` | `32.836` | `4.890` | `37.50%` | `62.50%` | `63.54%` | `3` | `85.385` |
+| `2` | `248.763` | `9,897` | `40.076` | `5.969` | `59.38%` | `40.62%` | `46.88%` | `1` | `103.094` |
+| `3` | `240.465` | `8,470` | `35.477` | `5.328` | `62.50%` | `37.50%` | `33.33%` | `0` | `88.229` |
+| `4` | `231.373` | `8,655` | `37.678` | `5.671` | `59.38%` | `40.62%` | `33.33%` | `1` | `90.156` |
+| `5` | `202.304` | `7,366` | `36.725` | `5.805` | `64.58%` | `35.42%` | `23.96%` | `0` | `76.729` |
+| `6` | `220.879` | `7,894` | `36.023` | `5.620` | `45.83%` | `54.17%` | `27.08%` | `0` | `82.229` |
+
+Initial read:
+
+- The dual-GPU worker split is functional: metrics record workers on both
+  `cuda:0` and `cuda:1`.
+- Throughput is materially better than the previous 4090D single-GPU
+  4x64/300-sim line (`~36.5` positions/s here vs about `15.5` positions/s in
+  the earlier 5.5-komi 300-sim run), but this is not a pure hardware comparison
+  because this run uses `96 games/cycle`, a 2x96 model, and two GPUs.
+- Average inference batch improved from roughly `3.1` in the previous line to
+  `5.5` here, which supports the idea that larger per-worker game batches reduce
+  tiny-GPU-batch overhead.
+- GPU utilization is still not saturated. CPU/rules/MCTS orchestration remains
+  a likely bottleneck: per cycle, summed legal-action time is still large.
+- Early-pass behavior is still visible in fresh-start cycle 1, but it improved
+  quickly during this short run. This should be monitored in any longer run.
