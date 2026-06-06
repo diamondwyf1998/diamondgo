@@ -12,7 +12,7 @@ cat > "$TRAIN_OUT/run_notes.md" <<NOTES
 # No-Komi-Input 4x64, Score Komi 5.5, Margin Reward 0.2 Continuation
 
 - created_time: $(date --iso-8601=seconds)
-- source_commit: 233db83
+- source_commit: 1436c45
 - fresh_start: false
 - resume_checkpoint: $RESUME
 - resume_semantics: model weights, optimizer state, cycle count, position count, and train step count continue from the resume checkpoint; replay buffer is rebuilt in this new run directory
