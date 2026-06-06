@@ -22,6 +22,8 @@ class OvernightConfig:
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
     input_komi: bool = True
+    terminal_dead_stone_cleanup: bool = False
+    score_margin_reward_scale: float = 0.0
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 64
@@ -57,6 +59,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--komi", type=float, default=OvernightConfig.komi)
     parser.add_argument("--score-komi", type=float, default=OvernightConfig.score_komi)
     parser.add_argument("--input-komi", action=argparse.BooleanOptionalAction, default=OvernightConfig.input_komi)
+    parser.add_argument(
+        "--terminal-dead-stone-cleanup",
+        action=argparse.BooleanOptionalAction,
+        default=OvernightConfig.terminal_dead_stone_cleanup,
+        help="At terminal scoring, remove conservatively detected obvious dead groups.",
+    )
+    parser.add_argument(
+        "--score-margin-reward-scale",
+        type=float,
+        default=OvernightConfig.score_margin_reward_scale,
+        help="Scale for signed abs(score_margin)**0.25/5 added to the +/-1 value target.",
+    )
     parser.add_argument("--max-moves", type=int, default=OvernightConfig.max_moves)
     parser.add_argument("--simulations", type=int, default=OvernightConfig.simulations)
     parser.add_argument("--train-steps-per-cycle", type=int, default=OvernightConfig.train_steps_per_cycle)
@@ -89,6 +103,8 @@ def make_selfplay_config(config: OvernightConfig, seed: int) -> BatchedConfig:
         komi=config.komi,
         score_komi=config.score_komi,
         input_komi=config.input_komi,
+        terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
+        score_margin_reward_scale=config.score_margin_reward_scale,
         channels=config.channels,
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,
@@ -239,6 +255,7 @@ def summarize_cycle(
     elapsed = time.perf_counter() - started_at
     policies = [np.asarray(item["policy"], dtype=np.float32) for item in examples]
     entropies = [float(-(policy * np.log(np.clip(policy, 1e-9, 1.0))).sum()) for policy in policies]
+    value_targets = [float(item["value_target"]) for item in examples]
     compact_selfplay_stats = {
         key: value for key, value in selfplay_stats.items() if key != "batch_sizes"
     }
@@ -252,9 +269,9 @@ def summarize_cycle(
         "total_train_steps": total_train_steps,
         "latest_loss": train_history[-1] if train_history else {},
         "policy_entropy_mean": round(float(np.mean(entropies)), 4) if entropies else 0.0,
-        "value_target_mean": round(float(np.mean([item["value_target"] for item in examples])), 4)
-        if examples
-        else 0.0,
+        "value_target_mean": round(float(np.mean(value_targets)), 4) if value_targets else 0.0,
+        "value_target_min": round(min(value_targets), 4) if value_targets else 0.0,
+        "value_target_max": round(max(value_targets), 4) if value_targets else 0.0,
         "selfplay": compact_selfplay_stats,
     }
 
@@ -371,6 +388,8 @@ def main() -> None:
         komi=args.komi,
         score_komi=args.score_komi,
         input_komi=args.input_komi,
+        terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
+        score_margin_reward_scale=args.score_margin_reward_scale,
         games_per_cycle=args.games_per_cycle,
         max_moves=args.max_moves,
         train_steps_per_cycle=args.train_steps_per_cycle,

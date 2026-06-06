@@ -30,6 +30,8 @@ class MultiWorkerConfig:
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
     input_komi: bool = True
+    terminal_dead_stone_cleanup: bool = False
+    score_margin_reward_scale: float = 0.0
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 100
@@ -68,6 +70,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--komi", type=float, default=MultiWorkerConfig.komi)
     parser.add_argument("--score-komi", type=float, default=MultiWorkerConfig.score_komi)
     parser.add_argument("--input-komi", action=argparse.BooleanOptionalAction, default=MultiWorkerConfig.input_komi)
+    parser.add_argument(
+        "--terminal-dead-stone-cleanup",
+        action=argparse.BooleanOptionalAction,
+        default=MultiWorkerConfig.terminal_dead_stone_cleanup,
+        help="At terminal scoring, remove conservatively detected obvious dead groups.",
+    )
+    parser.add_argument(
+        "--score-margin-reward-scale",
+        type=float,
+        default=MultiWorkerConfig.score_margin_reward_scale,
+        help="Scale for signed abs(score_margin)**0.25/5 added to the +/-1 value target.",
+    )
     parser.add_argument("--max-moves", type=int, default=MultiWorkerConfig.max_moves)
     parser.add_argument("--simulations", type=int, default=MultiWorkerConfig.simulations)
     parser.add_argument("--train-steps-per-cycle", type=int, default=MultiWorkerConfig.train_steps_per_cycle)
@@ -99,6 +113,8 @@ def to_overnight_config(config: MultiWorkerConfig) -> OvernightConfig:
         komi=config.komi,
         score_komi=config.score_komi,
         input_komi=config.input_komi,
+        terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
+        score_margin_reward_scale=config.score_margin_reward_scale,
         channels=config.channels,
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,
@@ -132,6 +148,8 @@ def make_selfplay_config(config: MultiWorkerConfig, seed: int) -> BatchedConfig:
         komi=config.komi,
         score_komi=config.score_komi,
         input_komi=config.input_komi,
+        terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
+        score_margin_reward_scale=config.score_margin_reward_scale,
         channels=config.channels,
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,
@@ -203,6 +221,7 @@ def summarize_cycle(
 ) -> dict[str, object]:
     policies = [np.asarray(item["policy"], dtype=np.float32) for item in examples]
     entropies = [float(-(policy * np.log(np.clip(policy, 1e-9, 1.0))).sum()) for policy in policies]
+    value_targets = [float(item["value_target"]) for item in examples]
     game_summaries = [
         game
         for worker in worker_summaries
@@ -243,9 +262,9 @@ def summarize_cycle(
         "total_train_steps": total_train_steps,
         "latest_loss": train_history[-1] if train_history else {},
         "policy_entropy_mean": round(float(np.mean(entropies)), 4) if entropies else 0.0,
-        "value_target_mean": round(float(np.mean([item["value_target"] for item in examples])), 4)
-        if examples
-        else 0.0,
+        "value_target_mean": round(float(np.mean(value_targets)), 4) if value_targets else 0.0,
+        "value_target_min": round(min(value_targets), 4) if value_targets else 0.0,
+        "value_target_max": round(max(value_targets), 4) if value_targets else 0.0,
         "game_behavior": summarize_game_behavior(game_summaries, examples),
         "selfplay_timing": selfplay_timing,
         "selfplay": {
@@ -297,6 +316,12 @@ def summarize_game_behavior(
     ]
     capture_moves = sum(int(item.get("capture_moves", 0)) for item in game_summaries)
     captured_stones = sum(int(item.get("captured_stones", 0)) for item in game_summaries)
+    terminal_cleanup_black_stones = sum(
+        int(item.get("terminal_cleanup_black_stones", 0)) for item in game_summaries
+    )
+    terminal_cleanup_white_stones = sum(
+        int(item.get("terminal_cleanup_white_stones", 0)) for item in game_summaries
+    )
     signed_margins = [float(item.get("black_score_margin", 0.0)) for item in game_summaries]
     margins = [abs(margin) for margin in signed_margins]
     black_win_margins = [margin for margin in signed_margins if margin > 0]
@@ -345,6 +370,8 @@ def summarize_game_behavior(
         "capture_moves": capture_moves,
         "captured_stones": captured_stones,
         "capture_move_fraction": round(capture_moves / max(len(examples), 1), 4),
+        "terminal_cleanup_black_stones": terminal_cleanup_black_stones,
+        "terminal_cleanup_white_stones": terminal_cleanup_white_stones,
         "black_wins": black_wins,
         "white_wins": white_wins,
         "black_win_rate": round(black_win_rate, 4),
@@ -529,6 +556,8 @@ def main() -> None:
         komi=args.komi,
         score_komi=args.score_komi,
         input_komi=args.input_komi,
+        terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
+        score_margin_reward_scale=args.score_margin_reward_scale,
         workers=args.workers,
         games_per_worker=args.games_per_worker,
         max_moves=args.max_moves,

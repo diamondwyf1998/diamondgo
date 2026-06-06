@@ -50,6 +50,12 @@ class GoRules(Protocol):
     def terminal_value(self) -> float:
         ...
 
+    def terminal_score_margin(self) -> float:
+        ...
+
+    def terminal_cleanup_counts(self) -> dict[str, int]:
+        ...
+
 
 class SimpleAreaRules:
     """Tiny CPU-demo rules backend.
@@ -65,11 +71,15 @@ class SimpleAreaRules:
         komi: float = DEFAULT_9X9_KOMI,
         score_komi: float = DEFAULT_9X9_SCORE_KOMI,
         input_komi: bool = True,
+        terminal_dead_stone_cleanup: bool = False,
+        score_margin_reward_scale: float = 0.0,
     ) -> None:
         self.size = size
         self.komi = komi
         self.score_komi = score_komi
         self.input_komi = input_komi
+        self.terminal_dead_stone_cleanup = terminal_dead_stone_cleanup
+        self.score_margin_reward_scale = score_margin_reward_scale
         self.board = np.zeros((size, size), dtype=np.int8)
         self.to_play = BLACK
         self._passes = 0
@@ -81,7 +91,14 @@ class SimpleAreaRules:
         return self.size * self.size + 1
 
     def copy(self) -> "SimpleAreaRules":
-        clone = SimpleAreaRules(self.size, self.komi, self.score_komi, self.input_komi)
+        clone = SimpleAreaRules(
+            self.size,
+            self.komi,
+            self.score_komi,
+            self.input_komi,
+            self.terminal_dead_stone_cleanup,
+            self.score_margin_reward_scale,
+        )
         clone.board = self.board.copy()
         clone.to_play = self.to_play
         clone._passes = self._passes
@@ -140,9 +157,21 @@ class SimpleAreaRules:
         return self._passes >= 2 or self._moves >= self.action_size + 1
 
     def terminal_value(self) -> float:
-        black_minus_white = float(self.board.sum()) - self.score_komi
-        winner = BLACK if black_minus_white > 0 else WHITE
-        return 1.0 if winner == self.to_play else -1.0
+        return _terminal_value_from_margin(
+            self.terminal_score_margin(),
+            self.to_play,
+            self.score_margin_reward_scale,
+        )
+
+    def terminal_score_margin(self) -> float:
+        if not self.terminal_dead_stone_cleanup:
+            return float(self.board.sum()) - self.score_komi
+        return _area_score_from_array(_cleaned_terminal_board(self.board)) - self.score_komi
+
+    def terminal_cleanup_counts(self) -> dict[str, int]:
+        if not self.terminal_dead_stone_cleanup:
+            return {"b": 0, "w": 0}
+        return _dead_stone_counts(self.board)
 
 
 class SgfmillRules:
@@ -154,6 +183,8 @@ class SgfmillRules:
         komi: float = DEFAULT_9X9_KOMI,
         score_komi: float = DEFAULT_9X9_SCORE_KOMI,
         input_komi: bool = True,
+        terminal_dead_stone_cleanup: bool = False,
+        score_margin_reward_scale: float = 0.0,
     ) -> None:
         try:
             from sgfmill import boards
@@ -167,6 +198,8 @@ class SgfmillRules:
         self.komi = komi
         self.score_komi = score_komi
         self.input_komi = input_komi
+        self.terminal_dead_stone_cleanup = terminal_dead_stone_cleanup
+        self.score_margin_reward_scale = score_margin_reward_scale
         self._boards = boards
         self.board = boards.Board(size)
         self.board_array = np.zeros((size, size), dtype=np.int8)
@@ -180,7 +213,14 @@ class SgfmillRules:
         return self.size * self.size + 1
 
     def copy(self) -> "SgfmillRules":
-        clone = SgfmillRules(self.size, self.komi, self.score_komi, self.input_komi)
+        clone = SgfmillRules(
+            self.size,
+            self.komi,
+            self.score_komi,
+            self.input_komi,
+            self.terminal_dead_stone_cleanup,
+            self.score_margin_reward_scale,
+        )
         clone.board = self.board.copy()
         clone.board_array = self.board_array.copy()
         clone.to_play = self.to_play
@@ -244,15 +284,27 @@ class SgfmillRules:
         return np.stack(planes).astype(np.float32)
 
     def area_winner_value(self) -> float:
-        black_minus_white = self.board.area_score() - self.score_komi
-        winner = BLACK if black_minus_white > 0 else WHITE
-        return 1.0 if winner == self.to_play else -1.0
+        return _terminal_value_from_margin(
+            self.terminal_score_margin(),
+            self.to_play,
+            self.score_margin_reward_scale,
+        )
 
     def is_terminal(self) -> bool:
         return self._passes >= 2
 
     def terminal_value(self) -> float:
         return self.area_winner_value()
+
+    def terminal_score_margin(self) -> float:
+        if not self.terminal_dead_stone_cleanup:
+            return self.board.area_score() - self.score_komi
+        return _area_score_from_array(_cleaned_terminal_board(self.board_array)) - self.score_komi
+
+    def terminal_cleanup_counts(self) -> dict[str, int]:
+        if not self.terminal_dead_stone_cleanup:
+            return {"b": 0, "w": 0}
+        return _dead_stone_counts(self.board_array)
 
     def _is_legal_point(
         self,
@@ -346,3 +398,155 @@ class SgfmillRules:
 
 
 GomillRules = SgfmillRules
+
+
+def _terminal_value_from_margin(
+    black_score_margin: float,
+    to_play: str,
+    score_margin_reward_scale: float,
+) -> float:
+    winner = BLACK if black_score_margin > 0 else WHITE
+    black_value = 1.0 if winner == BLACK else -1.0
+    if score_margin_reward_scale > 0.0 and black_score_margin != 0.0:
+        bonus = (abs(float(black_score_margin)) ** 0.25) / 5.0
+        black_value += float(score_margin_reward_scale) * np.sign(black_score_margin) * bonus
+    return float(black_value if to_play == BLACK else -black_value)
+
+
+def _cleaned_terminal_board(board: np.ndarray) -> np.ndarray:
+    cleaned = np.asarray(board, dtype=np.int8).copy()
+    cleaned[_obvious_dead_stone_mask(cleaned)] = 0
+    return cleaned
+
+
+def _dead_stone_counts(board: np.ndarray) -> dict[str, int]:
+    board_array = np.asarray(board, dtype=np.int8)
+    dead_mask = _obvious_dead_stone_mask(board_array)
+    return {
+        "b": int(((board_array == BLACK_VALUE) & dead_mask).sum()),
+        "w": int(((board_array == WHITE_VALUE) & dead_mask).sum()),
+    }
+
+
+def _area_score_from_array(board: np.ndarray) -> float:
+    board_array = np.asarray(board, dtype=np.int8)
+    score = float((board_array == BLACK_VALUE).sum() - (board_array == WHITE_VALUE).sum())
+    visited = np.zeros_like(board_array, dtype=np.bool_)
+    for start_row in range(board_array.shape[0]):
+        for start_col in range(board_array.shape[1]):
+            if board_array[start_row, start_col] != 0 or visited[start_row, start_col]:
+                continue
+            region, border_colours = _empty_region(board_array, [(start_row, start_col)])
+            for row, col in region:
+                visited[row, col] = True
+            if border_colours == {BLACK_VALUE}:
+                score += len(region)
+            elif border_colours == {WHITE_VALUE}:
+                score -= len(region)
+    return score
+
+
+def _obvious_dead_stone_mask(board: np.ndarray) -> np.ndarray:
+    board_array = np.asarray(board, dtype=np.int8)
+    dead = np.zeros_like(board_array, dtype=np.bool_)
+    for colour, stones in _stone_groups(board_array):
+        if _solid_eye_count(board_array, stones, colour) >= 2:
+            continue
+        removed = board_array.copy()
+        for row, col in stones:
+            removed[row, col] = 0
+        region, border_colours = _empty_region(removed, stones)
+        if _region_touches_edge(board_array, region):
+            continue
+        if region and border_colours == {-colour}:
+            for row, col in stones:
+                dead[row, col] = True
+    return dead
+
+
+def _solid_eye_count(board: np.ndarray, stones: list[tuple[int, int]], colour: int) -> int:
+    seen_regions: set[frozenset[tuple[int, int]]] = set()
+    eyes = 0
+    for row, col in stones:
+        for neighbour in _neighbors_array(board, row, col):
+            neighbour_row, neighbour_col = neighbour
+            if board[neighbour_row, neighbour_col] != 0:
+                continue
+            region, border_colours = _empty_region(board, [neighbour])
+            region_key = frozenset(region)
+            if region_key in seen_regions:
+                continue
+            seen_regions.add(region_key)
+            if border_colours == {colour}:
+                eyes += 1
+    return eyes
+
+
+def _stone_groups(board: np.ndarray) -> list[tuple[int, list[tuple[int, int]]]]:
+    visited = np.zeros_like(board, dtype=np.bool_)
+    groups: list[tuple[int, list[tuple[int, int]]]] = []
+    for start_row in range(board.shape[0]):
+        for start_col in range(board.shape[1]):
+            colour = int(board[start_row, start_col])
+            if colour == 0 or visited[start_row, start_col]:
+                continue
+            stack = [(start_row, start_col)]
+            visited[start_row, start_col] = True
+            stones: list[tuple[int, int]] = []
+            while stack:
+                row, col = stack.pop()
+                stones.append((row, col))
+                for neighbour_row, neighbour_col in _neighbors_array(board, row, col):
+                    if (
+                        not visited[neighbour_row, neighbour_col]
+                        and int(board[neighbour_row, neighbour_col]) == colour
+                    ):
+                        visited[neighbour_row, neighbour_col] = True
+                        stack.append((neighbour_row, neighbour_col))
+            groups.append((colour, stones))
+    return groups
+
+
+def _empty_region(
+    board: np.ndarray,
+    starts: list[tuple[int, int]],
+) -> tuple[list[tuple[int, int]], set[int]]:
+    stack = list(starts)
+    seen: set[tuple[int, int]] = set()
+    region: list[tuple[int, int]] = []
+    border_colours: set[int] = set()
+    while stack:
+        row, col = stack.pop()
+        if (row, col) in seen:
+            continue
+        seen.add((row, col))
+        colour = int(board[row, col])
+        if colour != 0:
+            border_colours.add(colour)
+            continue
+        region.append((row, col))
+        for neighbour in _neighbors_array(board, row, col):
+            neighbour_row, neighbour_col = neighbour
+            if int(board[neighbour_row, neighbour_col]) == 0:
+                if neighbour not in seen:
+                    stack.append(neighbour)
+            else:
+                border_colours.add(int(board[neighbour_row, neighbour_col]))
+    return region, border_colours
+
+
+def _neighbors_array(board: np.ndarray, row: int, col: int):
+    if row > 0:
+        yield row - 1, col
+    if row + 1 < board.shape[0]:
+        yield row + 1, col
+    if col > 0:
+        yield row, col - 1
+    if col + 1 < board.shape[1]:
+        yield row, col + 1
+
+
+def _region_touches_edge(board: np.ndarray, region: list[tuple[int, int]]) -> bool:
+    last_row = board.shape[0] - 1
+    last_col = board.shape[1] - 1
+    return any(row == 0 or row == last_row or col == 0 or col == last_col for row, col in region)

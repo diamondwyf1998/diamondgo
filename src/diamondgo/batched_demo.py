@@ -32,6 +32,8 @@ class BatchedConfig:
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
     input_komi: bool = True
+    terminal_dead_stone_cleanup: bool = False
+    score_margin_reward_scale: float = 0.0
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 64
@@ -58,6 +60,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--komi", type=float, default=BatchedConfig.komi)
     parser.add_argument("--score-komi", type=float, default=BatchedConfig.score_komi)
     parser.add_argument("--input-komi", action=argparse.BooleanOptionalAction, default=BatchedConfig.input_komi)
+    parser.add_argument(
+        "--terminal-dead-stone-cleanup",
+        action=argparse.BooleanOptionalAction,
+        default=BatchedConfig.terminal_dead_stone_cleanup,
+        help="At terminal scoring, remove conservatively detected obvious dead groups.",
+    )
+    parser.add_argument(
+        "--score-margin-reward-scale",
+        type=float,
+        default=BatchedConfig.score_margin_reward_scale,
+        help="Scale for signed abs(score_margin)**0.25/5 added to the +/-1 value target.",
+    )
     parser.add_argument("--simulations", type=int, default=BatchedConfig.simulations)
     parser.add_argument("--max-moves", type=int, default=BatchedConfig.max_moves)
     parser.add_argument("--train-steps", type=int, default=BatchedConfig.train_steps)
@@ -319,6 +333,7 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
         terminal_values_by_game[(game_index, state.to_play)] = value_for_to_play
         terminal_values_by_game[(game_index, "w" if state.to_play == "b" else "b")] = -value_for_to_play
         black_margin = _black_score_margin(state)
+        cleanup_counts = _terminal_cleanup_counts(state)
         winner = "b" if black_margin > 0 else "w"
         ended_by_pass = bool(state.is_terminal())
         game_summaries.append(
@@ -332,6 +347,8 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
                 "terminal_double_pass_move": terminal_double_pass_moves[game_index - 1],
                 "capture_moves": capture_move_counts[game_index - 1],
                 "captured_stones": captured_stone_counts[game_index - 1],
+                "terminal_cleanup_black_stones": cleanup_counts["b"],
+                "terminal_cleanup_white_stones": cleanup_counts["w"],
                 "black_score_margin": round(black_margin, 3),
                 "winner": winner,
                 "to_play_at_end": state.to_play,
@@ -389,12 +406,23 @@ def _captures_for_move(player: str, before: dict[str, int], after: dict[str, int
 
 
 def _black_score_margin(state: object) -> float:
+    terminal_score_margin = getattr(state, "terminal_score_margin", None)
+    if callable(terminal_score_margin):
+        return float(terminal_score_margin())
     board = getattr(state, "board", None)
     score_komi = float(getattr(state, "score_komi", getattr(state, "komi")))
     area_score = getattr(board, "area_score", None)
     if area_score is not None:
         return float(area_score()) - score_komi
     return float(np.asarray(board).sum()) - score_komi
+
+
+def _terminal_cleanup_counts(state: object) -> dict[str, int]:
+    counts = getattr(state, "terminal_cleanup_counts", None)
+    if callable(counts):
+        raw_counts = counts()
+        return {"b": int(raw_counts.get("b", 0)), "w": int(raw_counts.get("w", 0))}
+    return {"b": 0, "w": 0}
 
 
 def run(config: BatchedConfig, sgf_path: str, trace_path: str, dashboard_path: str, overview_svg_path: str) -> dict[str, object]:
@@ -461,6 +489,8 @@ def main() -> None:
         komi=args.komi,
         score_komi=args.score_komi,
         input_komi=args.input_komi,
+        terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
+        score_margin_reward_scale=args.score_margin_reward_scale,
         simulations=args.simulations,
         max_moves=args.max_moves,
         train_steps=args.train_steps,

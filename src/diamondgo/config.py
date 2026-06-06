@@ -11,6 +11,8 @@ class BoardConfig:
     size: int = 9
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
+    terminal_dead_stone_cleanup: bool = False
+    score_margin_reward_scale: float = 0.0
     rules_backend: str = "sgfmill"
 
 

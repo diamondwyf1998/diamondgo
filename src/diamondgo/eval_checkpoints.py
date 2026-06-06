@@ -25,6 +25,8 @@ class MatchConfig:
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
     input_komi: bool = True
+    terminal_dead_stone_cleanup: bool = False
+    score_margin_reward_scale: float = 0.0
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 32
@@ -71,6 +73,8 @@ def config_from_payload(payload: dict[str, object], device: str, simulations: in
         komi=float(raw.get("komi", DEFAULT_9X9_KOMI)),
         score_komi=float(raw.get("score_komi", raw.get("komi", DEFAULT_9X9_SCORE_KOMI))),
         input_komi=bool(raw.get("input_komi", True)),
+        terminal_dead_stone_cleanup=bool(raw.get("terminal_dead_stone_cleanup", False)),
+        score_margin_reward_scale=float(raw.get("score_margin_reward_scale", 0.0)),
         channels=int(raw.get("channels", 32)),
         residual_blocks=int(raw.get("residual_blocks", 2)),
         simulations=simulations,
@@ -175,6 +179,8 @@ def batched_config(config: MatchConfig, active_games: int) -> BatchedConfig:
         komi=config.komi,
         score_komi=config.score_komi,
         input_komi=config.input_komi,
+        terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
+        score_margin_reward_scale=config.score_margin_reward_scale,
         channels=config.channels,
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,
@@ -266,12 +272,20 @@ def play_match(
         value_for_to_play = float(state.terminal_value())
         winner = state.to_play if value_for_to_play > 0 else other_player(state.to_play)
         candidate_won = winner == candidate_colors[index]
+        cleanup_counts = (
+            state.terminal_cleanup_counts()
+            if hasattr(state, "terminal_cleanup_counts")
+            else {"b": 0, "w": 0}
+        )
         candidate_wins += int(candidate_won)
         candidate_black_wins += int(candidate_won and candidate_colors[index] == "b")
         candidate_white_wins += int(candidate_won and candidate_colors[index] == "w")
         game_records[index]["winner"] = winner
         game_records[index]["candidate_won"] = candidate_won
         game_records[index]["moves_played"] = move_counts[index]
+        game_records[index]["black_score_margin"] = round(float(state.terminal_score_margin()), 3)
+        game_records[index]["terminal_cleanup_black_stones"] = int(cleanup_counts.get("b", 0))
+        game_records[index]["terminal_cleanup_white_stones"] = int(cleanup_counts.get("w", 0))
 
     for record in game_records[:sample_games]:
         write_match_sgf(

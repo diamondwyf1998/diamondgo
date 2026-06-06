@@ -81,8 +81,17 @@ def make_case_state(
     komi: float,
     score_komi: float,
     input_komi: bool,
+    terminal_dead_stone_cleanup: bool,
+    score_margin_reward_scale: float,
 ) -> SgfmillRules:
-    state = SgfmillRules(size=board_size, komi=komi, score_komi=score_komi, input_komi=input_komi)
+    state = SgfmillRules(
+        size=board_size,
+        komi=komi,
+        score_komi=score_komi,
+        input_komi=input_komi,
+        terminal_dead_stone_cleanup=terminal_dead_stone_cleanup,
+        score_margin_reward_scale=score_margin_reward_scale,
+    )
     for row, col in case.black:
         state.board.board[row][col] = BLACK
     for row, col in case.white:
@@ -104,6 +113,8 @@ def load_model_config(checkpoint: Path, device: str) -> tuple[BatchedConfig, tor
         komi=float(raw.get("komi", DEFAULT_9X9_KOMI)),
         score_komi=float(raw.get("score_komi", raw.get("komi", DEFAULT_9X9_SCORE_KOMI))),
         input_komi=bool(raw.get("input_komi", True)),
+        terminal_dead_stone_cleanup=bool(raw.get("terminal_dead_stone_cleanup", False)),
+        score_margin_reward_scale=float(raw.get("score_margin_reward_scale", 0.0)),
         channels=int(raw.get("channels", 32)),
         residual_blocks=int(raw.get("residual_blocks", 2)),
         simulations=1,
@@ -138,7 +149,15 @@ def run(args: argparse.Namespace) -> dict[str, object]:
     )
     rows = []
     for case in TACTICAL_CASES:
-        state = make_case_state(case, config.board_size, config.komi, config.score_komi, config.input_komi)
+        state = make_case_state(
+            case,
+            config.board_size,
+            config.komi,
+            config.score_komi,
+            config.input_komi,
+            config.terminal_dead_stone_cleanup,
+            config.score_margin_reward_scale,
+        )
         root = run_batched_mcts(model, [state], search_config, stats={})[0]
         target_action = action_for(case.target, config.board_size)
         top_actions = root.top_actions(config.board_size, limit=10)

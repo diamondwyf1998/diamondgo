@@ -25,6 +25,8 @@ class CpuDemoConfig:
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
     input_komi: bool = True
+    terminal_dead_stone_cleanup: bool = False
+    score_margin_reward_scale: float = 0.0
     channels: int = 16
     residual_blocks: int = 1
     simulations: int = 8
@@ -46,6 +48,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--komi", type=float, default=CpuDemoConfig.komi)
     parser.add_argument("--score-komi", type=float, default=CpuDemoConfig.score_komi)
     parser.add_argument("--input-komi", action=argparse.BooleanOptionalAction, default=CpuDemoConfig.input_komi)
+    parser.add_argument(
+        "--terminal-dead-stone-cleanup",
+        action=argparse.BooleanOptionalAction,
+        default=CpuDemoConfig.terminal_dead_stone_cleanup,
+        help="At terminal scoring, remove conservatively detected obvious dead groups.",
+    )
+    parser.add_argument(
+        "--score-margin-reward-scale",
+        type=float,
+        default=CpuDemoConfig.score_margin_reward_scale,
+        help="Scale for signed abs(score_margin)**0.25/5 added to the +/-1 value target.",
+    )
     parser.add_argument("--simulations", type=int, default=CpuDemoConfig.simulations)
     parser.add_argument("--max-moves", type=int, default=CpuDemoConfig.max_moves)
     parser.add_argument("--train-steps", type=int, default=CpuDemoConfig.train_steps)
@@ -107,12 +121,16 @@ def make_rules(config: CpuDemoConfig):
             komi=config.komi,
             score_komi=config.score_komi,
             input_komi=config.input_komi,
+            terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
+            score_margin_reward_scale=config.score_margin_reward_scale,
         )
     return SimpleAreaRules(
         size=config.board_size,
         komi=config.komi,
         score_komi=config.score_komi,
         input_komi=config.input_komi,
+        terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
+        score_margin_reward_scale=config.score_margin_reward_scale,
     )
 
 
@@ -1003,6 +1021,8 @@ def main() -> None:
         komi=args.komi,
         score_komi=args.score_komi,
         input_komi=args.input_komi,
+        terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
+        score_margin_reward_scale=args.score_margin_reward_scale,
         simulations=args.simulations,
         max_moves=args.max_moves,
         train_steps=args.train_steps,
