@@ -18,6 +18,16 @@ than the first old 2-layer scripts. The architecture returns to 2 residual
 blocks, but the trunk channel count is set to `96`, interpreted as `1.5x` the
 recent `64` feature channels.
 
+This run is mainly a comparison experiment. Its cycle number should not be
+compared directly with earlier runs, because the amount of self-play per cycle
+changed:
+
+- recent single-GPU 4x64 line: `8 workers x 4 games = 32 games/cycle`
+- planned dual-GPU 2x96 line: `12 workers x 8 games = 96 games/cycle`
+
+For fair comparisons, prefer total positions, self-play games, wall-clock time,
+and checkpoint-vs-checkpoint eval, not raw cycle IDs.
+
 Parameter counts for reference:
 
 | model | parameters |
