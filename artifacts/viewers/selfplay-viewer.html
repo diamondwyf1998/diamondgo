@@ -1,0 +1,344 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>DiamondGo self-play viewer</title>
+<style>
+  :root { color: #172026; background: #f6f4ed; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
+  body { margin: 0; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 16px 20px; border-bottom: 1px solid #d7d2c5; background: #fbfaf6; }
+  h1 { font-size: 20px; margin: 0 12px 0 0; }
+  label { font-size: 13px; color: #52606d; display: grid; gap: 4px; }
+  select, button, input { height: 34px; border: 1px solid #bcc7c1; border-radius: 6px; background: #fff; padding: 0 10px; color: #172026; }
+  button { cursor: pointer; font-weight: 650; }
+  input[type="range"] { width: min(520px, 72vw); accent-color: #0b7285; }
+  main { display: grid; grid-template-columns: minmax(300px, 520px) minmax(280px, 1fr); gap: 20px; padding: 20px; }
+  .board-wrap { width: min(82vw, 520px); min-width: 0; }
+  canvas { width: 100%; aspect-ratio: 1; background: #d8a84f; border: 1px solid #7f5539; display: block; }
+  .panel { background: #fff; border: 1px solid #d7dce2; border-radius: 8px; padding: 14px; min-width: 0; overflow-wrap: anywhere; }
+  .toolbar, .scrubber { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+  .scrubber span { min-width: 78px; font-variant-numeric: tabular-nums; color: #52606d; }
+  .stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+  .stat { border: 1px solid #e4e7eb; border-radius: 6px; padding: 8px; background: #fbfaf6; }
+  .stat b { display: block; font-size: 12px; color: #627d98; margin-bottom: 3px; }
+  ol { margin: 8px 0 0; padding-left: 22px; }
+  li { margin: 7px 0; }
+  .move-list { max-height: 260px; overflow: auto; border-top: 1px solid #e4e7eb; margin-top: 12px; padding-top: 8px; font-size: 13px; line-height: 1.8; }
+  .current { color: #0b7285; font-weight: 750; }
+  .error { color: #9f1239; font-weight: 700; }
+  @media (max-width: 880px) { main { grid-template-columns: 1fr; } }
+</style>
+<header>
+  <h1>DiamondGo self-play viewer</h1>
+  <label>Dataset <input id="dataset" size="44" value="selfplay-catalog-fresh-nokomi-selected-20260606"></label>
+  <label>Checkpoint <select id="cycle">
+    <option value="20">cycle-00020 | score2p5 100sims</option>
+    <option value="40">cycle-00040 | score2p5 100sims</option>
+    <option value="60">cycle-00060 | score2p5 100sims</option>
+    <option value="80">cycle-00080 | score2p5 200sims</option>
+    <option value="100">cycle-00100 | score2p5 200sims</option>
+    <option value="150">cycle-00150 | score2p5 200sims</option>
+    <option value="200">cycle-00200 | score2p5 200sims</option>
+    <option value="250">cycle-00250 | score2p5 200sims</option>
+    <option value="300">cycle-00300 | score2p5 200sims</option>
+    <option value="350">cycle-00350 | score2p5 200sims</option>
+    <option value="400">cycle-00400 | score2p5 200sims</option>
+    <option value="430">cycle-00430 | score4p5 200sims</option>
+    <option value="435" selected>cycle-00435 | score4p5 200sims latest</option>
+  </select></label>
+  <label>Game <select id="game">
+    <option value="1" selected>Game 1</option>
+    <option value="2">Game 2</option>
+  </select></label>
+  <label>Move <select id="move"></select></label>
+  <button id="load">Load</button>
+  <button id="latestDataset">Latest dataset</button>
+</header>
+<main>
+  <section class="board-wrap">
+    <canvas id="board" width="900" height="900"></canvas>
+    <div class="scrubber"><input id="scrubber" type="range" min="0" max="0" value="0"><span id="scrubText">0 / 0</span></div>
+    <div class="toolbar"><button id="first">|&lt;</button><button id="prev">&lt;</button><button id="next">&gt;</button><button id="last">&gt;|</button></div>
+  </section>
+  <aside class="panel">
+    <div class="stat-grid">
+      <div class="stat"><b>Current</b><span id="current">-</span></div>
+      <div class="stat"><b>Root value</b><span id="root">-</span></div>
+      <div class="stat"><b>Result</b><span id="summary">-</span></div>
+      <div class="stat"><b>Captures</b><span id="captures">-</span></div>
+    </div>
+    <h3>Top 3 candidates</h3>
+    <ol id="top"></ol>
+    <div id="status" class="error"></div>
+    <div class="move-list" id="moves"></div>
+  </aside>
+</main>
+<script>
+window.addEventListener("error", event => {
+  const status = document.querySelector("#status");
+  if (status) status.textContent = `Viewer script error: ${event.message}`;
+});
+const boardSize = 9;
+const defaultDataset = "selfplay-catalog-fresh-nokomi-selected-20260606";
+const params = new URLSearchParams(location.search);
+let initialCycleParam = params.get("cycle");
+let initialGameParam = params.get("game");
+const datasetInput = document.querySelector("#dataset");
+const cycleSelect = document.querySelector("#cycle");
+const gameSelect = document.querySelector("#game");
+const moveSelect = document.querySelector("#move");
+const scrubber = document.querySelector("#scrubber");
+const scrubText = document.querySelector("#scrubText");
+const canvas = document.querySelector("#board");
+let ctx = null;
+let summary = [];
+let trace = null;
+let gameMoves = [];
+let step = 0;
+datasetInput.value = params.get("dataset") || datasetInput.value || defaultDataset;
+
+function getBoardContext() {
+  if (ctx) return ctx;
+  if (!canvas || typeof canvas.getContext !== "function") return null;
+  ctx = canvas.getContext("2d");
+  return ctx;
+}
+
+function dataUrl(path) {
+  return `../${datasetInput.value.replace(/^\.\.\//, "")}/${path}`;
+}
+
+function updateUrl() {
+  const next = new URLSearchParams();
+  next.set("dataset", datasetInput.value);
+  if (cycleSelect.value) next.set("cycle", cycleSelect.value);
+  if (gameSelect.value) next.set("game", gameSelect.value);
+  history.replaceState(null, "", `${location.pathname}?${next.toString()}`);
+}
+
+function actionPoint(action) {
+  if (action >= boardSize * boardSize) return null;
+  return { row: Math.floor(action / boardSize), col: action % boardSize };
+}
+
+function gtpFromAction(action) {
+  const p = actionPoint(action);
+  if (!p) return "pass";
+  return `${"ABCDEFGHJ"[p.col]}${boardSize - p.row}`;
+}
+
+function neighbors(row, col) {
+  return [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]].filter(([r, c]) => r >= 0 && r < boardSize && c >= 0 && c < boardSize);
+}
+
+function groupAt(board, row, col) {
+  const color = board[row][col];
+  const stones = [];
+  const seen = new Set([`${row},${col}`]);
+  const stack = [[row, col]];
+  let liberties = 0;
+  while (stack.length) {
+    const [r, c] = stack.pop();
+    stones.push([r, c]);
+    for (const [nr, nc] of neighbors(r, c)) {
+      const v = board[nr][nc];
+      if (!v) liberties += 1;
+      else if (v === color && !seen.has(`${nr},${nc}`)) {
+        seen.add(`${nr},${nc}`);
+        stack.push([nr, nc]);
+      }
+    }
+  }
+  return { stones, liberties };
+}
+
+function positionAt(count) {
+  const board = Array.from({ length: boardSize }, () => Array(boardSize).fill(""));
+  let blackCaptures = 0, whiteCaptures = 0;
+  for (const move of gameMoves.slice(0, count)) {
+    const p = actionPoint(Number(move.chosen_action));
+    if (!p) continue;
+    const color = move.player;
+    const enemy = color === "b" ? "w" : "b";
+    board[p.row][p.col] = color;
+    for (const [nr, nc] of neighbors(p.row, p.col)) {
+      if (board[nr][nc] !== enemy) continue;
+      const group = groupAt(board, nr, nc);
+      if (group.liberties === 0) {
+        for (const [sr, sc] of group.stones) board[sr][sc] = "";
+        if (color === "b") blackCaptures += group.stones.length;
+        else whiteCaptures += group.stones.length;
+      }
+    }
+  }
+  return { board, blackCaptures, whiteCaptures };
+}
+
+function draw() {
+  const ctx = getBoardContext();
+  const pos = positionAt(step);
+  if (!ctx) {
+    updateText(pos);
+    document.querySelector("#status").textContent = "Canvas is unavailable in this browser view; move data is loaded below.";
+    return;
+  }
+  const size = canvas.width, margin = 58, gap = (size - margin * 2) / (boardSize - 1);
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = "#d9ab55"; ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = "#3f2d20"; ctx.lineWidth = 3;
+  for (let i = 0; i < boardSize; i++) {
+    const x = margin + i * gap, y = margin + i * gap;
+    ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(size - margin, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, margin); ctx.lineTo(x, size - margin); ctx.stroke();
+  }
+  ctx.fillStyle = "#3f2d20";
+  for (const [r, c] of [[2,2],[2,6],[4,4],[6,2],[6,6]]) {
+    ctx.beginPath(); ctx.arc(margin + c * gap, margin + r * gap, 7, 0, Math.PI * 2); ctx.fill();
+  }
+  for (let r = 0; r < boardSize; r++) for (let c = 0; c < boardSize; c++) {
+    const stone = pos.board[r][c];
+    if (!stone) continue;
+    const x = margin + c * gap, y = margin + r * gap;
+    ctx.beginPath(); ctx.arc(x, y, gap * 0.42, 0, Math.PI * 2);
+    ctx.fillStyle = stone === "b" ? "#111" : "#f8fafc"; ctx.fill();
+    ctx.strokeStyle = stone === "b" ? "#000" : "#64748b"; ctx.lineWidth = 2; ctx.stroke();
+  }
+  if (step > 0) {
+    const p = actionPoint(Number(gameMoves[step - 1].chosen_action));
+    if (p) {
+      ctx.strokeStyle = "#d7263d"; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(margin + p.col * gap, margin + p.row * gap, gap * 0.5, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+  updateText(pos);
+}
+
+function updateText(pos) {
+  const move = gameMoves[Math.max(0, step - 1)];
+  document.querySelector("#current").textContent = step === 0 ? "Start" : `${step}/${gameMoves.length} ${move.player.toUpperCase()} ${move.chosen_move || gtpFromAction(Number(move.chosen_action))}`;
+  document.querySelector("#root").textContent = step === 0 ? "-" : Number(move.root_value || 0).toFixed(4);
+  const first = gameMoves[0];
+  const winner = Number(first?.value_target || 0) > 0 ? "B win" : "W win";
+  document.querySelector("#summary").textContent = gameMoves.length ? `${winner}, ${gameMoves.length} moves` : "-";
+  document.querySelector("#captures").textContent = `B ${pos.blackCaptures} / W ${pos.whiteCaptures}`;
+  const actions = step === 0 ? gameMoves[0]?.top_actions || [] : move.top_actions || [];
+  document.querySelector("#top").innerHTML = actions.slice(0, 3).map(item => `<li>${item.move} visits=${item.visits} prior=${item.prior} value=${item.value}</li>`).join("");
+  document.querySelector("#moves").innerHTML = gameMoves.map((m, i) => `<span class="${i + 1 === step ? "current" : ""}">${i + 1}. ${m.player.toUpperCase()} ${m.chosen_move || gtpFromAction(Number(m.chosen_action))}</span>`).join(" &nbsp; ");
+}
+
+function setStep(nextStep) {
+  step = Math.max(0, Math.min(gameMoves.length, nextStep));
+  moveSelect.value = String(step);
+  scrubber.value = String(step);
+  scrubText.textContent = `${step} / ${gameMoves.length}`;
+  draw();
+}
+
+async function loadDataset() {
+  document.querySelector("#status").textContent = "";
+  try {
+    summary = await fetch(dataUrl("summary.json"), { cache: "no-store" }).then(r => {
+      if (!r.ok) throw new Error(`summary.json ${r.status}`);
+      return r.json();
+    });
+    if (!Array.isArray(summary) || !summary.length) {
+      throw new Error(`summary.json has no checkpoint entries for ${datasetInput.value}`);
+    }
+    cycleSelect.innerHTML = "";
+    for (const item of summary) {
+      const option = document.createElement("option");
+      option.value = String(item.cycle);
+      option.textContent = item.label || `cycle-${String(item.cycle).padStart(5, "0")}`;
+      cycleSelect.append(option);
+    }
+    if (initialCycleParam && [...cycleSelect.options].some(option => option.value === initialCycleParam)) {
+      cycleSelect.value = initialCycleParam;
+    }
+    await loadCycle();
+    initialCycleParam = null;
+    initialGameParam = null;
+  } catch (err) {
+    document.querySelector("#status").textContent = `Could not load dataset: ${err.message}`;
+  }
+}
+
+async function loadCycle() {
+  document.querySelector("#status").textContent = "";
+  const traceFile = `cycle-${String(cycleSelect.value).padStart(5, "0")}-moves.json`;
+  trace = await fetch(dataUrl(traceFile), { cache: "no-store" }).then(r => {
+    if (!r.ok) throw new Error(`${traceFile} ${r.status}`);
+    return r.json();
+  });
+  if (!trace || !Array.isArray(trace.moves) || !trace.moves.length) {
+    throw new Error(`${traceFile} has no moves`);
+  }
+  const games = [...new Set(trace.moves.map(m => Number(m.game)).filter(Number.isFinite))].sort((a, b) => a - b);
+  const selectedGame = gameSelect.value || initialGameParam || "1";
+  gameSelect.innerHTML = "";
+  for (const game of games.length ? games : [1, 2]) {
+    const option = document.createElement("option");
+    option.value = String(game);
+    option.textContent = `Game ${game}`;
+    gameSelect.append(option);
+  }
+  if (initialGameParam && [...gameSelect.options].some(option => option.value === initialGameParam)) {
+    gameSelect.value = initialGameParam;
+  } else if ([...gameSelect.options].some(option => option.value === selectedGame)) {
+    gameSelect.value = selectedGame;
+  }
+  loadGame();
+  updateUrl();
+}
+
+function loadGame() {
+  if (!trace || !Array.isArray(trace.moves)) {
+    document.querySelector("#status").textContent = "Trace is not loaded yet";
+    return;
+  }
+  const game = Number(gameSelect.value);
+  gameMoves = trace.moves.filter(m => Number(m.game) === game).sort((a, b) => Number(a.move_in_game) - Number(b.move_in_game));
+  if (!gameMoves.length) {
+    document.querySelector("#status").textContent = `No moves found for Game ${game}`;
+    return;
+  }
+  moveSelect.innerHTML = "";
+  scrubber.min = "0"; scrubber.max = String(gameMoves.length);
+  for (let i = 0; i <= gameMoves.length; i++) {
+    const option = document.createElement("option");
+    option.value = i;
+    option.textContent = i === 0 ? "Start" : `${i}. ${gameMoves[i - 1].player.toUpperCase()} ${gameMoves[i - 1].chosen_move || gtpFromAction(Number(gameMoves[i - 1].chosen_action))}`;
+    moveSelect.append(option);
+  }
+  setStep(0);
+  updateUrl();
+}
+
+document.querySelector("#load").addEventListener("click", loadDataset);
+document.querySelector("#latestDataset").addEventListener("click", () => {
+  datasetInput.value = defaultDataset;
+  initialCycleParam = null;
+  initialGameParam = null;
+  loadDataset();
+});
+cycleSelect.addEventListener("change", () => {
+  initialGameParam = null;
+  loadCycle().catch(err => {
+    document.querySelector("#status").textContent = `Could not load checkpoint: ${err.message}`;
+  });
+});
+gameSelect.addEventListener("change", loadGame);
+moveSelect.addEventListener("change", () => setStep(Number(moveSelect.value)));
+scrubber.addEventListener("input", () => setStep(Number(scrubber.value)));
+document.querySelector("#first").addEventListener("click", () => setStep(0));
+document.querySelector("#prev").addEventListener("click", () => setStep(step - 1));
+document.querySelector("#next").addEventListener("click", () => setStep(step + 1));
+document.querySelector("#last").addEventListener("click", () => setStep(gameMoves.length));
+function startViewer() {
+  datasetInput.value = params.get("dataset") || datasetInput.value || defaultDataset;
+  loadDataset();
+}
+
+if (document.readyState === "loading") {
+  window.addEventListener("DOMContentLoaded", startViewer);
+} else {
+  startViewer();
+}
+</script>

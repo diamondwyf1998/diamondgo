@@ -18,6 +18,10 @@ Human-readable record rule:
   when a person needs to judge the position.
 - If an artifact is meant to support a visual claim, include the exact
   checkpoint/cycle and a link/path to the rendered view.
+- Result viewers should be reusable. Prefer stable frontends in
+  `artifacts/viewers/` plus JSON/server data over newly copied standalone HTML,
+  so labels, encoding, controls, and checkpoint identity do not drift between
+  experiments.
 
 Source labels:
 
@@ -370,22 +374,41 @@ needs a shape/distribution metric before treating it as a measured result.
     latest cycle has early first-pass `<40` rate `21.88%`.
   - Data reference:
     `docs/training-data-log.md#200-sim-continuation-cycle-403-snapshot`
-- `Agent measurement`: The 12-case tactical casebook was rerun every `50`
+- `Agent measurement`: The tactical casebook was rerun every `50`
   cycles for the 200-sim continuation, using checkpoints
-  `100,150,200,250,300,350,400`.
+  `100,150,200,250,300,350,400`. The two two-stone capture probes were removed
+  afterward because they were not good basic capture tests, leaving `10`
+  retained probes.
   - Atari-defense becomes the clearest improvement: from `0/1 of 4` top1/top3
     at cycle `100` to `4/4 of 4` top1/top3 from cycle `250` onward.
   - Fill-eye is mostly fixed in this probe set: bad fill-eye moves are
     `0/0 of 2` top1/top3 for all tested cycles except cycle `250`, which is
     `1/1 of 2`.
-  - Active capture remains weak: capture targets stay around `0-1` top1 hits
-    and only `1-2` top3 hits out of `4`.
+  - Active one-stone capture remains inconsistent: capture targets stay around
+    `0-1` top1 hits and `1` top3 hit out of `2`.
   - Self-atari/dead-shape avoidance is mostly clean early, but the bad black
     edge/corner move returns by cycle `400` as `1/1 of 2` bad top1/top3.
   - Rendered casebook:
     `artifacts/tactical-fresh-nokomi-4x64-200sims-cycle100-400-20260606/casebook.html`
   - Data reference:
     `docs/training-data-log.md#tactical-probes-200-sim-continuation-cycles-100-400`
+- `Agent measurement`: A second-level tactical casebook was added for the same
+  200-sim line, using checkpoints `100,150,200,250,300,350,400,410`.
+  - The tests cover hard-surrounded straight/bent three killing moves, double
+    atari, and third-line atari of a second-line stone. The second-line probe
+    was corrected to use only two attacking stones, so it is no longer a direct
+    last-liberty capture test.
+  - Double atari is the strongest result: `2/2` top3 in every tested
+    checkpoint, with `1-2` top1 hits.
+  - Life/death is not learned by this probe: cycle `410` is `0/0 of 4`
+    top1/top3 for straight/bent three vital points, and the targets are not
+    even top10.
+  - Second-line third-line atari is learned in this probe: cycle `410` is
+    `2/2 of 2` top1/top3, with both colors choosing `E3` as top1.
+  - Rendered casebook:
+    `artifacts/tactical-level2-fresh-nokomi-4x64-200sims-cycle100-410-20260606/casebook.html`
+  - Data reference:
+    `docs/training-data-log.md#tactical-level-2-probes-200-sim-continuation-cycles-100-410`
 
 ### Score-Komi 4.5 Continuation
 

@@ -879,22 +879,26 @@ Settings:
 | --- | --- |
 | Checkpoint line | `score_komi=2.5`, no-komi-input `4x64`, 200-sim continuation |
 | Tested checkpoints | `100, 150, 200, 250, 300, 350, 400` |
-| Tactical cases | `12` rendered casebook probes |
+| Tactical cases | `10` retained rendered casebook probes |
 | Probe simulations | `100` |
 | Positive categories | `capture`, `atari_defense`; higher top1/top3 is better |
 | Negative categories | `fill_eye`, `self_atari_or_dead`; lower bad top1/top3 is better |
+
+Note: `black_capture_two_stones` and `white_capture_two_stones` were removed
+from this summary after inspection because they were not suitable as basic
+capture probes.
 
 Summary:
 
 | Cycle | Capture top1/top3 | Atari defense top1/top3 | Fill-eye bad top1/top3 | Self/dead bad top1/top3 |
 | ---: | ---: | ---: | ---: | ---: |
-| `100` | `1/1 of 4` | `0/1 of 4` | `0/0 of 2` | `0/0 of 2` |
-| `150` | `0/2 of 4` | `1/3 of 4` | `0/0 of 2` | `0/0 of 2` |
-| `200` | `0/1 of 4` | `3/4 of 4` | `0/0 of 2` | `0/0 of 2` |
-| `250` | `0/1 of 4` | `4/4 of 4` | `1/1 of 2` | `0/1 of 2` |
-| `300` | `0/1 of 4` | `4/4 of 4` | `0/0 of 2` | `0/1 of 2` |
-| `350` | `1/1 of 4` | `4/4 of 4` | `0/0 of 2` | `0/1 of 2` |
-| `400` | `0/1 of 4` | `4/4 of 4` | `0/0 of 2` | `1/1 of 2` |
+| `100` | `1/1 of 2` | `0/1 of 4` | `0/0 of 2` | `0/0 of 2` |
+| `150` | `0/1 of 2` | `1/3 of 4` | `0/0 of 2` | `0/0 of 2` |
+| `200` | `0/1 of 2` | `3/4 of 4` | `0/0 of 2` | `0/0 of 2` |
+| `250` | `0/1 of 2` | `4/4 of 4` | `1/1 of 2` | `0/1 of 2` |
+| `300` | `0/1 of 2` | `4/4 of 4` | `0/0 of 2` | `0/1 of 2` |
+| `350` | `1/1 of 2` | `4/4 of 4` | `0/0 of 2` | `0/1 of 2` |
+| `400` | `0/1 of 2` | `4/4 of 4` | `0/0 of 2` | `1/1 of 2` |
 
 Observed interpretation:
 
@@ -903,11 +907,83 @@ Observed interpretation:
   top1/top3.
 - The earlier fill-eye habit is much reduced in this fixed probe set. The only
   recurrence among tested checkpoints is cycle `250`.
-- Active capture is still not reliably learned. The model often prefers center
-  or pass-like policy mass over immediate capture, especially in the two-stone
-  capture probes.
+- Active one-stone capture is still inconsistent. The target reaches top3 in
+  all tested cycles, but is top1 only at cycles `100` and `350`.
 - Self-atari/dead-shape avoidance is not monotonic: it is clean at cycles
   `100-200`, but the bad black edge/corner move is top1 again at cycle `400`.
+
+## Tactical Level 2 Probes, 200-Sim Continuation Cycles 100-410
+
+Source artifacts:
+
+- Server output:
+  `/root/diamondgo/artifacts/tactical-level2-fresh-nokomi-4x64-200sims-cycle100-410-20260606`
+- Local rendered casebook:
+  `artifacts/tactical-level2-fresh-nokomi-4x64-200sims-cycle100-410-20260606/casebook.html`
+- Raw results:
+  `artifacts/tactical-level2-fresh-nokomi-4x64-200sims-cycle100-410-20260606/tactical_results.json`
+
+Design:
+
+| Category | Cases | Intended skill |
+| --- | ---: | --- |
+| `life_death` | `4` | Kill hard-surrounded straight-three and bent-three eye spaces by playing the vital point |
+| `double_atari` | `2` | Play the shared point that puts two enemy stones into atari |
+| `second_line_atari` | `2` | Give third-line atari to a second-line stone with only two attacking stones on the board |
+
+The vital points were placed away from the exact board center where possible so
+these probes do not simply reward the model's center preference. The
+second-line probe was corrected after inspection: it now has only two attacking
+stones and measures whether the model chooses the third-line atari point, not
+whether it can fill the last liberty and capture immediately.
+
+Settings:
+
+| Field | Value |
+| --- | --- |
+| Checkpoint line | `score_komi=2.5`, no-komi-input `4x64`, 200-sim continuation |
+| Tested checkpoints | `100, 150, 200, 250, 300, 350, 400, 410` |
+| Probe simulations | `100` |
+| Probe type | All positive target tests; higher top1/top3 is better |
+
+Summary:
+
+| Cycle | Life/death top1/top3 | Double-atari top1/top3 | Second-line third-line-atari top1/top3 |
+| ---: | ---: | ---: | ---: |
+| `100` | `1/4 of 4` | `2/2 of 2` | `1/1 of 2` |
+| `150` | `1/2 of 4` | `2/2 of 2` | `0/1 of 2` |
+| `200` | `0/1 of 4` | `2/2 of 2` | `1/1 of 2` |
+| `250` | `0/1 of 4` | `2/2 of 2` | `2/2 of 2` |
+| `300` | `0/0 of 4` | `2/2 of 2` | `2/2 of 2` |
+| `350` | `0/0 of 4` | `1/2 of 2` | `2/2 of 2` |
+| `400` | `0/0 of 4` | `2/2 of 2` | `2/2 of 2` |
+| `410` | `0/0 of 4` | `1/2 of 2` | `2/2 of 2` |
+
+Cycle `410` details:
+
+| Case | Target | Top1 | Target rank |
+| --- | --- | --- | --- |
+| `black_kill_straight_three` | `D6` | `G4` | not top10 |
+| `white_kill_straight_three` | `D6` | `pass` | not top10 |
+| `black_kill_bent_three` | `D6` | `G3` | not top10 |
+| `white_kill_bent_three` | `D6` | `pass` | not top10 |
+| `black_double_atari` | `E6` | `D5` | `3` |
+| `white_double_atari` | `E6` | `E6` | `1` |
+| `black_second_line_third_line_atari` | `E3` | `E3` | `1` |
+| `white_second_line_third_line_atari` | `E3` | `E3` | `1` |
+
+Observed interpretation:
+
+- Double atari is already mostly learned in this probe design.
+- Basic straight/bent-three life-death is not learned. The late checkpoints do
+  worse than the early ones on these fixed vital-point tests, and White-to-play
+  life/death often prefers `pass`.
+- Second-line third-line atari is learned in this probe. After correcting the
+  target from `E1` to `E3`, cycle `410` has both colors choosing the target as
+  top1.
+- These are deliberately small probes. They are useful as diagnostics for
+  tactical understanding, but should not be treated as a complete tsumego
+  benchmark.
 
 ## Score-Komi 4.5 Continuation Configuration
 

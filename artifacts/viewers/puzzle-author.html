@@ -1,0 +1,561 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>DiamondGo puzzle author</title>
+<style>
+  :root {
+    color: #172026;
+    background: #f6f4ed;
+    font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid #d7d2c5;
+    background: #fbfaf6;
+  }
+  h1 { font-size: 20px; margin: 0 12px 0 0; }
+  main {
+    display: grid;
+    grid-template-columns: minmax(300px, 540px) minmax(320px, 1fr);
+    gap: 18px;
+    padding: 18px;
+  }
+  label { display: grid; gap: 4px; font-size: 12px; color: #52606d; }
+  input, select, textarea, button {
+    border: 1px solid #bcc7c1;
+    border-radius: 6px;
+    background: #fff;
+    color: #172026;
+    font: inherit;
+  }
+  input, select, button { height: 34px; padding: 0 10px; }
+  textarea {
+    min-height: 160px;
+    width: 100%;
+    padding: 10px;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  button { cursor: pointer; font-weight: 650; }
+  button.active { background: #0b7285; border-color: #0b7285; color: #fff; }
+  button.warn { border-color: #f2b8a2; color: #9a3412; }
+  button.good { border-color: #86b999; color: #166534; }
+  .board-wrap { width: min(84vw, 540px); min-width: 0; }
+  canvas {
+    width: 100%;
+    aspect-ratio: 1;
+    display: block;
+    background: #d8a84f;
+    border: 1px solid #7f5539;
+    cursor: crosshair;
+  }
+  .toolbar, .casebar, .fields, .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: end;
+  }
+  .toolbar, .casebar { margin-top: 12px; }
+  .panel {
+    min-width: 0;
+    background: #fff;
+    border: 1px solid #d7dce2;
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    align-items: end;
+    margin-bottom: 12px;
+  }
+  .fields label.wide { grid-column: 1 / -1; }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin: 12px 0;
+  }
+  .stat {
+    border: 1px solid #e4e7eb;
+    border-radius: 6px;
+    padding: 8px;
+    background: #fbfaf6;
+    min-width: 0;
+  }
+  .stat b {
+    display: block;
+    color: #627d98;
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+  .case-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 12px 0;
+    max-height: 88px;
+    overflow: auto;
+  }
+  .case-list button {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .status {
+    min-height: 22px;
+    color: #52606d;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  .status.error { color: #9f1239; font-weight: 700; }
+  .status.ok { color: #166534; font-weight: 700; }
+  .small { font-size: 12px; color: #627d98; }
+  @media (max-width: 920px) {
+    main { grid-template-columns: 1fr; }
+    .fields, .stats { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 560px) {
+    main { padding: 12px; }
+    .fields, .stats { grid-template-columns: 1fr; }
+  }
+</style>
+<header>
+  <h1>DiamondGo puzzle author</h1>
+  <button id="newCase">New</button>
+  <button id="duplicateCase">Duplicate</button>
+  <button id="deleteCase" class="warn">Delete</button>
+  <button id="copyJson" class="good">Copy JSON</button>
+  <button id="downloadJson">Download</button>
+</header>
+<main>
+  <section class="board-wrap">
+    <canvas id="board" width="900" height="900"></canvas>
+    <div class="toolbar" id="tools">
+      <button data-tool="black" class="active">Black</button>
+      <button data-tool="white">White</button>
+      <button data-tool="empty">Erase</button>
+      <button data-tool="good">Target</button>
+      <button data-tool="bad">Bad</button>
+    </div>
+    <div class="toolbar">
+      <button id="clearTargets">Clear targets</button>
+      <button id="clearBoard">Clear board</button>
+      <button id="swapColors">Swap colors</button>
+      <span id="hover" class="small">Point: -</span>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>Black</b><span id="blackCount">0</span></div>
+      <div class="stat"><b>White</b><span id="whiteCount">0</span></div>
+      <div class="stat"><b>Targets</b><span id="goodCount">0</span></div>
+      <div class="stat"><b>Bad</b><span id="badCount">0</span></div>
+    </div>
+  </section>
+  <aside class="panel">
+    <div class="fields">
+      <label>Name <input id="name" spellcheck="false"></label>
+      <label>To play
+        <select id="toPlay">
+          <option value="b">Black</option>
+          <option value="w">White</option>
+        </select>
+      </label>
+      <label>Category <input id="category" spellcheck="false"></label>
+      <label>Subcategory <input id="subcategory" spellcheck="false"></label>
+      <label class="wide">Note <input id="note" spellcheck="false"></label>
+    </div>
+    <div class="casebar">
+      <label>Case <select id="caseSelect"></select></label>
+      <button id="saveFields">Save fields</button>
+      <button id="renderJson">Refresh JSON</button>
+    </div>
+    <div class="case-list" id="caseList"></div>
+    <label>Export / import
+      <textarea id="jsonBox" spellcheck="false"></textarea>
+    </label>
+    <div class="toolbar">
+      <button id="loadJson">Load JSON</button>
+      <button id="copyPython">Copy Python case</button>
+      <button id="resetStorage" class="warn">Reset saved draft</button>
+    </div>
+    <div id="status" class="status"></div>
+  </aside>
+</main>
+<script>
+const boardSize = 9;
+const letters = "ABCDEFGHJ";
+const storageKey = "diamondgo-puzzle-author-v1";
+const canvas = document.querySelector("#board");
+const ctx = canvas.getContext("2d");
+const fields = {
+  name: document.querySelector("#name"),
+  category: document.querySelector("#category"),
+  subcategory: document.querySelector("#subcategory"),
+  to_play: document.querySelector("#toPlay"),
+  note: document.querySelector("#note")
+};
+let tool = "black";
+let cases = [];
+let current = 0;
+
+function pointKey(row, col) { return `${row},${col}`; }
+function gtp(row, col) { return `${letters[col]}${boardSize - row}`; }
+function sortPoints(points) { return [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]); }
+function pointSet(points) { return new Set((points || []).map(([r, c]) => pointKey(r, c))); }
+function pointsFromSet(set) {
+  return [...set].map(item => item.split(",").map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+}
+function emptyCase(index) {
+  return {
+    name: `custom_case_${String(index + 1).padStart(2, "0")}`,
+    category: "custom",
+    subcategory: "manual",
+    to_play: "b",
+    black: [],
+    white: [],
+    good: [],
+    bad: [],
+    note: ""
+  };
+}
+function normalizeCase(item, index = 0) {
+  return {
+    name: String(item?.name || `custom_case_${String(index + 1).padStart(2, "0")}`),
+    category: String(item?.category || "custom"),
+    subcategory: String(item?.subcategory || "manual"),
+    to_play: item?.to_play === "w" ? "w" : "b",
+    black: sortPoints(item?.black || []),
+    white: sortPoints(item?.white || []),
+    good: sortPoints(item?.good || item?.good_points || []),
+    bad: sortPoints(item?.bad || item?.bad_points || []),
+    note: String(item?.note || "")
+  };
+}
+function activeCase() { return cases[current]; }
+function setStatus(text, kind = "") {
+  const el = document.querySelector("#status");
+  el.textContent = text;
+  el.className = `status ${kind}`;
+}
+function persist() {
+  localStorage.setItem(storageKey, JSON.stringify({ version: 1, board_size: boardSize, cases }));
+}
+function casePayload() {
+  return { version: 1, board_size: boardSize, cases: cases.map((item, i) => normalizeCase(item, i)) };
+}
+function syncFieldsFromCase() {
+  const item = activeCase();
+  fields.name.value = item.name;
+  fields.category.value = item.category;
+  fields.subcategory.value = item.subcategory;
+  fields.to_play.value = item.to_play;
+  fields.note.value = item.note;
+}
+function syncFieldsToCase() {
+  const item = activeCase();
+  item.name = fields.name.value.trim() || item.name;
+  item.category = fields.category.value.trim() || "custom";
+  item.subcategory = fields.subcategory.value.trim() || "manual";
+  item.to_play = fields.to_play.value === "w" ? "w" : "b";
+  item.note = fields.note.value.trim();
+  persist();
+  refreshUi();
+}
+function refreshJson() {
+  document.querySelector("#jsonBox").value = JSON.stringify(casePayload(), null, 2);
+}
+function refreshCaseSelectors() {
+  const select = document.querySelector("#caseSelect");
+  select.replaceChildren(...cases.map((item, index) => {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = `${index + 1}. ${item.name}`;
+    return option;
+  }));
+  select.value = String(current);
+  const list = document.querySelector("#caseList");
+  list.replaceChildren(...cases.map((item, index) => {
+    const button = document.createElement("button");
+    button.textContent = `${index + 1}. ${item.name}`;
+    button.className = index === current ? "active" : "";
+    button.addEventListener("click", () => {
+      syncFieldsToCase();
+      current = index;
+      syncFieldsFromCase();
+      refreshUi();
+    });
+    return button;
+  }));
+}
+function validate(item) {
+  const black = pointSet(item.black);
+  const white = pointSet(item.white);
+  const good = pointSet(item.good);
+  const bad = pointSet(item.bad);
+  const overlaps = [];
+  for (const key of black) if (white.has(key)) overlaps.push(key);
+  for (const key of good) if (black.has(key) || white.has(key)) overlaps.push(key);
+  for (const key of bad) if (black.has(key) || white.has(key) || good.has(key)) overlaps.push(key);
+  if (overlaps.length) return `Overlap at ${[...new Set(overlaps)].map(k => gtp(...k.split(",").map(Number))).join(", ")}`;
+  if (!item.good.length) return "No target point yet";
+  return "";
+}
+function refreshUi() {
+  const item = activeCase();
+  refreshCaseSelectors();
+  document.querySelector("#blackCount").textContent = String(item.black.length);
+  document.querySelector("#whiteCount").textContent = String(item.white.length);
+  document.querySelector("#goodCount").textContent = item.good.map(([r, c]) => gtp(r, c)).join(", ") || "0";
+  document.querySelector("#badCount").textContent = item.bad.map(([r, c]) => gtp(r, c)).join(", ") || "0";
+  const problem = validate(item);
+  setStatus(problem || `Ready: ${item.name}`, problem ? "error" : "ok");
+  refreshJson();
+  draw();
+}
+function draw() {
+  const item = activeCase();
+  const size = canvas.width;
+  const margin = 58;
+  const gap = (size - margin * 2) / (boardSize - 1);
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = "#d9ab55";
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = "#3f2d20";
+  ctx.lineWidth = 3;
+  for (let i = 0; i < boardSize; i += 1) {
+    const x = margin + i * gap;
+    const y = margin + i * gap;
+    ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(size - margin, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, margin); ctx.lineTo(x, size - margin); ctx.stroke();
+  }
+  ctx.fillStyle = "#3f2d20";
+  for (const [r, c] of [[2, 2], [2, 6], [4, 4], [6, 2], [6, 6]]) {
+    ctx.beginPath(); ctx.arc(margin + c * gap, margin + r * gap, 7, 0, Math.PI * 2); ctx.fill();
+  }
+  for (const [color, points] of [["b", item.black], ["w", item.white]]) {
+    for (const [r, c] of points) {
+      const x = margin + c * gap;
+      const y = margin + r * gap;
+      ctx.beginPath();
+      ctx.arc(x, y, gap * 0.42, 0, Math.PI * 2);
+      ctx.fillStyle = color === "b" ? "#111" : "#f8fafc";
+      ctx.fill();
+      ctx.strokeStyle = color === "b" ? "#000" : "#64748b";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+  for (const [r, c] of item.good) {
+    const x = margin + c * gap;
+    const y = margin + r * gap;
+    ctx.strokeStyle = "#16a34a";
+    ctx.lineWidth = 6;
+    ctx.strokeRect(x - gap * 0.2, y - gap * 0.2, gap * 0.4, gap * 0.4);
+  }
+  for (const [r, c] of item.bad) {
+    const x = margin + c * gap;
+    const y = margin + r * gap;
+    ctx.strokeStyle = "#dc2626";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(x - gap * 0.22, y - gap * 0.22);
+    ctx.lineTo(x + gap * 0.22, y + gap * 0.22);
+    ctx.moveTo(x + gap * 0.22, y - gap * 0.22);
+    ctx.lineTo(x - gap * 0.22, y + gap * 0.22);
+    ctx.stroke();
+  }
+}
+function boardPoint(event) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) * canvas.width / rect.width;
+  const y = (event.clientY - rect.top) * canvas.height / rect.height;
+  const margin = 58;
+  const gap = (canvas.width - margin * 2) / (boardSize - 1);
+  const col = Math.round((x - margin) / gap);
+  const row = Math.round((y - margin) / gap);
+  if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) return null;
+  const dx = Math.abs(x - (margin + col * gap));
+  const dy = Math.abs(y - (margin + row * gap));
+  if (dx > gap * 0.45 || dy > gap * 0.45) return null;
+  return { row, col };
+}
+function removePoint(item, row, col) {
+  const keep = ([r, c]) => r !== row || c !== col;
+  item.black = item.black.filter(keep);
+  item.white = item.white.filter(keep);
+  item.good = item.good.filter(keep);
+  item.bad = item.bad.filter(keep);
+}
+function togglePoint(list, row, col) {
+  const key = pointKey(row, col);
+  const set = pointSet(list);
+  if (set.has(key)) set.delete(key);
+  else set.add(key);
+  return pointsFromSet(set);
+}
+function applyTool(row, col) {
+  const item = activeCase();
+  removePoint(item, row, col);
+  if (tool === "black") item.black = sortPoints([...item.black, [row, col]]);
+  if (tool === "white") item.white = sortPoints([...item.white, [row, col]]);
+  if (tool === "good") item.good = togglePoint(item.good, row, col);
+  if (tool === "bad") item.bad = togglePoint(item.bad, row, col);
+  persist();
+  refreshUi();
+}
+function loadPayload(payload) {
+  const rawCases = Array.isArray(payload) ? payload : payload.cases;
+  if (!Array.isArray(rawCases) || rawCases.length === 0) {
+    throw new Error("JSON needs a non-empty cases array");
+  }
+  cases = rawCases.map((item, index) => normalizeCase(item, index));
+  current = 0;
+  syncFieldsFromCase();
+  persist();
+  refreshUi();
+}
+function pythonCase(item) {
+  const clean = normalizeCase(item);
+  return JSON.stringify(clean, null, 2);
+}
+async function copyText(text) {
+  await navigator.clipboard.writeText(text);
+}
+
+document.querySelector("#tools").addEventListener("click", event => {
+  const button = event.target.closest("button[data-tool]");
+  if (!button) return;
+  tool = button.dataset.tool;
+  for (const item of document.querySelectorAll("#tools button")) {
+    item.classList.toggle("active", item.dataset.tool === tool);
+  }
+});
+canvas.addEventListener("mousemove", event => {
+  const p = boardPoint(event);
+  document.querySelector("#hover").textContent = p ? `Point: ${gtp(p.row, p.col)} (${p.row}, ${p.col})` : "Point: -";
+});
+canvas.addEventListener("click", event => {
+  const p = boardPoint(event);
+  if (!p) return;
+  applyTool(p.row, p.col);
+});
+for (const input of Object.values(fields)) input.addEventListener("change", syncFieldsToCase);
+document.querySelector("#saveFields").addEventListener("click", syncFieldsToCase);
+document.querySelector("#renderJson").addEventListener("click", () => { syncFieldsToCase(); refreshJson(); });
+document.querySelector("#caseSelect").addEventListener("change", event => {
+  syncFieldsToCase();
+  current = Number(event.target.value);
+  syncFieldsFromCase();
+  refreshUi();
+});
+document.querySelector("#newCase").addEventListener("click", () => {
+  syncFieldsToCase();
+  cases.push(emptyCase(cases.length));
+  current = cases.length - 1;
+  syncFieldsFromCase();
+  persist();
+  refreshUi();
+});
+document.querySelector("#duplicateCase").addEventListener("click", () => {
+  syncFieldsToCase();
+  const copy = normalizeCase(JSON.parse(JSON.stringify(activeCase())), cases.length);
+  copy.name = `${copy.name}_copy`;
+  cases.splice(current + 1, 0, copy);
+  current += 1;
+  syncFieldsFromCase();
+  persist();
+  refreshUi();
+});
+document.querySelector("#deleteCase").addEventListener("click", () => {
+  if (cases.length === 1) {
+    cases = [emptyCase(0)];
+    current = 0;
+  } else {
+    cases.splice(current, 1);
+    current = Math.max(0, current - 1);
+  }
+  syncFieldsFromCase();
+  persist();
+  refreshUi();
+});
+document.querySelector("#clearTargets").addEventListener("click", () => {
+  activeCase().good = [];
+  activeCase().bad = [];
+  persist();
+  refreshUi();
+});
+document.querySelector("#clearBoard").addEventListener("click", () => {
+  activeCase().black = [];
+  activeCase().white = [];
+  persist();
+  refreshUi();
+});
+document.querySelector("#swapColors").addEventListener("click", () => {
+  const item = activeCase();
+  [item.black, item.white] = [item.white, item.black];
+  item.to_play = item.to_play === "b" ? "w" : "b";
+  syncFieldsFromCase();
+  persist();
+  refreshUi();
+});
+document.querySelector("#copyJson").addEventListener("click", async () => {
+  syncFieldsToCase();
+  await copyText(JSON.stringify(casePayload(), null, 2));
+  setStatus("JSON copied", "ok");
+});
+document.querySelector("#copyPython").addEventListener("click", async () => {
+  syncFieldsToCase();
+  await copyText(pythonCase(activeCase()));
+  setStatus("Python-style case copied", "ok");
+});
+document.querySelector("#downloadJson").addEventListener("click", () => {
+  syncFieldsToCase();
+  const blob = new Blob([JSON.stringify(casePayload(), null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "diamondgo-custom-tactical-cases.json";
+  a.click();
+  URL.revokeObjectURL(url);
+  setStatus("Download started", "ok");
+});
+document.querySelector("#loadJson").addEventListener("click", () => {
+  try {
+    loadPayload(JSON.parse(document.querySelector("#jsonBox").value));
+    setStatus("JSON loaded", "ok");
+  } catch (err) {
+    setStatus(err.message, "error");
+  }
+});
+document.querySelector("#resetStorage").addEventListener("click", () => {
+  localStorage.removeItem(storageKey);
+  cases = [emptyCase(0)];
+  current = 0;
+  syncFieldsFromCase();
+  persist();
+  refreshUi();
+});
+
+try {
+  const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+  if (saved) loadPayload(saved);
+  else {
+    cases = [emptyCase(0)];
+    syncFieldsFromCase();
+    refreshUi();
+  }
+} catch (_err) {
+  cases = [emptyCase(0)];
+  syncFieldsFromCase();
+  refreshUi();
+}
+</script>

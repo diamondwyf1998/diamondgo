@@ -1,0 +1,286 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>DiamondGo play AI</title>
+<style>
+  :root { color: #172026; background: #f6f4ed; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
+  body { margin: 0; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 16px 20px; border-bottom: 1px solid #d7d2c5; background: #fbfaf6; }
+  h1 { font-size: 20px; margin: 0 12px 0 0; }
+  label { font-size: 13px; color: #52606d; display: grid; gap: 4px; }
+  select, button, input { height: 34px; border: 1px solid #bcc7c1; border-radius: 6px; background: #fff; padding: 0 10px; color: #172026; }
+  button { cursor: pointer; font-weight: 650; }
+  main { display: grid; grid-template-columns: minmax(300px, 540px) minmax(280px, 1fr); gap: 20px; padding: 20px; }
+  .board-wrap { width: min(84vw, 540px); min-width: 0; }
+  canvas { width: 100%; aspect-ratio: 1; background: #d8a84f; border: 1px solid #7f5539; display: block; cursor: pointer; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .panel { background: #fff; border: 1px solid #d7dce2; border-radius: 8px; padding: 14px; min-width: 0; overflow-wrap: anywhere; }
+  .stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+  .stat { border: 1px solid #e4e7eb; border-radius: 6px; padding: 8px; background: #fbfaf6; }
+  .stat b { display: block; font-size: 12px; color: #627d98; margin-bottom: 3px; }
+  ol { margin: 8px 0 14px; padding-left: 22px; }
+  .moves { max-height: 300px; overflow: auto; border-top: 1px solid #e4e7eb; padding-top: 10px; line-height: 1.8; font-size: 13px; }
+  .error { color: #9f1239; font-weight: 700; }
+  @media (max-width: 880px) { main { grid-template-columns: 1fr; } }
+</style>
+<header>
+  <h1>DiamondGo play AI</h1>
+  <label>Checkpoint <select id="checkpoint"></select></label>
+  <label>Your color <select id="humanColor"><option value="b">Black</option><option value="w">White</option></select></label>
+  <label>AI sims <input id="simulations" type="number" min="1" max="400" value="100"></label>
+  <button id="newGame">New game</button>
+  <button id="undo">Undo</button>
+  <button id="pass">Pass</button>
+</header>
+<main>
+  <section class="board-wrap">
+    <canvas id="board" width="900" height="900"></canvas>
+    <div class="toolbar"><span id="status">Loading...</span></div>
+  </section>
+  <aside class="panel">
+    <div class="stat-grid">
+      <div class="stat"><b>To play</b><span id="toPlay">-</span></div>
+      <div class="stat"><b>Last move</b><span id="lastMove">-</span></div>
+      <div class="stat"><b>Root value</b><span id="rootValue">-</span></div>
+      <div class="stat"><b>AI selection</b><span id="selection">max_visit / temp 0</span></div>
+      <div class="stat"><b>Captures</b><span id="captures">B 0 / W 0</span></div>
+      <div class="stat"><b>Model</b><span id="modelInfo">-</span></div>
+    </div>
+    <h3>AI top candidates</h3>
+    <ol id="top"></ol>
+    <div id="error" class="error"></div>
+    <div class="moves" id="moves"></div>
+  </aside>
+</main>
+<script>
+const boardSize = 9;
+const canvas = document.querySelector("#board");
+const ctx = canvas.getContext("2d");
+let history = [];
+let toPlay = "b";
+let humanColor = "b";
+let lastAi = null;
+let busy = false;
+let serverInfo = null;
+let checkpointCatalog = [];
+
+function other(color) { return color === "b" ? "w" : "b"; }
+function actionPoint(action) { return action >= 81 ? null : { row: Math.floor(action / 9), col: action % 9 }; }
+function gtp(action) { const p = actionPoint(action); return p ? `${"ABCDEFGHJ"[p.col]}${9 - p.row}` : "pass"; }
+function actionFromPoint(row, col) { return row * 9 + col; }
+function neighbors(row, col) { return [[row-1,col],[row+1,col],[row,col-1],[row,col+1]].filter(([r,c]) => r>=0 && r<9 && c>=0 && c<9); }
+function groupAt(board, row, col) {
+  const color = board[row][col], stones = [], seen = new Set([`${row},${col}`]), stack = [[row,col]];
+  let liberties = 0;
+  while (stack.length) {
+    const [r,c] = stack.pop(); stones.push([r,c]);
+    for (const [nr,nc] of neighbors(r,c)) {
+      const v = board[nr][nc];
+      if (!v) liberties += 1;
+      else if (v === color && !seen.has(`${nr},${nc}`)) { seen.add(`${nr},${nc}`); stack.push([nr,nc]); }
+    }
+  }
+  return { stones, liberties };
+}
+function position() {
+  const board = Array.from({length:9}, () => Array(9).fill(""));
+  let bcap = 0, wcap = 0, turn = "b";
+  for (const action of history) {
+    const p = actionPoint(action);
+    if (!p) { turn = other(turn); continue; }
+    board[p.row][p.col] = turn;
+    const enemy = other(turn);
+    for (const [nr,nc] of neighbors(p.row,p.col)) {
+      if (board[nr][nc] !== enemy) continue;
+      const group = groupAt(board, nr, nc);
+      if (group.liberties === 0) {
+        for (const [sr,sc] of group.stones) board[sr][sc] = "";
+        if (turn === "b") bcap += group.stones.length; else wcap += group.stones.length;
+      }
+    }
+    turn = other(turn);
+  }
+  toPlay = turn;
+  return { board, bcap, wcap };
+}
+function draw() {
+  const pos = position();
+  const size = canvas.width, margin = 58, gap = (size - margin * 2) / 8;
+  ctx.clearRect(0,0,size,size); ctx.fillStyle = "#d9ab55"; ctx.fillRect(0,0,size,size);
+  ctx.strokeStyle = "#3f2d20"; ctx.lineWidth = 3;
+  for (let i=0;i<9;i++) {
+    const x=margin+i*gap, y=margin+i*gap;
+    ctx.beginPath(); ctx.moveTo(margin,y); ctx.lineTo(size-margin,y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x,margin); ctx.lineTo(x,size-margin); ctx.stroke();
+  }
+  ctx.fillStyle = "#3f2d20";
+  for (const [r,c] of [[2,2],[2,6],[4,4],[6,2],[6,6]]) { ctx.beginPath(); ctx.arc(margin+c*gap, margin+r*gap, 7, 0, Math.PI*2); ctx.fill(); }
+  for (let r=0;r<9;r++) for (let c=0;c<9;c++) {
+    const stone = pos.board[r][c]; if (!stone) continue;
+    const x=margin+c*gap, y=margin+r*gap;
+    ctx.beginPath(); ctx.arc(x,y,gap*0.42,0,Math.PI*2);
+    ctx.fillStyle = stone === "b" ? "#111" : "#f8fafc"; ctx.fill();
+    ctx.strokeStyle = stone === "b" ? "#000" : "#64748b"; ctx.lineWidth = 2; ctx.stroke();
+  }
+  const last = history[history.length - 1], p = last === undefined ? null : actionPoint(last);
+  if (p) { ctx.strokeStyle = "#d7263d"; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(margin+p.col*gap, margin+p.row*gap, gap*0.5, 0, Math.PI*2); ctx.stroke(); }
+  document.querySelector("#toPlay").textContent = toPlay.toUpperCase();
+  document.querySelector("#lastMove").textContent = last === undefined ? "-" : gtp(last);
+  document.querySelector("#captures").textContent = `B ${pos.bcap} / W ${pos.wcap}`;
+  document.querySelector("#moves").innerHTML = history.map((a,i) => `${i+1}. ${(i%2===0?"B":"W")} ${gtp(a)}`).join(" &nbsp; ");
+}
+async function aiMoveIfNeeded() {
+  draw();
+  if (busy) return;
+  if (toPlay === humanColor) {
+    document.querySelector("#status").textContent = "Your turn";
+    return;
+  }
+  busy = true; document.querySelector("#status").textContent = "AI thinking...";
+  document.querySelector("#error").textContent = "";
+  try {
+    const response = await fetch("/api/ai_move", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ history, simulations: Number(document.querySelector("#simulations").value || serverInfo?.default_simulations || 100) })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || response.statusText);
+    lastAi = data;
+    history.push(data.action);
+    document.querySelector("#rootValue").textContent = Number(data.root_value || 0).toFixed(4);
+    document.querySelector("#selection").textContent = `${data.move_selection || "max_visit"} / temp ${data.move_temperature ?? 0}`;
+    document.querySelector("#top").innerHTML = data.top_actions.slice(0, 5).map(x => `<li>${x.move} visits=${x.visits} prior=${x.prior} value=${x.value}</li>`).join("");
+    document.querySelector("#status").textContent = `AI played ${data.move}`;
+  } catch (err) {
+    document.querySelector("#error").textContent = err.message;
+    document.querySelector("#status").textContent = "Error";
+  } finally {
+    busy = false; draw();
+  }
+}
+function updateServerInfo() {
+  if (!serverInfo) return;
+  document.querySelector("#simulations").value = String(serverInfo.default_simulations || 100);
+  const label = serverInfo.checkpoint_label || serverInfo.checkpoint_name || "checkpoint";
+  document.querySelector("#modelInfo").textContent = `${label} / ${serverInfo.channels}x${serverInfo.residual_blocks} / score komi ${serverInfo.score_komi} / rules ${serverInfo.rules_backend}`;
+}
+async function playHuman(action) {
+  if (busy || toPlay !== humanColor) return;
+  const p = actionPoint(action);
+  if (p) {
+    const pos = position();
+    if (pos.board[p.row][p.col]) return;
+  }
+  busy = true;
+  document.querySelector("#status").textContent = "Checking move...";
+  document.querySelector("#error").textContent = "";
+  try {
+    const response = await fetch("/api/validate_move", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ history, action })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || response.statusText);
+    if (!data.legal) {
+      document.querySelector("#status").textContent = "Illegal move";
+      document.querySelector("#error").textContent = data.reason || `${gtp(action)} is illegal`;
+      return;
+    }
+  } catch (err) {
+    document.querySelector("#status").textContent = "Error";
+    document.querySelector("#error").textContent = err.message;
+    return;
+  } finally {
+    busy = false;
+  }
+  history.push(action);
+  aiMoveIfNeeded();
+}
+canvas.addEventListener("click", event => {
+  const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) * canvas.width / rect.width;
+  const y = (event.clientY - rect.top) * canvas.height / rect.height;
+  const margin = 58, gap = (canvas.width - margin * 2) / 8;
+  const col = Math.round((x - margin) / gap), row = Math.round((y - margin) / gap);
+  if (row < 0 || row >= 9 || col < 0 || col >= 9) return;
+  playHuman(actionFromPoint(row, col));
+});
+document.querySelector("#newGame").addEventListener("click", () => { history = []; lastAi = null; humanColor = document.querySelector("#humanColor").value; document.querySelector("#top").innerHTML = ""; document.querySelector("#rootValue").textContent = "-"; aiMoveIfNeeded(); });
+document.querySelector("#undo").addEventListener("click", () => {
+  if (busy) return;
+  if (history.length) history.pop();
+  if (history.length) history.pop();
+  document.querySelector("#status").textContent = "Undone";
+  draw();
+  aiMoveIfNeeded();
+});
+document.querySelector("#pass").addEventListener("click", () => playHuman(81));
+document.querySelector("#humanColor").addEventListener("change", () => document.querySelector("#newGame").click());
+document.querySelector("#checkpoint").addEventListener("change", async event => {
+  if (busy) return;
+  const id = event.target.value;
+  if (!id) return;
+  busy = true;
+  document.querySelector("#status").textContent = "Loading checkpoint...";
+  document.querySelector("#error").textContent = "";
+  try {
+    const response = await fetch("/api/load_checkpoint", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ id })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || response.statusText);
+    serverInfo = data;
+    updateServerInfo();
+    history = [];
+    lastAi = null;
+    document.querySelector("#top").innerHTML = "";
+    document.querySelector("#rootValue").textContent = "-";
+  } catch (err) {
+    document.querySelector("#error").textContent = err.message;
+  } finally {
+    busy = false;
+    document.querySelector("#newGame").click();
+  }
+});
+async function loadCheckpoints() {
+  try {
+    const response = await fetch("/api/checkpoints");
+    if (!response.ok) throw new Error(response.statusText);
+    const data = await response.json();
+    checkpointCatalog = data.checkpoints || [];
+    const select = document.querySelector("#checkpoint");
+    select.innerHTML = "";
+    if (!checkpointCatalog.length) {
+      const option = document.createElement("option");
+      option.value = serverInfo?.checkpoint_id || "";
+      option.textContent = serverInfo?.checkpoint_label || serverInfo?.checkpoint_name || "current checkpoint";
+      select.append(option);
+      return;
+    }
+    for (const item of checkpointCatalog) {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent = item.label || item.id;
+      select.append(option);
+    }
+    if (data.current) select.value = data.current;
+  } catch (err) {
+    document.querySelector("#checkpoint").innerHTML = "";
+  }
+}
+async function loadServerInfo() {
+  try {
+    const response = await fetch("/api/info");
+    if (!response.ok) throw new Error(response.statusText);
+    serverInfo = await response.json();
+    updateServerInfo();
+    await loadCheckpoints();
+  } catch (err) {
+    document.querySelector("#modelInfo").textContent = "info unavailable";
+  }
+}
+loadServerInfo().finally(() => document.querySelector("#newGame").click());
+</script>

@@ -37,6 +37,28 @@ This file records coordination notes for Codex agents working on DiamondGo.
   cycle and a rendered artifact path so a human can inspect whether the case is
   meaningful.
 
+## Frontend Reuse Rules
+
+- Do not generate a new replay/play frontend from scratch for each result
+  bundle. Reuse the stable viewers in `artifacts/viewers/` and pass data through
+  query params, JSON files, or server APIs.
+- `artifacts/viewers/play-ai.html` is the reusable human-vs-AI UI. The server
+  must expose `/api/info` so the page can display the loaded checkpoint and
+  default simulations without hand-editing HTML.
+- The play server must use the same rules backend as training/evaluation via
+  `demo_cpu.make_rules` and checkpoint `rules_backend`. Do not add a separate
+  UI-only Go rules implementation; it will drift on ko, suicide, scoring, or
+  pass semantics.
+- `artifacts/viewers/selfplay-viewer.html` is the reusable self-play replay UI.
+  New self-play artifacts should provide `summary.json` and
+  `cycle-xxxxx-moves.json` in the expected shape instead of copying the viewer.
+- Generated casebooks should keep their data separate from presentation where
+  practical. If a temporary standalone HTML casebook is still used, verify
+  rendered board count, controls, and encoding in the browser before handing it
+  to the user.
+- Keep generated HTML copy ASCII-only unless the page has already been tested
+  in the local static server. This avoids recurring mojibake in artifact pages.
+
 ## Evaluation Dashboard
 
 `src/diamondgo/eval_checkpoints.py` writes these files during evaluation:

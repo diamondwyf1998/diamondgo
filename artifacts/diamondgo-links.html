@@ -1,0 +1,114 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>DiamondGo links</title>
+<style>
+  :root { color: #172026; background: #f7f5ef; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
+  body { margin: 0; }
+  header { padding: 22px 28px; background: #1f2d2f; color: #fff; }
+  h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: 0; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px; }
+  section { margin-bottom: 22px; }
+  h2 { font-size: 16px; margin: 0 0 10px; color: #334e52; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  a.card {
+    display: block;
+    min-height: 74px;
+    padding: 13px 14px;
+    border: 1px solid #d7d2c5;
+    border-radius: 8px;
+    background: #fff;
+    color: #172026;
+    text-decoration: none;
+  }
+  a.card b { display: block; margin-bottom: 5px; color: #0b7285; }
+  a.card span { display: block; color: #52606d; font-size: 13px; line-height: 1.35; }
+  .note { color: #52606d; line-height: 1.5; }
+</style>
+<header>
+  <h1>DiamondGo links</h1>
+  <div>常用展示入口集中在这里，之后不用每次重新找。</div>
+</header>
+<main>
+  <section>
+    <h2>Play</h2>
+    <div class="grid">
+      <a class="card" href="/viewers/play-ai.html">
+        <b>和 AI 对弈</b>
+        <span>当前服务默认载入最新 catalog checkpoint，可在顶部下拉切换搜索量和版本。</span>
+      </a>
+    </div>
+  </section>
+  <section>
+    <h2>Self-play 展示</h2>
+    <div class="grid">
+      <a class="card" href="/viewers/selfplay-catalog-viewer.html?dataset=selfplay-catalog-fresh-nokomi-selected-20260606&cycle=435&game=1&v=syntax-fix-20260606">
+        <b>Checkpoint 自对弈目录</b>
+        <span>20/40/60/80/100/150/200/250/300/350/400/430/435 的统一自对弈 viewer。</span>
+      </a>
+      <a class="card" href="/selfplay-catalog-fresh-nokomi-selected-20260606/index.html">
+        <b>Self-play 索引页</b>
+        <span>同一批自对弈 trace 的简易索引。</span>
+      </a>
+    </div>
+  </section>
+  <section>
+    <h2>Pairwise 评测</h2>
+    <div class="grid">
+      <a class="card" href="/pairwise-50cycle-score2p5-100sims-10valid-noearlypass50-20260606/dashboard.html">
+        <b>过滤早 pass 后 10 盘统计</b>
+        <span>每对 10 盘，5 黑 5 白；过滤 50 手内双 pass 终局。当前主参考。</span>
+      </a>
+      <a class="card" href="/pairwise-50cycle-score2p5-100sims-10valid-noearlypass50-20260606/valid_games_dashboard.html">
+        <b>过滤后有效棋局回放</b>
+        <span>21 个 match，每个 10 盘，带棋盘、slider、top candidates。</span>
+      </a>
+      <a class="card" href="/pairwise-50cycle-score2p5-100sims-10games-20260606/dashboard.html">
+        <b>未过滤 10 盘统计</b>
+        <span>先跑 4 盘再补 6 盘合并的版本。</span>
+      </a>
+      <a class="card" href="/pairwise-50cycle-score2p5-100sims-10games-20260606/supplemental_games_dashboard.html">
+        <b>补跑 6 盘回放</b>
+        <span>只包含补跑的 6 盘棋局明细。</span>
+      </a>
+      <a class="card" href="/pairwise-50cycle-score2p5-100sims-4games-20260606/dashboard.html">
+        <b>最初 4 盘统计</b>
+        <span>快速小样本版本，主要用于对照。</span>
+      </a>
+    </div>
+  </section>
+  <section>
+    <h2>最新测试</h2>
+    <div class="grid">
+      <a class="card" href="/eval-suite-cont-nokomi-4x64-score5p5-margin0p2-300sims-train-100sims-eval-6h-20260606/step-00050-vs-previous/dashboard.html">
+        <b>cont score5p5: every 50 vs previous</b>
+        <span>包含 550/600/650/666 的连续代际评测，带棋局回放。</span>
+      </a>
+      <a class="card" href="/eval-suite-cont-nokomi-4x64-score5p5-margin0p2-300sims-train-100sims-eval-6h-20260606/step-00050-vs-initial/dashboard.html">
+        <b>cont score5p5: every 50 vs initial</b>
+        <span>与初始模型对比，注意早 pass 指标偏高。</span>
+      </a>
+      <a class="card" href="/eval-suite-cont-nokomi-4x64-score5p5-margin0p2-300sims-train-100sims-eval-6h-20260606/step-00200-vs-previous/dashboard.html">
+        <b>cont score5p5: every 200 vs previous</b>
+        <span>600 vs initial、666 vs 600 的粗粒度对比。</span>
+      </a>
+      <a class="card" href="/tactical-cont-nokomi-4x64-score5p5-margin0p2-300sims-train-100sims-eval-6h-20260606/tactical_report.md">
+        <b>cont score5p5: tactical report</b>
+        <span>4 个基础战术探针，top1=2/4，top3=3/4。</span>
+      </a>
+    </div>
+  </section>
+  <section>
+    <h2>技能测试</h2>
+    <div class="grid">
+      <a class="card" href="/tactical-fresh-nokomi-4x64-200sims-cycle100-400-20260606/casebook.html">
+        <b>技能题集 100-400</b>
+        <span>去掉 capture_two_stones 后的战术/技能测试 casebook。</span>
+      </a>
+      <a class="card" href="/tactical-level2-fresh-nokomi-4x64-200sims-cycle100-410-20260606/casebook.html">
+        <b>Level 2 技能题集</b>
+        <span>更细的技能观察入口。</span>
+      </a>
+    </div>
+  </section>
+  <p class="note">本页位于 <code>artifacts/diamondgo-links.html</code>，只依赖本地 8765 静态服务。</p>
+</main>
