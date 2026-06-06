@@ -22,7 +22,12 @@ from diamondgo.multiworker_train import (
     summarize_cycle,
     to_overnight_config,
 )
-from diamondgo.overnight_train import load_checkpoint, save_checkpoint, train_from_replay
+from diamondgo.overnight_train import (
+    load_checkpoint,
+    save_checkpoint,
+    should_save_cycle_checkpoint,
+    train_from_replay,
+)
 
 
 @dataclass(frozen=True)
@@ -219,7 +224,12 @@ def run(config: DualGpuConfig, out_dir: Path, resume: str = "") -> dict[str, obj
             total_train_steps,
             metrics,
         )
-        if cycle % max(1, config.checkpoint_every) == 0:
+        if should_save_cycle_checkpoint(
+            cycle,
+            config.checkpoint_every,
+            config.early_checkpoint_cycles,
+            config.early_checkpoint_every,
+        ):
             save_checkpoint(
                 out_dir / "checkpoints" / f"cycle-{cycle:05d}.pt",
                 checkpoint_config,
@@ -289,6 +299,8 @@ def main() -> None:
         cycles=args.cycles,
         time_limit_minutes=args.time_limit_minutes,
         checkpoint_every=args.checkpoint_every,
+        early_checkpoint_cycles=args.early_checkpoint_cycles,
+        early_checkpoint_every=args.early_checkpoint_every,
         selfplay_devices=args.selfplay_devices,
     )
     summary = run(config, Path(args.out_dir), resume=args.resume)

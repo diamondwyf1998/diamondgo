@@ -47,7 +47,9 @@ class OvernightConfig:
     rules_backend: str = "sgfmill"
     cycles: int = 10_000
     time_limit_minutes: float = 0.0
-    checkpoint_every: int = 5
+    checkpoint_every: int = 10
+    early_checkpoint_cycles: int = 50
+    early_checkpoint_every: int = 5
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -92,9 +94,27 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--device", default=OvernightConfig.device)
     parser.add_argument("--rules", choices=["simple", "sgfmill"], default=OvernightConfig.rules_backend)
     parser.add_argument("--checkpoint-every", type=int, default=OvernightConfig.checkpoint_every)
+    parser.add_argument("--early-checkpoint-cycles", type=int, default=OvernightConfig.early_checkpoint_cycles)
+    parser.add_argument("--early-checkpoint-every", type=int, default=OvernightConfig.early_checkpoint_every)
     parser.add_argument("--resume", default="")
     parser.add_argument("--json", action="store_true")
     return parser
+
+
+def should_save_cycle_checkpoint(
+    cycle: int,
+    checkpoint_every: int,
+    early_checkpoint_cycles: int = 50,
+    early_checkpoint_every: int = 5,
+) -> bool:
+    """Use denser snapshots early, then a coarser steady-state cadence."""
+    if cycle <= 0:
+        return False
+    early_every = max(1, early_checkpoint_every)
+    late_every = max(1, checkpoint_every)
+    if cycle <= max(0, early_checkpoint_cycles):
+        return cycle % early_every == 0
+    return cycle % late_every == 0
 
 
 def make_selfplay_config(config: OvernightConfig, seed: int) -> BatchedConfig:
@@ -360,7 +380,12 @@ def run(config: OvernightConfig, out_dir: Path, resume: str = "") -> dict[str, o
             total_train_steps,
             metrics,
         )
-        if cycle % max(1, config.checkpoint_every) == 0:
+        if should_save_cycle_checkpoint(
+            cycle,
+            config.checkpoint_every,
+            config.early_checkpoint_cycles,
+            config.early_checkpoint_every,
+        ):
             save_checkpoint(
                 out_dir / "checkpoints" / f"cycle-{cycle:05d}.pt",
                 config,
@@ -417,6 +442,8 @@ def main() -> None:
         cycles=args.cycles,
         time_limit_minutes=args.time_limit_minutes,
         checkpoint_every=args.checkpoint_every,
+        early_checkpoint_cycles=args.early_checkpoint_cycles,
+        early_checkpoint_every=args.early_checkpoint_every,
     )
     summary = run(config, Path(args.out_dir), args.resume)
     if args.json:

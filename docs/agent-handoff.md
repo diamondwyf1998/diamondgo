@@ -79,6 +79,11 @@ Current server dashboard:
 - Default 9x9 scoring komi is `6.5`; terminal winner, value targets, score margins, and SGF `KM` use `score_komi`.
 - Old checkpoints that do not include `score_komi` are evaluated with their serialized `config.komi` unless a new run explicitly sets `--score-komi`.
 - Default 9x9 self-play cap is `120` moves.
+- Checkpoint snapshots are dense at the start: save every `5` cycles through
+  cycle `50`, then every `10` cycles by default. Override with
+  `--early-checkpoint-cycles`, `--early-checkpoint-every`, and
+  `--checkpoint-every` only when the run intentionally needs a different
+  archive cadence.
 - `src/diamondgo/eval_suite.py` runs standard checkpoint matches at step tiers such as `50,200,500` against `initial` and `previous`.
 - `src/diamondgo/tactical_eval.py` runs fixed capture/atari probes and reports target top-1/top-3/rank.
 - `multiworker_train` behavior metrics include black/white win rates, color-bias alerts, and signed score-margin summaries.
@@ -107,3 +112,7 @@ Regenerate these after important source commits if the user may switch servers.
 - At minimum, preserve the final `latest.pt`, selected checkpoint snapshots,
   `train.log`, `metrics.jsonl`, `gpu_monitor.csv`, eval/tactical reports, and
   the human-readable notes that point to them.
+- To upload a run's saved checkpoints to GitHub LFS from a server checkout, run:
+  `python scripts/archive_run_checkpoints.py artifacts/<run-dir> --commit --push`.
+  This writes `artifacts/checkpoint-archive/<run-dir>/manifest.json`, stages the
+  `.pt` files through Git LFS, commits them, and pushes to `origin/main`.

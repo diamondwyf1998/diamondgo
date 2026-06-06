@@ -20,6 +20,7 @@ from diamondgo.overnight_train import (
     OvernightConfig,
     load_checkpoint,
     save_checkpoint,
+    should_save_cycle_checkpoint,
     train_from_replay,
 )
 
@@ -56,7 +57,9 @@ class MultiWorkerConfig:
     rules_backend: str = "sgfmill"
     cycles: int = 10_000
     time_limit_minutes: float = 0.0
-    checkpoint_every: int = 5
+    checkpoint_every: int = 10
+    early_checkpoint_cycles: int = 50
+    early_checkpoint_every: int = 5
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -103,6 +106,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--device", default=MultiWorkerConfig.device)
     parser.add_argument("--rules", choices=["simple", "sgfmill"], default=MultiWorkerConfig.rules_backend)
     parser.add_argument("--checkpoint-every", type=int, default=MultiWorkerConfig.checkpoint_every)
+    parser.add_argument("--early-checkpoint-cycles", type=int, default=MultiWorkerConfig.early_checkpoint_cycles)
+    parser.add_argument("--early-checkpoint-every", type=int, default=MultiWorkerConfig.early_checkpoint_every)
     parser.add_argument("--json", action="store_true")
     return parser
 
@@ -139,6 +144,8 @@ def to_overnight_config(config: MultiWorkerConfig) -> OvernightConfig:
         cycles=config.cycles,
         time_limit_minutes=config.time_limit_minutes,
         checkpoint_every=config.checkpoint_every,
+        early_checkpoint_cycles=config.early_checkpoint_cycles,
+        early_checkpoint_every=config.early_checkpoint_every,
     )
 
 
@@ -528,7 +535,12 @@ def run(config: MultiWorkerConfig, out_dir: Path, resume: str = "") -> dict[str,
             total_train_steps,
             metrics,
         )
-        if cycle % max(1, config.checkpoint_every) == 0:
+        if should_save_cycle_checkpoint(
+            cycle,
+            config.checkpoint_every,
+            config.early_checkpoint_cycles,
+            config.early_checkpoint_every,
+        ):
             save_checkpoint(
                 out_dir / "checkpoints" / f"cycle-{cycle:05d}.pt",
                 checkpoint_config,
@@ -586,6 +598,8 @@ def main() -> None:
         cycles=args.cycles,
         time_limit_minutes=args.time_limit_minutes,
         checkpoint_every=args.checkpoint_every,
+        early_checkpoint_cycles=args.early_checkpoint_cycles,
+        early_checkpoint_every=args.early_checkpoint_every,
     )
     summary = run(config, Path(args.out_dir), args.resume)
     if args.json:
