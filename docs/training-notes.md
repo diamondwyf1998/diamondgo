@@ -497,3 +497,30 @@ needs a shape/distribution metric before treating it as a measured result.
     speed.
   - Data reference:
     `docs/training-data-log.md#preflight-cross-run-matches-dual-gpu-2x96-score45-vs-late-old-4x64-score55`
+- `User request / technical operation`: When the 18-hour dual-GPU run was close
+  to finishing, the user asked to immediately continue for another `3` hours if
+  the run had completed. A queue watcher was installed so this would happen
+  automatically.
+  - The original 18h finalizer was intentionally stopped; otherwise it would
+    have started eval immediately and competed with the requested continuation
+    training.
+  - The continuation started from the 18h `latest.pt` at `2026-06-07 17:52
+    +08`, finished at `20:57 +08`, and then ran eval/tactical probes.
+  - All important artifacts were copied back locally under
+    `artifacts/server-runs/20260607-dualgpu-2x96-18h-plus3h/`.
+  - The 18h segment ended at cycle `236` with `2.45M` total positions; the +3h
+    continuation ended at cycle `272` with `2.86M` total positions.
+  - The final continuation self-play snapshot is still strongly Black-favored:
+    cycle `272` has Black `76.04%`, White `23.96%`, and a `black` color-bias
+    alert.
+  - The valid continuation `n+50` eval slice is `cycle-272` vs `cycle-250`,
+    where `cycle-272` won `17/20`. This match had first-pass `<=40` in only
+    `1/20` games, which is much healthier than the vs-initial slices.
+  - Caveat: the `step-200` and `step-500` "vs previous" continuation reports
+    are effectively vs initial because the continuation checkpoint directory
+    does not contain a selected previous checkpoint at those step intervals.
+  - Tactical probes remain weak at `cycle-272`: only the white one-stone
+    capture probe is top1/top3; black capture and both atari-escape probes
+    fail.
+  - Data reference:
+    `docs/training-data-log.md#dual-gpu-2x96-score45-18h--3h-continuation`

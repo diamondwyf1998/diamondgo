@@ -1251,3 +1251,144 @@ Observed interpretation:
 - Because the opponent checkpoints are hundreds of cycles later, this is mostly
   a "late old line remains much stronger" check, not a fair architecture or
   same-training-age comparison.
+
+## Dual-GPU 2x96 Score4.5 18h + 3h Continuation
+
+Context:
+
+- The 18-hour fresh dual-GPU `2x96`, `score_komi=4.5`, `250`-simulation run
+  was allowed to finish, then a queue watcher immediately launched a 3-hour
+  continuation from the 18-hour run's `latest.pt`.
+- The original 18-hour finalizer was intentionally stopped before it could run,
+  so eval would not compete with the requested continuation training. Eval and
+  tactical probes were run after the +3h continuation instead.
+- The continuation preserves checkpoint cycle numbering from the resumed
+  checkpoint. The run ended at cycle `272`, not at a fresh cycle `36`.
+
+Artifacts:
+
+- Local archive:
+  `artifacts/server-runs/20260607-dualgpu-2x96-18h-plus3h/diamondgo-dualgpu-2x96-18h-plus3h-20260607.tar.gz`
+- Local extracted root:
+  `artifacts/server-runs/20260607-dualgpu-2x96-18h-plus3h/artifacts/`
+- 18h training directory:
+  `artifacts/server-runs/20260607-dualgpu-2x96-18h-plus3h/artifacts/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607`
+- +3h continuation directory:
+  `artifacts/server-runs/20260607-dualgpu-2x96-18h-plus3h/artifacts/multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607`
+- Continuation eval suite:
+  `artifacts/server-runs/20260607-dualgpu-2x96-18h-plus3h/artifacts/eval-suite-cont-dualgpu-2x96-score4p5-margin0p2-250sims-train-100sims-eval-3h-after18h-20260607`
+- Continuation tactical probes:
+  `artifacts/server-runs/20260607-dualgpu-2x96-18h-plus3h/artifacts/tactical-cont-dualgpu-2x96-score4p5-margin0p2-250sims-train-100sims-eval-3h-after18h-20260607`
+
+Training settings:
+
+| Field | Value |
+| --- | --- |
+| Architecture | `2` residual blocks x `96` channels |
+| Parameters | `356,957` |
+| Input komi | `false` |
+| Komi metadata | `0.5` |
+| Score komi | `4.5` |
+| Terminal dead-stone cleanup | `false` |
+| Score margin reward scale | `0.2` |
+| Rules backend | `sgfmill` |
+| Self-play simulations | `250` |
+| Workers | `12` |
+| Self-play devices | `cuda:0,cuda:1` |
+| Trainer device | `cuda:0` |
+| Games per worker | `8` |
+| Games per cycle | `96` |
+| Max moves | `150` |
+| Train steps per cycle | `64` |
+| Batch size | `256` |
+| Replay size | `100,000` |
+| Learning rate | `0.001` |
+| Weight decay | `0.0001` |
+| `c_puct` | `1.5` |
+| Root noise | Dirichlet alpha `0.15`, fraction `0.25` |
+| Root policy temperature | `1.1` |
+| Move temperature | `1.0` for first `16` moves, then `0.25` |
+| Augmentation | Random dihedral transforms |
+| SGF/trace archive | Every `5` cycles |
+
+Training results:
+
+| Segment | Start time | End time | Final cycle | Segment cycles | Total positions at end | Recent speed | Checkpoints | SGF/trace records |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 18h fresh run | `2026-06-06 23:51 +08` | `2026-06-07 17:52 +08` | `236` | `236` | `2,452,260` | `38.53 pos/s` over cycles `232-236` | `28` | `47/47` |
+| +3h continuation | `2026-06-07 17:52 +08` | `2026-06-07 20:57 +08` | `272` | `36` | `2,857,846` | `36.82 pos/s` over cycles `268-272` | `4` | `7/7` |
+
+Final self-play snapshot:
+
+| Segment | Cycle | Games | Positions | Black win rate | White win rate | Early pass `<40` | Mean moves | Max-move games | Color alert |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 18h final | `236` | `96` | `11,252` | `64.58%` | `35.42%` | `16.67%` | `117.208` | `32` | none |
+| +3h final | `272` | `96` | `11,026` | `76.04%` | `23.96%` | `12.50%` | `114.854` | `33` | `black` |
+| +3h recent 5 | `268-272` | `480` | n/a | `75.83%` | `24.17%` | `15.62%` | n/a | n/a | n/a |
+
+GPU monitor during the +3h continuation:
+
+| GPU | Mean util | Recent mean util | Max util | Max memory |
+| ---: | ---: | ---: | ---: | ---: |
+| `0` | `38.21%` | `37.62%` | `90%` | `4017 MiB` |
+| `1` | `36.11%` | `35.37%` | `87%` | `1991 MiB` |
+
+Continuation eval settings:
+
+| Field | Value |
+| --- | --- |
+| Eval simulations | `100` |
+| Games per match | `20` |
+| Max moves | `150` |
+| Sample SGFs per match | `2` |
+| Opponents requested | `initial,previous` |
+| Step tiers requested | `50,200,500` |
+
+Important eval caveat:
+
+- `eval_suite` chooses "previous" from the checkpoints available inside the
+  checkpoint directory being evaluated. In this continuation directory,
+  checkpoint files are `cycle-00240`, `cycle-00250`, `cycle-00260`,
+  `cycle-00270`, plus `latest` cycle `272`.
+- Therefore, the useful n+50-style continuation comparison is
+  `cycle-00272` versus `cycle-00250` in the `step-00050-vs-previous` report.
+- The `step-00200-vs-previous` and `step-00500-vs-previous` reports include
+  only `latest`, so their "previous" opponent is effectively still the initial
+  model. Do not read those two as true previous-checkpoint comparisons.
+
+Eval results:
+
+| Eval report | Candidate | Opponent | Win rate | Wins | Black wins | White wins | First pass median | First pass `<40` |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `step-00050-vs-initial` | `cycle-00250` | `cycle-00000` | `55.0%` | `11/20` | `1/10` | `10/10` | `30.5` | `17/20` |
+| `step-00050-vs-initial` | `cycle-00272` | `cycle-00000` | `85.0%` | `17/20` | `7/10` | `10/10` | `30.0` | `15/20` |
+| `step-00050-vs-previous` | `cycle-00250` | `cycle-00000` | `55.0%` | `11/20` | `1/10` | `10/10` | `30.5` | `17/20` |
+| `step-00050-vs-previous` | `cycle-00272` | `cycle-00250` | `85.0%` | `17/20` | `10/10` | `7/10` | `57.0` | `1/20` |
+| `step-00200-vs-initial` | `cycle-00272` | `cycle-00000` | `75.0%` | `15/20` | `5/10` | `10/10` | `33.0` | `15/20` |
+| `step-00500-vs-initial` | `cycle-00272` | `cycle-00000` | `75.0%` | `15/20` | `5/10` | `10/10` | `33.0` | `15/20` |
+
+Tactical probe results for continuation latest:
+
+| Case | Target | Top1 | Top3 | Rank |
+| --- | --- | --- | --- | ---: |
+| `black_capture_one_stone` | `C8` | false | false | n/a |
+| `white_capture_one_stone` | `F5` | true | true | `1` |
+| `black_escape_atari` | `D7` | false | false | `5` |
+| `white_escape_atari` | `F3` | false | false | n/a |
+
+Observed interpretation:
+
+- The +3h continuation did continue learning by the eval metric:
+  `cycle-272` beat `cycle-250` by `17/20` in the valid `step-50 vs previous`
+  match.
+- The color issue is still substantial. Final self-play is about
+  `76%` Black wins, and eval versus initial often has the candidate winning all
+  White games. This should be read together with the pass metrics, not as a
+  clean strength number.
+- The `cycle-272 vs cycle-250` eval has much healthier pass timing than the
+  initial-opponent eval: first-pass `<=40` is `1/20`, while vs initial remains
+  `15/20`.
+- Tactical probes are still weak. Only `white_capture_one_stone` is top1/top3;
+  the black capture and both atari-escape probes fail. This supports the user's
+  earlier concern that higher aggregate win rate does not necessarily mean the
+  model has learned the local tactics we care about.
