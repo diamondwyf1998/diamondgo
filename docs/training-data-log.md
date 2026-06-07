@@ -1392,3 +1392,78 @@ Observed interpretation:
   the black capture and both atari-escape probes fail. This supports the user's
   earlier concern that higher aggregate win rate does not necessarily mean the
   model has learned the local tactics we care about.
+
+## Dual-GPU 2x96 Score6.5 400-Sim 7-Day Continuation
+
+Context:
+
+- After the 18h+3h continuation ended at cycle `272`, the user asked to raise
+  scoring komi to `6.5`, raise self-play MCTS simulations to `400`, and start a
+  7-day continuation.
+- This is a continuation from the `score_komi=4.5`, `250`-simulation
+  `cycle-272` latest checkpoint, not a fresh run.
+- The change is intentionally narrow: scoring komi and search count change;
+  model architecture, no-komi input, margin reward, worker layout, max moves,
+  and recording cadence stay aligned with the previous dual-GPU run.
+
+Start snapshot:
+
+| Field | Value |
+| --- | --- |
+| Launch time | `2026-06-07 22:23:53 +08` |
+| Server train PID | `225750` |
+| Server finalizer PID | `225751` |
+| Resume checkpoint | `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607/latest.pt` |
+| Output directory | `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-margin0p2-400sims-max150-7d-after18hplus3h-20260607` |
+| Eval output directory | `/root/diamondgo/artifacts/eval-suite-cont-dualgpu-2x96-score6p5-margin0p2-400sims-train-100sims-eval-7d-after18hplus3h-20260607` |
+| Tactical output directory | `/root/diamondgo/artifacts/tactical-cont-dualgpu-2x96-score6p5-margin0p2-400sims-train-100sims-eval-7d-after18hplus3h-20260607` |
+
+Training settings:
+
+| Field | Value |
+| --- | --- |
+| Architecture | `2` residual blocks x `96` channels |
+| Parameters | `356,957` |
+| Input komi | `false` |
+| Komi metadata | `0.5` |
+| Score komi | `6.5` |
+| Terminal dead-stone cleanup | `false` |
+| Score margin reward scale | `0.2` |
+| Rules backend | `sgfmill` |
+| Self-play simulations | `400` |
+| Workers | `12` |
+| Self-play devices | `cuda:0,cuda:1` |
+| Trainer device | `cuda:0` |
+| Games per worker | `8` |
+| Games per cycle | `96` |
+| Max moves | `150` |
+| Train steps per cycle | `64` |
+| Batch size | `256` |
+| Replay size | `100,000` |
+| Learning rate | `0.001` |
+| Weight decay | `0.0001` |
+| `c_puct` | `1.5` |
+| Root noise | Dirichlet alpha `0.15`, fraction `0.25` |
+| Root policy temperature | `1.1` |
+| Move temperature | `1.0` for first `16` moves, then `0.25` |
+| Augmentation | Random dihedral transforms |
+| SGF/trace archive | Every `5` cycles |
+| Time limit | `10080` minutes, 7 days |
+
+Monitoring:
+
+- Codex heartbeat monitoring was scheduled every `3` hours.
+- The server training script also appends a local status snapshot every `3`
+  hours to:
+  `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-margin0p2-400sims-max150-7d-after18hplus3h-20260607/status_3h.log`
+- This server-side log matters because remote training continues even if the
+  user's local computer or Codex app is offline; local heartbeat checks may not
+  fire while the local environment is unavailable.
+
+Initial launch check:
+
+- About one minute after launch, both training and finalizer shells were alive.
+- GPU snapshot was roughly GPU0 `41%`, `4118 MiB`; GPU1 `33%`, `1991 MiB`.
+- No cycle metrics had completed yet, which is expected because `400`
+  simulations should make each cycle longer than the previous `250`-simulation
+  run.

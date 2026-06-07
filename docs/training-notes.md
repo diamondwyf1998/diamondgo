@@ -529,3 +529,23 @@ needs a shape/distribution metric before treating it as a measured result.
     fail.
   - Data reference:
     `docs/training-data-log.md#dual-gpu-2x96-score45-18h--3h-continuation`
+- `User request / technical operation`: After the 18h+3h result, the user asked
+  to raise the scoring komi to `6.5`, raise self-play search to `400` MCTS
+  simulations, and start a `7` day continuation.
+  - This continues from the `cycle-272` latest checkpoint of the
+    `score_komi=4.5`, `250`-simulation dual-GPU line.
+  - Kept constant for comparability: `2x96` model, `input_komi=false`,
+    `komi_metadata=0.5`, `score_margin_reward_scale=0.2`, `max_moves=150`,
+    `12` workers, `96` games/cycle, `record_every=5`.
+  - Changed for this run: `score_komi=6.5`, `selfplay_simulations=400`,
+    `time_limit_minutes=10080`.
+  - Started on the server at `2026-06-07 22:23:53 +08`.
+  - Server PIDs at launch: train `225750`, finalizer `225751`.
+  - A server-side `status_3h.log` was added in the run directory because
+    remote training continues even if the local Codex app or user computer is
+    offline; app heartbeat checks may be delayed while the local environment is
+    unavailable.
+  - Initial GPU snapshot showed the process had entered self-play: GPU0 about
+    `41%` / `4118 MiB`, GPU1 about `33%` / `1991 MiB`.
+  - Data reference:
+    `docs/training-data-log.md#dual-gpu-2x96-score65-400-sim-7-day-continuation`
