@@ -431,3 +431,56 @@ needs a shape/distribution metric before treating it as a measured result.
     rented server expires.
   - Data reference:
     `docs/training-data-log.md#score-komi-45-continuation-configuration`
+
+### Dual-GPU 2x96 Score-Komi 4.5 Fresh Run
+
+- `Technical operation`: A new server run was started on the dual-GPU machine
+  with a larger but shallower model: `2` residual blocks x `96` channels,
+  `score_komi=4.5`, no komi input, `250` self-play simulations, `12` workers,
+  `8` games per worker, and `96` games/cycle. This is a fresh run rather than a
+  continuation from the previous `4x64` line.
+  - Data reference:
+    `docs/training-data-log.md#dual-gpu-2x96-score45-recorded-self-play-cycles-5-160`
+- `User observation/request`: For new checkpoints, use already recorded
+  self-play games when possible instead of regenerating display games. This
+  keeps the displayed games tied to the actual training run and avoids mixing
+  display artifacts with new ad hoc samples.
+- `Agent measurement`: Recorded self-play for cycles
+  `5,25,50,80,110,140,160` was pulled into a reusable catalog and opened in the
+  shared self-play viewer.
+  - Local catalog:
+    `artifacts/selfplay-recorded-dualgpu-2x96-score4p5-20260607`
+  - Viewer example:
+    `http://127.0.0.1:8765/viewers/selfplay-catalog-viewer.html?dataset=selfplay-recorded-dualgpu-2x96-score4p5-20260607&cycle=160&game=20`
+  - Black remains favored in these recorded cycles. Black win rate ranges from
+    `54.17%` at cycle `5` to `75.00%` at cycle `160`, with cycle `50` already
+    at `70.83%`.
+  - Early pass before move `40` drops quickly from `31.25%` at cycle `5` to
+    roughly `5-9%` in the middle/late sampled cycles, though it is not gone.
+- `Agent measurement`: A reusable cross-run match script was added so future
+  comparisons do not hardcode "same cycle" as the only pairing mode.
+  - Script:
+    `scripts/run_cross_run_matches.py`
+  - It supports explicit checkpoint pairs, same-cycle pairing when requested,
+    and close/approximate pair lists.
+  - Data reference:
+    `docs/training-data-log.md#cross-run-matches-dual-gpu-2x96-score45-vs-old-4x64-score25`
+- `Agent measurement`: In 10-game cross-run matches against the earlier
+  no-komi-input `4x64`, `score_komi=2.5` line, the new `2x96`,
+  `score_komi=4.5` line is already competitive at similar early checkpoint
+  counts, but not yet stronger than much later old checkpoints.
+  - Exact available same-cycle result: new cycle `80` beat old cycle `80` by
+    `8/10`.
+  - Exact available double-cycle result: new cycle `50` versus old cycle `100`
+    was `5/10`.
+  - Close same-ish results were `7/10`, `6/10`, `5/10`, and `8/10` for
+    `new50-vs-old60`, `new110-vs-old100`, `new140-vs-old150`, and
+    `new160-vs-old150`.
+  - Close double-ish results were weaker: `4/10`, `1/10`, `3/10`, and `3/10`
+    for `new80-vs-old150`, `new110-vs-old200`, `new140-vs-old300`, and
+    `new160-vs-old300`.
+  - Interpretation: the fresh `2x96` run is learning useful play quickly, but
+    the current evidence does not show it surpassing the older line at about
+    twice the training age. The sample size is small, and color asymmetry is
+    still visible, so these numbers should guide follow-up tests rather than
+    settle strength.

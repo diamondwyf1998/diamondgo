@@ -1057,3 +1057,142 @@ Expected interpretation:
 - Because replay is rebuilt after the resume boundary, the model weights start
   from cycle `410`, but training examples come from new `score_komi=4.5`
   self-play.
+
+## Dual-GPU 2x96 Score4.5 Recorded Self-Play, Cycles 5-160
+
+Source run:
+
+- Server directory:
+  `/root/diamondgo/artifacts/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607`
+- Local recorded catalog:
+  `artifacts/selfplay-recorded-dualgpu-2x96-score4p5-20260607`
+- Local catalog index:
+  `artifacts/selfplay-recorded-dualgpu-2x96-score4p5-20260607/index.html`
+- Shared self-play viewer example:
+  `http://127.0.0.1:8765/viewers/selfplay-catalog-viewer.html?dataset=selfplay-recorded-dualgpu-2x96-score4p5-20260607&cycle=160&game=20`
+
+Configuration:
+
+| Field | Value |
+| --- | --- |
+| Fresh start | `true` |
+| Input komi | `false` |
+| Input planes | `3`: own stones, opponent stones, side-to-play |
+| Score komi | `4.5` |
+| Score margin reward scale | `0.2` |
+| Channels / residual blocks | `96 / 2` |
+| MCTS simulations | `250` for training self-play |
+| Workers | `12` |
+| Games per worker / cycle | `8 / 96` |
+| Self-play devices | `cuda:0,cuda:1` |
+| Max moves | `150` |
+| Root Dirichlet noise | alpha `0.15`, fraction `0.25` |
+| Root policy temperature | `1.1` |
+| Move temperature | `1.0` through move `16`, then `0.25` |
+| Checkpoint interval | every `5` cycles through cycle `50`, then every `10` cycles |
+| Recorded self-play interval | every `5` cycles |
+
+Recorded-cycle summary:
+
+| Cycle | Games | Positions | Black wins | White wins | Black win rate | Mean moves | Early pass `<40` | Capture fraction | Mean Black margin |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `5` | `96` | `9512` | `52` | `44` | `54.17%` | `99.083` | `31.25%` | `0.1340` | `+3.802` |
+| `25` | `96` | `10877` | `54` | `42` | `56.25%` | `113.302` | `13.54%` | `0.2102` | `+1.240` |
+| `50` | `96` | `10403` | `68` | `28` | `70.83%` | `108.365` | `8.33%` | `0.1728` | `+2.312` |
+| `80` | `96` | `10976` | `65` | `31` | `67.71%` | `114.333` | `5.21%` | `0.1535` | `+2.615` |
+| `110` | `96` | `9996` | `61` | `35` | `63.54%` | `104.125` | `8.33%` | `0.1414` | `+0.906` |
+| `140` | `96` | `9485` | `63` | `33` | `65.62%` | `98.802` | `7.29%` | `0.1264` | `+0.719` |
+| `160` | `96` | `10593` | `72` | `24` | `75.00%` | `110.344` | `9.38%` | `0.1560` | `+2.010` |
+
+Observed interpretation:
+
+- The run is still Black-favored despite `score_komi=4.5`, especially from
+  cycle `50` onward.
+- Early pass is much more common in the first recorded cycle than later. This
+  suggests the early-pass pathology is still worth monitoring, but it is not
+  dominating the sampled later self-play in the same way as the earlier failed
+  eval slices.
+- The catalog viewer should be the default display path for this run because
+  it reuses recorded training games instead of creating new showcase games.
+
+## Cross-Run Matches, Dual-GPU 2x96 Score4.5 vs Old 4x64 Score2.5
+
+Reusable script:
+
+- `scripts/run_cross_run_matches.py`
+- Commit introducing the script: `8850431 Add reusable cross-run match script`
+
+The script supports explicit checkpoint pairs and close/approximate pair lists.
+It does not require hardcoded same-cycle comparisons.
+
+Match settings:
+
+| Field | Value |
+| --- | --- |
+| Candidate line | fresh dual-GPU `2x96`, `score_komi=4.5` |
+| Opponent line | earlier fresh no-komi-input `4x64`, `score_komi=2.5` |
+| Games per pair | `10` |
+| Color split | candidate Black `5`, candidate White `5` |
+| Candidate simulations | `100` |
+| Opponent simulations | `100` |
+| Match rules source | candidate config |
+| Match score komi | `4.5` |
+| Match max moves | `150` |
+
+Artifacts:
+
+- Exact/available pair dashboard:
+  `artifacts/crossrun-exact-and-x2-20260607/dashboard.html`
+- Exact/available pair games:
+  `artifacts/crossrun-exact-and-x2-20260607/games_dashboard.html`
+- Close-pair dashboard:
+  `artifacts/crossrun-close-20260607/dashboard.html`
+- Close-pair games:
+  `artifacts/crossrun-close-20260607/games_dashboard.html`
+
+Availability note:
+
+- The old server was no longer reachable, so exact same-cycle and exact
+  double-cycle tests were limited by locally/server-side archived checkpoint
+  inventory.
+- Exact available same-cycle: old cycle `80`.
+- Exact available double-cycle: new cycle `50` versus old cycle `100`.
+- Additional close-pair tests use nearby old checkpoints where exact
+  counterparts were unavailable.
+
+Exact/available pairs:
+
+| Pair | Candidate wins | Candidate as Black | Candidate as White | Early pass `<40` |
+| --- | ---: | ---: | ---: | ---: |
+| `new80-vs-old80` | `8/10` | `5/5` | `3/5` | `20.00%` |
+| `new50-vs-old100` | `5/10` | `2/5` | `3/5` | `0.00%` |
+
+Close same-ish pairs:
+
+| Pair | Candidate wins | Candidate as Black | Candidate as White | Early pass `<40` |
+| --- | ---: | ---: | ---: | ---: |
+| `new50-vs-old60` | `7/10` | `3/5` | `4/5` | `10.00%` |
+| `new110-vs-old100` | `6/10` | `3/5` | `3/5` | `10.00%` |
+| `new140-vs-old150` | `5/10` | `3/5` | `2/5` | `10.00%` |
+| `new160-vs-old150` | `8/10` | `4/5` | `4/5` | `30.00%` |
+
+Close double-ish pairs:
+
+| Pair | Candidate wins | Candidate as Black | Candidate as White | Early pass `<40` |
+| --- | ---: | ---: | ---: | ---: |
+| `new80-vs-old150` | `4/10` | `4/5` | `0/5` | `0.00%` |
+| `new110-vs-old200` | `1/10` | `1/5` | `0/5` | `10.00%` |
+| `new140-vs-old300` | `3/10` | `1/5` | `2/5` | `10.00%` |
+| `new160-vs-old300` | `3/10` | `3/5` | `0/5` | `10.00%` |
+
+Observed interpretation:
+
+- At similar early checkpoint counts, the fresh `2x96`, `score_komi=4.5` line
+  looks competitive with or ahead of the old `4x64`, `score_komi=2.5` line.
+- Against roughly double-age old checkpoints, the new line is clearly not
+  consistently ahead yet.
+- The color split is still informative. Several weak results are especially
+  weak when the new model is White, so future reports should keep color-split
+  win rates rather than only aggregate wins.
+- Each pair has only `10` games, so these are quick diagnostic matches rather
+  than final strength estimates.
