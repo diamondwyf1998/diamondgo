@@ -27,11 +27,12 @@ Human-readable record rule:
   curves, recorded self-play game viewer, and human-vs-AI play page loaded with
   the latest checkpoint. Prefer recorded training games when they exist; only
   generate new showcase games when recorded games are unavailable.
-- When the user asks for "比较实验", pick several representative checkpoints
-  from the current candidate run and compare each against approximately `1x`
-  and `2x` training-progress opponents from the reference run. Use exact cycle
-  matches when available; otherwise choose the nearest reasonable checkpoint
-  and label it as approximate.
+- When the user asks for "比较实验", pick representative checkpoints and choose
+  reference opponents that best answer the current comparison question. Start
+  with approximately `1x` and `2x` training-progress opponents when they are
+  meaningful, but do not treat those ratios as fixed. If those pairings are
+  unavailable, unfair, or uninformative, choose other sensible ratios/checkpoints
+  and clearly label the rationale and approximation.
 
 Source labels:
 

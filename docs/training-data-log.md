@@ -1256,11 +1256,13 @@ Observed interpretation:
 
 Definition:
 
-- "比较实验" means selecting several representative candidate checkpoints and
-  testing each against approximately `1x` and `2x` training-progress reference
-  checkpoints.
-- Exact cycle matches are preferred. If unavailable, the nearest reasonable
-  checkpoint is selected and the approximation is recorded.
+- "比较实验" means selecting representative candidate checkpoints and choosing
+  reference opponents that best answer the current comparison question.
+- Approximately `1x` and `2x` training-progress opponents are useful default
+  starting points, but they are not required. If those ratios are unavailable,
+  unfair, or not informative, choose other sensible ratios/checkpoints.
+- Exact cycle matches are preferred when they fit the question. Otherwise, use
+  the nearest reasonable checkpoint and record the approximation/rationale.
 
 Artifacts:
 
