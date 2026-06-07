@@ -1196,3 +1196,58 @@ Observed interpretation:
   win rates rather than only aggregate wins.
 - Each pair has only `10` games, so these are quick diagnostic matches rather
   than final strength estimates.
+
+## Preflight Cross-Run Matches, Dual-GPU 2x96 Score4.5 vs Late Old 4x64 Score5.5
+
+Context:
+
+- This was the first cross-run comparison run before the user clarified that
+  the desired first report was same-cycle or close-cycle comparison.
+- It is retained as a preflight record because it measures the new early
+  `2x96`, `score_komi=4.5` line against a much later old `4x64`,
+  `score_komi=5.5` continuation.
+- It should not be mixed with the same-ish or double-ish `score_komi=2.5`
+  comparison above.
+
+Artifacts:
+
+- Server directory:
+  `/root/diamondgo/artifacts/crossrun-dualgpu2x96-score4p5-vs-old4x64-score5p5-20260607`
+- Local dashboard:
+  `artifacts/crossrun-dualgpu2x96-score4p5-vs-old4x64-score5p5-20260607/dashboard.html`
+- Local games dashboard:
+  `artifacts/crossrun-dualgpu2x96-score4p5-vs-old4x64-score5p5-20260607/games_dashboard.html`
+- Local summary:
+  `artifacts/crossrun-dualgpu2x96-score4p5-vs-old4x64-score5p5-20260607/summary.json`
+
+Match settings:
+
+| Field | Value |
+| --- | --- |
+| Candidate line | fresh dual-GPU `2x96`, `score_komi=4.5` |
+| Opponent line | late continuation `4x64`, `score_komi=5.5` |
+| Games per pair | `10` |
+| Color split | candidate Black `5`, candidate White `5` |
+| Candidate simulations | `100` |
+| Opponent simulations | `100` |
+| Match rules source | candidate config |
+| Match score komi | `4.5` |
+| Match max moves | `150` |
+
+Preflight pairs:
+
+| Pair | Candidate wins | Candidate as Black | Candidate as White | Early pass `<40` |
+| --- | ---: | ---: | ---: | ---: |
+| `new050-vs-old530` | `0/10` | `0/5` | `0/5` | `30.00%` |
+| `new080-vs-old560` | `3/10` | `1/5` | `2/5` | `20.00%` |
+| `new110-vs-old590` | `1/10` | `0/5` | `1/5` | `30.00%` |
+| `new140-vs-old620` | `3/10` | `1/5` | `2/5` | `10.00%` |
+| `new160-vs-old650` | `1/10` | `0/5` | `1/5` | `0.00%` |
+
+Observed interpretation:
+
+- The new early `2x96` run is far behind the late old `4x64`,
+  `score_komi=5.5` continuation in this preflight matchup.
+- Because the opponent checkpoints are hundreds of cycles later, this is mostly
+  a "late old line remains much stronger" check, not a fair architecture or
+  same-training-age comparison.

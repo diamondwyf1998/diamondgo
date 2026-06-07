@@ -484,3 +484,16 @@ needs a shape/distribution metric before treating it as a measured result.
     twice the training age. The sample size is small, and color asymmetry is
     still visible, so these numbers should guide follow-up tests rather than
     settle strength.
+- `Correction / preflight record`: Before the exact/close same-era comparison,
+  an earlier preflight match was run against the much later old `4x64`,
+  `score_komi=5.5` continuation. This was not the comparison the user wanted
+  for same-cycle progress, but it is still useful as a sanity check against a
+  substantially more trained previous line.
+  - Pairs were `new50-vs-old530`, `new80-vs-old560`, `new110-vs-old590`,
+    `new140-vs-old620`, and `new160-vs-old650`, all `10` games each.
+  - Candidate wins were `0/10`, `3/10`, `1/10`, `3/10`, and `1/10`.
+  - Interpretation: this should be read as "early new line is far behind a
+    much later old continuation", not as evidence about same-cycle learning
+    speed.
+  - Data reference:
+    `docs/training-data-log.md#preflight-cross-run-matches-dual-gpu-2x96-score45-vs-late-old-4x64-score55`
