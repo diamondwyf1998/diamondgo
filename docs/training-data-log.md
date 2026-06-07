@@ -1252,6 +1252,67 @@ Observed interpretation:
   a "late old line remains much stronger" check, not a fair architecture or
   same-training-age comparison.
 
+## Comparison Experiment, Dual-GPU 2x96 After18h vs Old 4x64
+
+Definition:
+
+- "比较实验" means selecting several representative candidate checkpoints and
+  testing each against approximately `1x` and `2x` training-progress reference
+  checkpoints.
+- Exact cycle matches are preferred. If unavailable, the nearest reasonable
+  checkpoint is selected and the approximation is recorded.
+
+Artifacts:
+
+- Server output:
+  `/root/diamondgo/artifacts/compare-experiment-1x-2x-dualgpu2x96-20260607`
+- Local dashboard:
+  `artifacts/compare-experiment-1x-2x-dualgpu2x96-20260607/dashboard.html`
+- Local games dashboard:
+  `artifacts/compare-experiment-1x-2x-dualgpu2x96-20260607/games_dashboard.html`
+- Raw summary:
+  `artifacts/compare-experiment-1x-2x-dualgpu2x96-20260607/summary.json`
+
+Match settings:
+
+| Field | Value |
+| --- | --- |
+| Candidate line | after18h continuation dual-GPU `2x96`, `score_komi=4.5` |
+| Candidate checkpoints | `240, 250, 260, 270` |
+| Opponent line for `1x` | old `4x64`, `score_komi=2.5` |
+| Opponent line for `2x` | old `4x64`, later score-komi `6.5/5.5` lines |
+| Games per pair | `10` |
+| Color split | candidate Black `5`, candidate White `5` |
+| Candidate simulations | `100` |
+| Opponent simulations | `100` |
+| Match rules source | candidate config |
+| Match score komi | `4.5` |
+| Match max moves | `150` |
+
+Results:
+
+| Pair type | Pair | Candidate wins | Candidate as Black | Candidate as White | Early pass `<40` |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `1x approximate` | `new240-vs-old250` | `4/10` | `2/5` | `2/5` | `10.00%` |
+| `1x approximate` | `new250-vs-old250` | `2/10` | `1/5` | `1/5` | `0.00%` |
+| `1x approximate` | `new260-vs-old250` | `6/10` | `5/5` | `1/5` | `10.00%` |
+| `1x approximate` | `new270-vs-old300` | `4/10` | `2/5` | `2/5` | `0.00%` |
+| `2x approximate` | `new240-vs-old500` | `7/10` | `5/5` | `2/5` | `10.00%` |
+| `2x approximate` | `new250-vs-old500` | `3/10` | `1/5` | `2/5` | `0.00%` |
+| `2x approximate` | `new260-vs-old520` | `7/10` | `4/5` | `3/5` | `0.00%` |
+| `2x approximate` | `new270-vs-old530` | `3/10` | `3/5` | `0/5` | `0.00%` |
+
+Observed interpretation:
+
+- The results are not monotonic by candidate checkpoint. Cycles `240` and
+  `260` look stronger than cycles `250` and `270` in this quick test.
+- The `1x` block is a cleaner near-age comparison than the `2x` block.
+- The `2x` block should be read cautiously because the old `500/520/530`
+  opponents come from later score-komi settings, not from the exact same old
+  `score_komi=2.5` line.
+- Color split remains important. `new260-vs-old250` is `5/5` as Black but only
+  `1/5` as White; `new270-vs-old530` is `3/5` as Black and `0/5` as White.
+
 ## Dual-GPU 2x96 Score4.5 18h + 3h Continuation
 
 Context:

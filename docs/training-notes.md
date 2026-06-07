@@ -27,6 +27,11 @@ Human-readable record rule:
   curves, recorded self-play game viewer, and human-vs-AI play page loaded with
   the latest checkpoint. Prefer recorded training games when they exist; only
   generate new showcase games when recorded games are unavailable.
+- When the user asks for "比较实验", pick several representative checkpoints
+  from the current candidate run and compare each against approximately `1x`
+  and `2x` training-progress opponents from the reference run. Use exact cycle
+  matches when available; otherwise choose the nearest reasonable checkpoint
+  and label it as approximate.
 
 Source labels:
 
@@ -502,6 +507,36 @@ needs a shape/distribution metric before treating it as a measured result.
     speed.
   - Data reference:
     `docs/training-data-log.md#preflight-cross-run-matches-dual-gpu-2x96-score45-vs-late-old-4x64-score55`
+
+### Comparison Experiment: Dual-GPU 2x96 After18h vs Old 4x64
+
+- `User request`: Run a "比较实验": pick several checkpoints and compare
+  against approximately `1x` and `2x` training-progress old checkpoints. If
+  exact pairings are unavailable, choose close reasonable substitutes.
+- `Agent measurement`: Four candidate checkpoints from the after18h
+  dual-GPU `2x96`, `score_komi=4.5` line were tested: cycles
+  `240,250,260,270`. Each pair used `10` games, `5` as Black and `5` as White,
+  with both sides at `100` simulations.
+  - `1x` approximate opponents: old `4x64`, `score_komi=2.5` cycles
+    `250,250,250,300`.
+  - `2x` approximate opponents: old `4x64` cycles `500,500,520,530`; these
+    come from later score-komi `6.5/5.5` lines, so they are not clean same-rule
+    architecture comparisons.
+  - Dashboard:
+    `artifacts/compare-experiment-1x-2x-dualgpu2x96-20260607/dashboard.html`
+  - Game replay dashboard:
+    `artifacts/compare-experiment-1x-2x-dualgpu2x96-20260607/games_dashboard.html`
+  - Data reference:
+    `docs/training-data-log.md#comparison-experiment-dual-gpu-2x96-after18h-vs-old-4x64`
+- `Agent measurement`: Results are noisy and not monotonic. Against `1x`
+  approximate opponents the new line scores `4/10`, `2/10`, `6/10`, `4/10`.
+  Against `2x` approximate opponents it scores `7/10`, `3/10`, `7/10`,
+  `3/10`.
+- `Interpretation`: This quick comparison does not support a simple "later new
+  checkpoint is always stronger" story. The strongest pair results are cycles
+  `240` and `260`, while cycles `250` and `270` are weak. Because the `2x`
+  opponents mix later score-komi settings, treat the experiment as a practical
+  progress probe rather than a clean scientific isolation of architecture.
 - `User request / technical operation`: When the 18-hour dual-GPU run was close
   to finishing, the user asked to immediately continue for another `3` hours if
   the run had completed. A queue watcher was installed so this would happen
