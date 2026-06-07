@@ -205,5 +205,27 @@
     "filename": "cont-nokomi-4x64-score5p5-margin0p2-300sims-latest-cycle-00666.pt",
     "run": "multiworker-9x9-cont-nokomi-4x64-score5p5-margin0p2-300sims-max150-6h-20260606",
     "score_komi": 5.5
+  },
+  {
+    "id": "dualgpu2x96-score4p5-cycle-00270",
+    "cycle": 270,
+    "label": "cycle-00270 | dualgpu 2x96 score4p5 250sims after18h",
+    "checkpoint": "artifacts/play-ai-checkpoints/dualgpu2x96-score4p5-after18h-cycle-00270.pt",
+    "filename": "dualgpu2x96-score4p5-after18h-cycle-00270.pt",
+    "run": "multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607",
+    "score_komi": 4.5,
+    "channels": 96,
+    "residual_blocks": 2
+  },
+  {
+    "id": "dualgpu2x96-score4p5-cycle-00272-latest",
+    "cycle": 272,
+    "label": "cycle-00272 | dualgpu 2x96 score4p5 250sims after18h latest",
+    "checkpoint": "artifacts/play-ai-checkpoints/dualgpu2x96-score4p5-after18h-latest-cycle-00272.pt",
+    "filename": "dualgpu2x96-score4p5-after18h-latest-cycle-00272.pt",
+    "run": "multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607",
+    "score_komi": 4.5,
+    "channels": 96,
+    "residual_blocks": 2
   }
 ]

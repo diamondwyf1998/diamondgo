@@ -22,6 +22,11 @@ Human-readable record rule:
   `artifacts/viewers/` plus JSON/server data over newly copied standalone HTML,
   so labels, encoding, controls, and checkpoint identity do not drift between
   experiments.
+- When the user asks for "大测评展示", prepare the complete display bundle:
+  latest training-result summary, evaluation dashboards/reports, training
+  curves, recorded self-play game viewer, and human-vs-AI play page loaded with
+  the latest checkpoint. Prefer recorded training games when they exist; only
+  generate new showcase games when recorded games are unavailable.
 
 Source labels:
 
