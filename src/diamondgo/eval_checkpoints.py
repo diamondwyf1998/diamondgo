@@ -521,13 +521,16 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
       gap: 10px;
       margin-bottom: 14px;
     }}
-    select {{
+    select, input[type="text"] {{
       height: 34px;
       border: 1px solid #b8c4c0;
       border-radius: 6px;
       background: #fff;
       color: #203033;
       padding: 0 8px;
+    }}
+    input[type="text"] {{
+      min-width: 220px;
     }}
     .board-wrap {{
       padding: 12px;
@@ -542,6 +545,13 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
       gap: 10px;
       align-items: center;
       margin-top: 14px;
+    }}
+    .authoring {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 12px;
     }}
     button {{
       min-width: 42px;
@@ -567,6 +577,13 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     }}
     .box b {{ display: block; color: #657174; font-size: 12px; margin-bottom: 4px; }}
     .box span {{ font-size: 18px; }}
+    .status {{
+      min-height: 20px;
+      color: #657174;
+      font-size: 13px;
+    }}
+    .status.ok {{ color: #166534; font-weight: 700; }}
+    .status.error {{ color: #9f1239; font-weight: 700; }}
     .candidate-list {{
       display: grid;
       gap: 9px;
@@ -624,6 +641,12 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
             <input id="move-slider" type="range" min="0" value="0">
             <span id="move-count"></span>
           </div>
+          <div class="authoring">
+            <input id="puzzle-name" type="text" placeholder="Optional puzzle name">
+            <button type="button" id="save-puzzle">Save as puzzle</button>
+            <button type="button" id="open-puzzle-author">Open author</button>
+          </div>
+          <div id="puzzle-status" class="status"></div>
         </div>
         <div class="panel">
           <div class="box"><b>Game</b><span id="game-info"></span></div>
@@ -650,6 +673,11 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     const moveInfo = document.getElementById("move-info");
     const rootValue = document.getElementById("root-value");
     const candidateList = document.getElementById("candidate-list");
+    const puzzleNameInput = document.getElementById("puzzle-name");
+    const savePuzzleButton = document.getElementById("save-puzzle");
+    const openPuzzleAuthorButton = document.getElementById("open-puzzle-author");
+    const puzzleStatus = document.getElementById("puzzle-status");
+    const puzzleStorageKey = "diamondgo-puzzle-author-v1";
 
     function makeSvg(name, attributes = {{}}, text = "") {{
       const node = document.createElementNS("http://www.w3.org/2000/svg", name);
@@ -665,6 +693,15 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
         x: state.pad + col * state.cell,
         y: state.pad + row * state.cell
       }};
+    }}
+
+    function pointArrayFor(action) {{
+      if (action >= state.boardSize * state.boardSize) return null;
+      return [Math.floor(action / state.boardSize), action % state.boardSize];
+    }}
+
+    function moveText(move) {{
+      return move?.move || (move ? String(move.action) : "");
     }}
 
     function neighbors(action) {{
@@ -731,6 +768,89 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     function currentGame() {{
       const match = currentMatch();
       return match.gamesDetail[Number(gameSelect.value)] || match.gamesDetail[0];
+    }}
+
+    function setPuzzleStatus(message, kind = "") {{
+      puzzleStatus.textContent = message;
+      puzzleStatus.className = `status ${{kind}}`;
+    }}
+
+    function boardPointsFor(boardState, color) {{
+      const points = [];
+      boardState.forEach((stone, action) => {{
+        if (stone?.color === color) points.push(pointArrayFor(action));
+      }});
+      return points.filter(Boolean);
+    }}
+
+    function nextPlayerAfter(index) {{
+      const game = currentGame();
+      const nextMove = game.moves[index + 1];
+      if (nextMove?.player) return nextMove.player;
+      const current = game.moves[index];
+      if (current?.player) return current.player === "b" ? "w" : "b";
+      return "b";
+    }}
+
+    function loadPuzzleDraft() {{
+      try {{
+        const saved = JSON.parse(localStorage.getItem(puzzleStorageKey) || "null");
+        if (saved && Array.isArray(saved.cases)) {{
+          return {{ version: 1, board_size: state.boardSize, cases: saved.cases }};
+        }}
+      }} catch (_err) {{
+        // Use a fresh draft if localStorage contains an old or broken value.
+      }}
+      return {{ version: 1, board_size: state.boardSize, cases: [] }};
+    }}
+
+    function isEmptyPuzzleCase(item) {{
+      return item
+        && !item.black?.length
+        && !item.white?.length
+        && !item.good?.length
+        && !item.bad?.length
+        && !item.note;
+    }}
+
+    function saveCurrentPuzzle() {{
+      const match = currentMatch();
+      const game = currentGame();
+      if (!game || !game.moves.length) {{
+        setPuzzleStatus("No evaluation game is loaded yet.", "error");
+        return;
+      }}
+      const index = Math.max(0, Math.min(game.moves.length - 1, Number(slider.value)));
+      const currentMove = game.moves[index];
+      const nextMove = game.moves[index + 1] || null;
+      const boardState = replayBoard(index);
+      const matchLabel = `match-${{Number(matchSelect.value) + 1}}`;
+      const gameLabel = `game-${{String(game.game).padStart(2, "0")}}`;
+      const moveLabel = `move-${{String(currentMove.moveNumber).padStart(3, "0")}}`;
+      const autoName = `${{matchLabel}}_${{gameLabel}}_${{moveLabel}}`;
+      const nextPoint = nextMove ? pointArrayFor(nextMove.action) : null;
+      const nextTop = nextMove?.topActions?.slice(0, 5).map(item => item.move).join(", ") || "";
+      const puzzleCase = {{
+        name: puzzleNameInput.value.trim() || autoName,
+        category: "eval_match_snapshot",
+        subcategory: `${{match.candidate}} vs ${{match.opponent}}`,
+        to_play: nextPlayerAfter(index),
+        black: boardPointsFor(boardState, "b"),
+        white: boardPointsFor(boardState, "w"),
+        good: nextPoint ? [nextPoint] : [],
+        bad: [],
+        note: [
+          `Source evaluation dashboard, ${{match.candidate}} vs ${{match.opponent}}, ${{gameLabel}}, after move ${{currentMove.moveNumber}} ${{currentMove.player.toUpperCase()}} ${{moveText(currentMove)}}.`,
+          nextMove ? `Target is next move ${{nextMove.player.toUpperCase()}} ${{moveText(nextMove)}} by ${{nextMove.model}}.` : "No next move was available; target left empty.",
+          nextTop ? `Next search top5: ${{nextTop}}.` : "",
+        ].filter(Boolean).join(" ")
+      }};
+      const draft = loadPuzzleDraft();
+      if (draft.cases.length === 1 && isEmptyPuzzleCase(draft.cases[0])) draft.cases[0] = puzzleCase;
+      else draft.cases.push(puzzleCase);
+      localStorage.setItem(puzzleStorageKey, JSON.stringify(draft));
+      const targetText = nextMove ? `, answer ${{moveText(nextMove)}}` : ", answer pending";
+      setPuzzleStatus(`Saved move ${{currentMove.moveNumber}} position as puzzle "${{puzzleCase.name}}"${{targetText}}.`, "ok");
     }}
 
     function populateMatches() {{
@@ -826,6 +946,10 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     slider.addEventListener("input", () => render(Number(slider.value)));
     prevButton.addEventListener("click", () => render(Number(slider.value) - 1));
     nextButton.addEventListener("click", () => render(Number(slider.value) + 1));
+    savePuzzleButton.addEventListener("click", saveCurrentPuzzle);
+    openPuzzleAuthorButton.addEventListener("click", () => {{
+      location.href = "../viewers/puzzle-author.html";
+    }});
     populateMatches();
     populateGames();
   </script>

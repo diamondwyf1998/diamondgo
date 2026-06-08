@@ -23,7 +23,9 @@
   li { margin: 7px 0; }
   .move-list { max-height: 260px; overflow: auto; border-top: 1px solid #e4e7eb; margin-top: 12px; padding-top: 8px; font-size: 13px; line-height: 1.8; }
   .current { color: #0b7285; font-weight: 750; }
-  .error { color: #9f1239; font-weight: 700; }
+  #status { min-height: 22px; color: #52606d; font-size: 13px; }
+  #status.error { color: #9f1239; font-weight: 700; }
+  #status.ok { color: #166534; font-weight: 700; }
   @media (max-width: 880px) { main { grid-template-columns: 1fr; } }
 </style>
 <header>
@@ -56,7 +58,7 @@
   <section class="board-wrap">
     <canvas id="board" width="900" height="900"></canvas>
     <div class="scrubber"><input id="scrubber" type="range" min="0" max="0" value="0"><span id="scrubText">0 / 0</span></div>
-    <div class="toolbar"><button id="first">|&lt;</button><button id="prev">&lt;</button><button id="next">&gt;</button><button id="last">&gt;|</button></div>
+    <div class="toolbar"><button id="first">|&lt;</button><button id="prev">&lt;</button><button id="next">&gt;</button><button id="last">&gt;|</button><button id="savePuzzle">Save as puzzle</button><button id="openPuzzleAuthor">Open author</button></div>
   </section>
   <aside class="panel">
     <div class="stat-grid">
@@ -65,9 +67,10 @@
       <div class="stat"><b>Result</b><span id="summary">-</span></div>
       <div class="stat"><b>Captures</b><span id="captures">-</span></div>
     </div>
+    <label>Puzzle name <input id="puzzleName" placeholder="Optional name before saving"></label>
     <h3>Top 3 candidates</h3>
     <ol id="top"></ol>
-    <div id="status" class="error"></div>
+    <div id="status"></div>
     <div class="move-list" id="moves"></div>
   </aside>
 </main>
@@ -78,6 +81,7 @@ window.addEventListener("error", event => {
 });
 const boardSize = 9;
 const defaultDataset = "selfplay-catalog-fresh-nokomi-selected-20260606";
+const puzzleStorageKey = "diamondgo-puzzle-author-v1";
 const params = new URLSearchParams(location.search);
 let initialCycleParam = params.get("cycle");
 let initialGameParam = params.get("game");
@@ -88,6 +92,7 @@ const moveSelect = document.querySelector("#move");
 const scrubber = document.querySelector("#scrubber");
 const scrubText = document.querySelector("#scrubText");
 const canvas = document.querySelector("#board");
+const puzzleNameInput = document.querySelector("#puzzleName");
 let ctx = null;
 let summary = [];
 let trace = null;
@@ -114,6 +119,12 @@ function updateUrl() {
   history.replaceState(null, "", `${location.pathname}?${next.toString()}`);
 }
 
+function setStatus(message, kind = "") {
+  const status = document.querySelector("#status");
+  status.textContent = message;
+  status.className = kind;
+}
+
 function actionPoint(action) {
   if (action >= boardSize * boardSize) return null;
   return { row: Math.floor(action / boardSize), col: action % boardSize };
@@ -123,6 +134,14 @@ function gtpFromAction(action) {
   const p = actionPoint(action);
   if (!p) return "pass";
   return `${"ABCDEFGHJ"[p.col]}${boardSize - p.row}`;
+}
+
+function colorAfterStep() {
+  if (step < gameMoves.length && gameMoves[step]?.player) return gameMoves[step].player;
+  if (step > 0 && gameMoves[step - 1]?.player) {
+    return gameMoves[step - 1].player === "b" ? "w" : "b";
+  }
+  return "b";
 }
 
 function neighbors(row, col) {
@@ -172,12 +191,86 @@ function positionAt(count) {
   return { board, blackCaptures, whiteCaptures };
 }
 
+function boardPointsFor(pos, color) {
+  const points = [];
+  for (let row = 0; row < boardSize; row++) {
+    for (let col = 0; col < boardSize; col++) {
+      if (pos.board[row][col] === color) points.push([row, col]);
+    }
+  }
+  return points;
+}
+
+function actionToPointArray(action) {
+  const point = actionPoint(Number(action));
+  return point ? [point.row, point.col] : null;
+}
+
+function loadPuzzleDraft() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(puzzleStorageKey) || "null");
+    if (saved && Array.isArray(saved.cases)) {
+      return { version: 1, board_size: boardSize, cases: saved.cases };
+    }
+  } catch (_err) {
+    // Fall through to a fresh draft.
+  }
+  return { version: 1, board_size: boardSize, cases: [] };
+}
+
+function isEmptyPuzzleCase(item) {
+  return item
+    && !item.black?.length
+    && !item.white?.length
+    && !item.good?.length
+    && !item.bad?.length
+    && !item.note;
+}
+
+function saveCurrentPuzzle() {
+  if (!gameMoves.length) {
+    setStatus("No self-play game is loaded yet.", "error");
+    return;
+  }
+  const pos = positionAt(step);
+  const nextMove = gameMoves[step] || null;
+  const nextPoint = nextMove ? actionToPointArray(nextMove.chosen_action) : null;
+  const cycleLabel = `cycle-${String(cycleSelect.value || "0").padStart(5, "0")}`;
+  const gameLabel = `game-${String(gameSelect.value || "1").padStart(2, "0")}`;
+  const moveLabel = `move-${String(step).padStart(3, "0")}`;
+  const autoName = `${cycleLabel}_${gameLabel}_${moveLabel}`;
+  const customName = puzzleNameInput.value.trim();
+  const top3 = nextMove?.top_actions?.slice(0, 3).map(item => item.move).join(", ") || "";
+  const nextMoveText = nextMove ? nextMove.chosen_move || gtpFromAction(Number(nextMove.chosen_action)) : "";
+  const puzzleCase = {
+    name: customName || autoName,
+    category: "selfplay_snapshot",
+    subcategory: cycleLabel,
+    to_play: colorAfterStep(),
+    black: boardPointsFor(pos, "b"),
+    white: boardPointsFor(pos, "w"),
+    good: nextPoint ? [nextPoint] : [],
+    bad: [],
+    note: [
+      `Source ${datasetInput.value}, ${cycleLabel}, ${gameLabel}, after ${step} moves.`,
+      nextMove ? `Target is next self-play move ${nextMoveText}.` : "No next move was available; target left empty.",
+      top3 ? `Next search top3: ${top3}.` : "",
+    ].filter(Boolean).join(" ")
+  };
+  const draft = loadPuzzleDraft();
+  if (draft.cases.length === 1 && isEmptyPuzzleCase(draft.cases[0])) draft.cases[0] = puzzleCase;
+  else draft.cases.push(puzzleCase);
+  localStorage.setItem(puzzleStorageKey, JSON.stringify(draft));
+  const targetText = nextPoint ? `, answer ${nextMoveText}` : ", answer pending";
+  setStatus(`Saved move ${step} position as puzzle "${puzzleCase.name}"${targetText}.`, "ok");
+}
+
 function draw() {
   const ctx = getBoardContext();
   const pos = positionAt(step);
   if (!ctx) {
     updateText(pos);
-    document.querySelector("#status").textContent = "Canvas is unavailable in this browser view; move data is loaded below.";
+    setStatus("Canvas is unavailable in this browser view; move data is loaded below.", "error");
     return;
   }
   const size = canvas.width, margin = 58, gap = (size - margin * 2) / (boardSize - 1);
@@ -233,7 +326,7 @@ function setStep(nextStep) {
 }
 
 async function loadDataset() {
-  document.querySelector("#status").textContent = "";
+  setStatus("");
   try {
     summary = await fetch(dataUrl("summary.json"), { cache: "no-store" }).then(r => {
       if (!r.ok) throw new Error(`summary.json ${r.status}`);
@@ -256,12 +349,12 @@ async function loadDataset() {
     initialCycleParam = null;
     initialGameParam = null;
   } catch (err) {
-    document.querySelector("#status").textContent = `Could not load dataset: ${err.message}`;
+    setStatus(`Could not load dataset: ${err.message}`, "error");
   }
 }
 
 async function loadCycle() {
-  document.querySelector("#status").textContent = "";
+  setStatus("");
   const traceFile = `cycle-${String(cycleSelect.value).padStart(5, "0")}-moves.json`;
   trace = await fetch(dataUrl(traceFile), { cache: "no-store" }).then(r => {
     if (!r.ok) throw new Error(`${traceFile} ${r.status}`);
@@ -290,13 +383,13 @@ async function loadCycle() {
 
 function loadGame() {
   if (!trace || !Array.isArray(trace.moves)) {
-    document.querySelector("#status").textContent = "Trace is not loaded yet";
+    setStatus("Trace is not loaded yet", "error");
     return;
   }
   const game = Number(gameSelect.value);
   gameMoves = trace.moves.filter(m => Number(m.game) === game).sort((a, b) => Number(a.move_in_game) - Number(b.move_in_game));
   if (!gameMoves.length) {
-    document.querySelector("#status").textContent = `No moves found for Game ${game}`;
+    setStatus(`No moves found for Game ${game}`, "error");
     return;
   }
   moveSelect.innerHTML = "";
@@ -321,7 +414,7 @@ document.querySelector("#latestDataset").addEventListener("click", () => {
 cycleSelect.addEventListener("change", () => {
   initialGameParam = null;
   loadCycle().catch(err => {
-    document.querySelector("#status").textContent = `Could not load checkpoint: ${err.message}`;
+    setStatus(`Could not load checkpoint: ${err.message}`, "error");
   });
 });
 gameSelect.addEventListener("change", loadGame);
@@ -331,6 +424,10 @@ document.querySelector("#first").addEventListener("click", () => setStep(0));
 document.querySelector("#prev").addEventListener("click", () => setStep(step - 1));
 document.querySelector("#next").addEventListener("click", () => setStep(step + 1));
 document.querySelector("#last").addEventListener("click", () => setStep(gameMoves.length));
+document.querySelector("#savePuzzle").addEventListener("click", saveCurrentPuzzle);
+document.querySelector("#openPuzzleAuthor").addEventListener("click", () => {
+  location.href = "../viewers/puzzle-author.html";
+});
 function startViewer() {
   datasetInput.value = params.get("dataset") || datasetInput.value || defaultDataset;
   loadDataset();
