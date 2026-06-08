@@ -27,6 +27,10 @@ Human-readable record rule:
   curves, recorded self-play game viewer, and human-vs-AI play page loaded with
   the latest checkpoint. Prefer recorded training games when they exist; only
   generate new showcase games when recorded games are unavailable.
+- When the user asks for "小测评", prepare a light display bundle without a
+  full evaluation matrix: sample several recorded self-play checkpoints from
+  the newest active run, open the reusable self-play viewer, and load the
+  latest checkpoint into the human-vs-AI play page.
 - When the user asks for "比较实验", pick representative checkpoints and choose
   reference opponents that best answer the current comparison question. Start
   with approximately `1x` and `2x` training-progress opponents when they are
@@ -551,6 +555,40 @@ needs a shape/distribution metric before treating it as a measured result.
   - Interpretation: the 100-sim comparison overestimated at least some
     `new260` matchups. Higher-search comparisons should be used before calling
     a checkpoint clearly stronger.
+
+### Small Eval: Score6.5 Cleanup 400-Sim Active Run
+
+- `User request`: Do a "小测评" for the new training line: inspect a few
+  recorded self-play checkpoints and load the latest model into human-vs-AI.
+- `Technical operation`: The active server run is the cleanup continuation:
+  `2x96`, `score_komi=6.5`, terminal dead-stone cleanup enabled, `400`
+  self-play simulations, `12` workers, `96` games/cycle.
+- `Agent measurement`: A lightweight local display was prepared from recorded
+  self-play cycles `300,330,360,365`; no new showcase games were generated.
+  - Small eval entry:
+    `artifacts/small-eval-score6p5-cleanup-400sims-20260608/index.html`
+  - Recorded self-play catalog:
+    `artifacts/small-eval-selfplay-score6p5-cleanup-400sims-20260608/index.html`
+  - Latest recorded viewer:
+    `http://127.0.0.1:8765/viewers/selfplay-catalog-viewer.html?dataset=small-eval-selfplay-score6p5-cleanup-400sims-20260608&cycle=365&game=1`
+  - Human-vs-AI:
+    `http://127.0.0.1:8787/viewers/play-ai.html?checkpoint=dualgpu2x96-score6p5-cleanup-cycle-00366-latest&v=small-eval-score6p5-cleanup-366`
+- `Agent measurement`: At the pulled latest checkpoint/metrics snapshot,
+  `latest.pt` is cycle `366`. Latest metrics show Black win rate `65.6%`,
+  early first-pass `<40` rate `5.2%`, mean moves `123.385`, loss `0.959`, and
+  terminal cleanup counts `17` Black stones / `58` White stones.
+- `Agent measurement`: A same-line `+50 cycle` PK check was run on the cleanup
+  line, using `100` simulations and `10` games per pair.
+  - Dashboard:
+    `artifacts/pairwise-plus50-cleanup-score6p5-100sims-10games-20260608/dashboard.html`
+  - Game replay dashboard:
+    `artifacts/pairwise-plus50-cleanup-score6p5-100sims-10games-20260608/games_dashboard.html`
+  - Later checkpoints score `8/10`, `5/10`, `6/10`, and `6/10` for
+    `330-vs-280`, `340-vs-290`, `350-vs-300`, and `360-vs-310`.
+  - Interpretation: the line shows some improvement over +50 cycles, but it is
+    not cleanly monotonic. The `350-vs-300` and `360-vs-310` wins are still
+    color-skewed toward candidate-as-Black, so use color split when judging
+    progress.
 - `User request / technical operation`: When the 18-hour dual-GPU run was close
   to finishing, the user asked to immediately continue for another `3` hours if
   the run had completed. A queue watcher was installed so this would happen
