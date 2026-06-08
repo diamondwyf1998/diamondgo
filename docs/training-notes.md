@@ -585,3 +585,24 @@ needs a shape/distribution metric before treating it as a measured result.
     `41%` / `4118 MiB`, GPU1 about `33%` / `1991 MiB`.
   - Data reference:
     `docs/training-data-log.md#dual-gpu-2x96-score65-400-sim-7-day-continuation`
+- `User observation / technical operation`: The user observed that terminal
+  dead stones were already causing problems and asked to add clear obvious-dead
+  cleanup into the active training round, but only after testing it first.
+  - The active no-cleanup run was left running during implementation/testing.
+  - Tests passed for the conservative cleanup path: `5 passed, 2 skipped` in
+    terminal reward/play-server focused tests, plus a tiny CPU `sgfmill`
+    training smoke with `terminal_dead_stone_cleanup=true`.
+  - A more aggressive edge-cleanup idea was tested and rejected because it can
+    falsely kill edge groups; this is exactly the kind of hidden label bug we
+    want the notes to preserve.
+  - The cleanup being used is intentionally conservative: it only removes a
+    whole group with fewer than two solid eyes when removing it creates a
+    non-edge-touching empty region bordered only by opponent stones. It does
+    not solve edge deaths, seki, ko, or complex life-and-death.
+  - After tests passed, the no-cleanup score6.5/400 segment was stopped at
+    cycle `276`, backed up to
+    `/root/autodl-tmp/diamondgo-checkpoint-backups/score6p5_400sims_precleanup_cycle276_latest.pt`,
+    and a cleanup-enabled 7-day continuation was launched from that checkpoint.
+  - New server PIDs at launch: train `230774`, finalizer `230775`.
+  - Data reference:
+    `docs/training-data-log.md#dual-gpu-2x96-score65-400-sim-7-day-continuation`

@@ -1530,3 +1530,56 @@ Initial launch check:
 - No cycle metrics had completed yet, which is expected because `400`
   simulations should make each cycle longer than the previous `250`-simulation
   run.
+
+Cleanup transition:
+
+- User observation: terminal dead stones are already causing visible problems,
+  so the active 7-day run should include obvious-dead cleanup.
+- Safety constraint from user: do not pause the active training until cleanup
+  behavior is tested.
+- Tests run before pausing:
+  - `PYTHONPATH=src pytest -q tests/test_terminal_rewards.py tests/test_play_server_rules.py`
+    passed: `5 passed, 2 skipped`.
+  - CPU smoke:
+    `python -m diamondgo.multiworker_train ... --terminal-dead-stone-cleanup`
+    completed one tiny `sgfmill` cycle and serialized
+    `terminal_dead_stone_cleanup=true` into the checkpoint config.
+  - Full `pytest` through the `pytest.exe` shim failed because that shim used
+    an Anaconda environment without `torch`; this was an environment mismatch,
+    not a cleanup test failure. The torch-using smoke path ran with the active
+    `python` interpreter.
+- Important failed experiment before the switch:
+  - An attempted broader edge cleanup rule was tested and rejected because it
+    falsely marked edge groups as dead in positions where an outside edge group
+    surrounds an interior group.
+  - Therefore the enabled cleanup remains conservative: it removes only groups
+    that have fewer than two solid eyes, whose removal creates an empty region
+    not touching the board edge, bordered only by opponent stones.
+- The no-cleanup score6.5/400 segment was stopped after reaching checkpoint
+  cycle `276`.
+  - Backup checkpoint:
+    `/root/autodl-tmp/diamondgo-checkpoint-backups/score6p5_400sims_precleanup_cycle276_latest.pt`
+  - Old train PID: `225750`
+  - Old finalizer PID: `225751`
+  - Old no-cleanup output remains preserved at:
+    `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-margin0p2-400sims-max150-7d-after18hplus3h-20260607`
+- Cleanup-enabled continuation launched from that backup at
+  `2026-06-07 23:05:43 +08`.
+  - Train PID: `230774`
+  - Finalizer PID: `230775`
+  - Output directory:
+    `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-max150-7d-after18hplus3h-20260607`
+  - Eval directory:
+    `/root/diamondgo/artifacts/eval-suite-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-train-100sims-eval-7d-after18hplus3h-20260607`
+  - Tactical directory:
+    `/root/diamondgo/artifacts/tactical-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-train-100sims-eval-7d-after18hplus3h-20260607`
+- Launch check for cleanup run:
+  - `config.json` confirms `terminal_dead_stone_cleanup=true`,
+    `score_komi=6.5`, `input_komi=false`, `simulations=400`,
+    `max_moves=150`, `workers=12`, `games_per_worker=8`, and
+    `record_every=5`.
+  - GPU snapshot shortly after launch: GPU0 about `52%`, `7626 MiB`; GPU1
+    about `35%`, `3981 MiB`.
+  - First cleanup-enabled cycle had not yet completed at the launch check, so
+    cleanup counts should be inspected by the 3-hour monitor once metrics start
+    arriving.
