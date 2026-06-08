@@ -538,6 +538,19 @@ needs a shape/distribution metric before treating it as a measured result.
   `240` and `260`, while cycles `250` and `270` are weak. Because the `2x`
   opponents mix later score-komi settings, treat the experiment as a practical
   progress probe rather than a clean scientific isolation of architecture.
+- `Agent measurement`: The stronger-looking comparison pairs were rerun at
+  `300` simulations for both sides.
+  - Dashboard:
+    `artifacts/compare-experiment-strong-300sims-dualgpu2x96-combined-20260607/dashboard.html`
+  - Game replay dashboard:
+    `artifacts/compare-experiment-strong-300sims-dualgpu2x96-combined-20260607/games_dashboard.html`
+  - `new240` looks more stable at higher search: `7/10` against old `250` and
+    `5/10` against old `500`.
+  - `new260` does not preserve its 100-sim strength: it is `5/10` against old
+    `250` and `0/10` against old `520`.
+  - Interpretation: the 100-sim comparison overestimated at least some
+    `new260` matchups. Higher-search comparisons should be used before calling
+    a checkpoint clearly stronger.
 - `User request / technical operation`: When the 18-hour dual-GPU run was close
   to finishing, the user asked to immediately continue for another `3` hours if
   the run had completed. A queue watcher was installed so this would happen

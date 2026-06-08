@@ -1315,6 +1315,65 @@ Observed interpretation:
 - Color split remains important. `new260-vs-old250` is `5/5` as Black but only
   `1/5` as White; `new270-vs-old530` is `3/5` as Black and `0/5` as White.
 
+### 300-Sim Rerun Of Stronger Comparison Pairs
+
+Reason:
+
+- The 100-sim comparison made cycles `240` and `260` look like the stronger
+  candidate checkpoints.
+- The user asked to rerun the stronger comparison-experiment cases at
+  `300` simulations.
+
+Artifacts:
+
+- Partial server output:
+  `/root/diamondgo/artifacts/compare-experiment-strong-300sims-dualgpu2x96-20260607`
+- Missing-pair server output:
+  `/root/diamondgo/artifacts/compare-experiment-strong-300sims-dualgpu2x96-missing-20260607`
+- Local combined dashboard:
+  `artifacts/compare-experiment-strong-300sims-dualgpu2x96-combined-20260607/dashboard.html`
+- Local combined games dashboard:
+  `artifacts/compare-experiment-strong-300sims-dualgpu2x96-combined-20260607/games_dashboard.html`
+- Local combined summary:
+  `artifacts/compare-experiment-strong-300sims-dualgpu2x96-combined-20260607/summary.json`
+
+Run note:
+
+- The first SSH session was reset after three pairs had completed. The missing
+  fourth pair was rerun separately and then merged locally into the combined
+  dashboard above.
+
+Settings:
+
+| Field | Value |
+| --- | --- |
+| Games per pair | `10` |
+| Color split | candidate Black `5`, candidate White `5` |
+| Candidate simulations | `300` |
+| Opponent simulations | `300` |
+| Match rules source | candidate config |
+| Match score komi | `4.5` |
+| Match max moves | `150` |
+
+Results:
+
+| Pair | Candidate wins | Candidate as Black | Candidate as White | Early pass `<40` |
+| --- | ---: | ---: | ---: | ---: |
+| `new240-vs-old250` | `7/10` | `5/5` | `2/5` | `10.00%` |
+| `new240-vs-old500` | `5/10` | `3/5` | `2/5` | `20.00%` |
+| `new260-vs-old250` | `5/10` | `4/5` | `1/5` | `0.00%` |
+| `new260-vs-old520` | `0/10` | `0/5` | `0/5` | `0.00%` |
+
+Observed interpretation:
+
+- Cycle `240` is more stable under higher search than cycle `260` in these
+  selected comparisons.
+- Cycle `260` looked good at 100 sims, but the high-search rerun undermines
+  that conclusion, especially the `new260-vs-old520` case changing from `7/10`
+  at 100 sims to `0/10` at 300 sims.
+- The color split is still a warning sign: `new260-vs-old250` remains mostly a
+  Black-side result (`4/5` as Black, `1/5` as White).
+
 ## Dual-GPU 2x96 Score4.5 18h + 3h Continuation
 
 Context:
