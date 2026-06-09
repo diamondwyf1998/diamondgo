@@ -7,7 +7,9 @@
   header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 16px 20px; border-bottom: 1px solid #d7d2c5; background: #fbfaf6; }
   h1 { font-size: 20px; margin: 0 12px 0 0; }
   label { font-size: 13px; color: #52606d; display: grid; gap: 4px; }
-  select, button, input { height: 34px; border: 1px solid #bcc7c1; border-radius: 6px; background: #fff; padding: 0 10px; color: #172026; }
+  select, button, input, textarea { border: 1px solid #bcc7c1; border-radius: 6px; background: #fff; padding: 0 10px; color: #172026; }
+  select, button, input { height: 34px; }
+  textarea { min-height: 76px; padding: 8px 10px; resize: vertical; font: inherit; }
   button { cursor: pointer; font-weight: 650; }
   input[type="range"] { width: min(520px, 72vw); accent-color: #0b7285; }
   main { display: grid; grid-template-columns: minmax(300px, 520px) minmax(280px, 1fr); gap: 20px; padding: 20px; }
@@ -26,6 +28,15 @@
   #status { min-height: 22px; color: #52606d; font-size: 13px; }
   #status.error { color: #9f1239; font-weight: 700; }
   #status.ok { color: #166534; font-weight: 700; }
+  .modal-backdrop[hidden] { display: none; }
+  .modal-backdrop { position: fixed; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(23, 32, 38, 0.48); z-index: 10; }
+  .modal-card { width: min(520px, 100%); background: #fbfaf6; border: 1px solid #d7d2c5; border-radius: 8px; padding: 18px; box-shadow: 0 18px 48px rgba(23, 32, 38, 0.24); }
+  .modal-card h2 { margin: 0 0 14px; font-size: 18px; }
+  .modal-grid { display: grid; gap: 12px; }
+  .modal-grid label { color: #172026; }
+  .modal-grid input, .modal-grid select, .modal-grid textarea { width: 100%; box-sizing: border-box; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .secondary { background: #f8fafc; }
   @media (max-width: 880px) { main { grid-template-columns: 1fr; } }
 </style>
 <header>
@@ -74,6 +85,31 @@
     <div class="move-list" id="moves"></div>
   </aside>
 </main>
+<div id="puzzleModal" class="modal-backdrop" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="puzzleModalTitle">
+    <h2 id="puzzleModalTitle">Save puzzle</h2>
+    <div class="modal-grid">
+      <label>Name <input id="modalPuzzleName"></label>
+      <label>Category
+        <select id="modalPuzzleCategory">
+          <option value="selfplay_snapshot">selfplay_snapshot</option>
+          <option value="capture">capture</option>
+          <option value="atari">atari</option>
+          <option value="defense">defense</option>
+          <option value="eye_shape">eye_shape</option>
+          <option value="terminal_cleanup">terminal_cleanup</option>
+          <option value="other">other</option>
+        </select>
+      </label>
+      <label>Subcategory <input id="modalPuzzleSubcategory"></label>
+      <label>Note <textarea id="modalPuzzleNote"></textarea></label>
+    </div>
+    <div class="modal-actions">
+      <button type="button" id="cancelPuzzleSave" class="secondary">Cancel</button>
+      <button type="button" id="confirmPuzzleSave">Save to draft</button>
+    </div>
+  </div>
+</div>
 <script>
 window.addEventListener("error", event => {
   const status = document.querySelector("#status");
@@ -85,6 +121,7 @@ const puzzleStorageKey = "diamondgo-puzzle-author-v1";
 const params = new URLSearchParams(location.search);
 let initialCycleParam = params.get("cycle");
 let initialGameParam = params.get("game");
+let initialMoveParam = params.get("move");
 const datasetInput = document.querySelector("#dataset");
 const cycleSelect = document.querySelector("#cycle");
 const gameSelect = document.querySelector("#game");
@@ -93,11 +130,19 @@ const scrubber = document.querySelector("#scrubber");
 const scrubText = document.querySelector("#scrubText");
 const canvas = document.querySelector("#board");
 const puzzleNameInput = document.querySelector("#puzzleName");
+const puzzleModal = document.querySelector("#puzzleModal");
+const modalPuzzleName = document.querySelector("#modalPuzzleName");
+const modalPuzzleCategory = document.querySelector("#modalPuzzleCategory");
+const modalPuzzleSubcategory = document.querySelector("#modalPuzzleSubcategory");
+const modalPuzzleNote = document.querySelector("#modalPuzzleNote");
+const confirmPuzzleSaveButton = document.querySelector("#confirmPuzzleSave");
+const cancelPuzzleSaveButton = document.querySelector("#cancelPuzzleSave");
 let ctx = null;
 let summary = [];
 let trace = null;
 let gameMoves = [];
 let step = 0;
+let pendingPuzzleCase = null;
 datasetInput.value = params.get("dataset") || datasetInput.value || defaultDataset;
 
 function getBoardContext() {
@@ -116,6 +161,7 @@ function updateUrl() {
   next.set("dataset", datasetInput.value);
   if (cycleSelect.value) next.set("cycle", cycleSelect.value);
   if (gameSelect.value) next.set("game", gameSelect.value);
+  if (step > 0) next.set("move", String(step));
   history.replaceState(null, "", `${location.pathname}?${next.toString()}`);
 }
 
@@ -325,10 +371,10 @@ function isEmptyPuzzleCase(item) {
     && !item.note;
 }
 
-function saveCurrentPuzzle() {
+function buildCurrentPuzzleCase() {
   if (!gameMoves.length) {
     setStatus("No self-play game is loaded yet.", "error");
-    return;
+    return null;
   }
   const pos = positionAt(step);
   const cycleLabel = `cycle-${String(cycleSelect.value || "0").padStart(5, "0")}`;
@@ -350,11 +396,41 @@ function saveCurrentPuzzle() {
     bad: [],
     note: `Source ${datasetInput.value}, ${cycleLabel}, ${gameLabel}, after ${step} moves.${cleanupNote}`
   };
+  return puzzleCase;
+}
+
+function openPuzzleModal() {
+  pendingPuzzleCase = buildCurrentPuzzleCase();
+  if (!pendingPuzzleCase) return;
+  modalPuzzleName.value = pendingPuzzleCase.name;
+  modalPuzzleCategory.value = pendingPuzzleCase.category;
+  modalPuzzleSubcategory.value = pendingPuzzleCase.subcategory;
+  modalPuzzleNote.value = pendingPuzzleCase.note;
+  puzzleModal.hidden = false;
+  modalPuzzleName.focus();
+  modalPuzzleName.select();
+}
+
+function closePuzzleModal() {
+  puzzleModal.hidden = true;
+  pendingPuzzleCase = null;
+}
+
+function savePendingPuzzle() {
+  if (!pendingPuzzleCase) return;
+  const puzzleCase = {
+    ...pendingPuzzleCase,
+    name: modalPuzzleName.value.trim() || pendingPuzzleCase.name,
+    category: modalPuzzleCategory.value || pendingPuzzleCase.category,
+    subcategory: modalPuzzleSubcategory.value.trim() || pendingPuzzleCase.subcategory,
+    note: modalPuzzleNote.value.trim() || pendingPuzzleCase.note
+  };
   const draft = loadPuzzleDraft();
   if (draft.cases.length === 1 && isEmptyPuzzleCase(draft.cases[0])) draft.cases[0] = puzzleCase;
   else draft.cases.push(puzzleCase);
   localStorage.setItem(puzzleStorageKey, JSON.stringify(draft));
-  setStatus(`Saved move ${step} position as puzzle "${puzzleCase.name}", answer left empty.`, "ok");
+  closePuzzleModal();
+  setStatus(`Saved "${puzzleCase.name}" to puzzle draft (${puzzleCase.category} / ${puzzleCase.subcategory}); answer left empty.`, "ok");
 }
 
 function draw() {
@@ -493,7 +569,9 @@ function loadGame() {
     option.textContent = i === 0 ? "Start" : `${i}. ${gameMoves[i - 1].player.toUpperCase()} ${gameMoves[i - 1].chosen_move || gtpFromAction(Number(gameMoves[i - 1].chosen_action))}`;
     moveSelect.append(option);
   }
-  setStep(0);
+  const requestedStep = initialMoveParam === null ? 0 : Number(initialMoveParam);
+  setStep(Number.isFinite(requestedStep) ? requestedStep : 0);
+  initialMoveParam = null;
   updateUrl();
 }
 
@@ -517,7 +595,15 @@ document.querySelector("#first").addEventListener("click", () => setStep(0));
 document.querySelector("#prev").addEventListener("click", () => setStep(step - 1));
 document.querySelector("#next").addEventListener("click", () => setStep(step + 1));
 document.querySelector("#last").addEventListener("click", () => setStep(gameMoves.length));
-document.querySelector("#savePuzzle").addEventListener("click", saveCurrentPuzzle);
+document.querySelector("#savePuzzle").addEventListener("click", openPuzzleModal);
+confirmPuzzleSaveButton.addEventListener("click", savePendingPuzzle);
+cancelPuzzleSaveButton.addEventListener("click", closePuzzleModal);
+puzzleModal.addEventListener("click", event => {
+  if (event.target === puzzleModal) closePuzzleModal();
+});
+window.addEventListener("keydown", event => {
+  if (event.key === "Escape" && !puzzleModal.hidden) closePuzzleModal();
+});
 document.querySelector("#openPuzzleAuthor").addEventListener("click", () => {
   location.href = "../viewers/puzzle-author.html";
 });

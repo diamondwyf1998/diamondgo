@@ -523,13 +523,20 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
       gap: 10px;
       margin-bottom: 14px;
     }}
-    select, input[type="text"] {{
+    select, input[type="text"], textarea {{
       height: 34px;
       border: 1px solid #b8c4c0;
       border-radius: 6px;
       background: #fff;
       color: #203033;
       padding: 0 8px;
+    }}
+    textarea {{
+      height: auto;
+      min-height: 76px;
+      padding: 8px;
+      resize: vertical;
+      font: inherit;
     }}
     input[type="text"] {{
       min-width: 220px;
@@ -586,6 +593,30 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     }}
     .status.ok {{ color: #166534; font-weight: 700; }}
     .status.error {{ color: #9f1239; font-weight: 700; }}
+    .modal-backdrop[hidden] {{ display: none; }}
+    .modal-backdrop {{
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(32, 48, 51, 0.48);
+      z-index: 10;
+    }}
+    .modal-card {{
+      width: min(520px, 100%);
+      padding: 18px;
+      border: 1px solid #dbe2df;
+      border-radius: 8px;
+      background: #fbfcfb;
+      box-shadow: 0 18px 48px rgba(32, 48, 51, 0.24);
+    }}
+    .modal-card h2 {{ margin: 0 0 14px; font-size: 18px; }}
+    .modal-grid {{ display: grid; gap: 12px; }}
+    .modal-grid label {{ display: grid; gap: 4px; font-size: 13px; color: #657174; }}
+    .modal-grid input, .modal-grid select, .modal-grid textarea {{ width: 100%; box-sizing: border-box; }}
+    .modal-actions {{ display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }}
+    .secondary {{ background: #f8fafc; }}
     .candidate-list {{
       display: grid;
       gap: 9px;
@@ -662,6 +693,31 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
       </div>
     </section>
   </main>
+  <div id="puzzle-modal" class="modal-backdrop" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="puzzle-modal-title">
+      <h2 id="puzzle-modal-title">Save puzzle</h2>
+      <div class="modal-grid">
+        <label>Name <input id="modal-puzzle-name" type="text"></label>
+        <label>Category
+          <select id="modal-puzzle-category">
+            <option value="eval_match_snapshot">eval_match_snapshot</option>
+            <option value="capture">capture</option>
+            <option value="atari">atari</option>
+            <option value="defense">defense</option>
+            <option value="eye_shape">eye_shape</option>
+            <option value="terminal_cleanup">terminal_cleanup</option>
+            <option value="other">other</option>
+          </select>
+        </label>
+        <label>Subcategory <input id="modal-puzzle-subcategory" type="text"></label>
+        <label>Note <textarea id="modal-puzzle-note"></textarea></label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="cancel-puzzle-save" class="secondary">Cancel</button>
+        <button type="button" id="confirm-puzzle-save">Save to draft</button>
+      </div>
+    </div>
+  </div>
   <script>
     const state = {state_json};
     const board = document.getElementById("eval-board");
@@ -679,7 +735,15 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     const savePuzzleButton = document.getElementById("save-puzzle");
     const openPuzzleAuthorButton = document.getElementById("open-puzzle-author");
     const puzzleStatus = document.getElementById("puzzle-status");
+    const puzzleModal = document.getElementById("puzzle-modal");
+    const modalPuzzleName = document.getElementById("modal-puzzle-name");
+    const modalPuzzleCategory = document.getElementById("modal-puzzle-category");
+    const modalPuzzleSubcategory = document.getElementById("modal-puzzle-subcategory");
+    const modalPuzzleNote = document.getElementById("modal-puzzle-note");
+    const cancelPuzzleSaveButton = document.getElementById("cancel-puzzle-save");
+    const confirmPuzzleSaveButton = document.getElementById("confirm-puzzle-save");
     const puzzleStorageKey = "diamondgo-puzzle-author-v1";
+    let pendingPuzzleCase = null;
 
     function makeSvg(name, attributes = {{}}, text = "") {{
       const node = document.createElementNS("http://www.w3.org/2000/svg", name);
@@ -913,12 +977,12 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
         && !item.note;
     }}
 
-    function saveCurrentPuzzle() {{
+    function buildCurrentPuzzleCase() {{
       const match = currentMatch();
       const game = currentGame();
       if (!game || !game.moves.length) {{
         setPuzzleStatus("No evaluation game is loaded yet.", "error");
-        return;
+        return null;
       }}
       const index = Math.max(0, Math.min(game.moves.length - 1, Number(slider.value)));
       const currentMove = game.moves[index];
@@ -941,11 +1005,41 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
         bad: [],
         note: `Source evaluation dashboard, ${{match.candidate}} vs ${{match.opponent}}, ${{gameLabel}}, after move ${{currentMove.moveNumber}} ${{currentMove.player.toUpperCase()}} ${{moveText(currentMove)}}.${{cleanupNote}}`
       }};
+      return puzzleCase;
+    }}
+
+    function openPuzzleModal() {{
+      pendingPuzzleCase = buildCurrentPuzzleCase();
+      if (!pendingPuzzleCase) return;
+      modalPuzzleName.value = pendingPuzzleCase.name;
+      modalPuzzleCategory.value = pendingPuzzleCase.category;
+      modalPuzzleSubcategory.value = pendingPuzzleCase.subcategory;
+      modalPuzzleNote.value = pendingPuzzleCase.note;
+      puzzleModal.hidden = false;
+      modalPuzzleName.focus();
+      modalPuzzleName.select();
+    }}
+
+    function closePuzzleModal() {{
+      puzzleModal.hidden = true;
+      pendingPuzzleCase = null;
+    }}
+
+    function savePendingPuzzle() {{
+      if (!pendingPuzzleCase) return;
+      const puzzleCase = {{
+        ...pendingPuzzleCase,
+        name: modalPuzzleName.value.trim() || pendingPuzzleCase.name,
+        category: modalPuzzleCategory.value || pendingPuzzleCase.category,
+        subcategory: modalPuzzleSubcategory.value.trim() || pendingPuzzleCase.subcategory,
+        note: modalPuzzleNote.value.trim() || pendingPuzzleCase.note
+      }};
       const draft = loadPuzzleDraft();
       if (draft.cases.length === 1 && isEmptyPuzzleCase(draft.cases[0])) draft.cases[0] = puzzleCase;
       else draft.cases.push(puzzleCase);
       localStorage.setItem(puzzleStorageKey, JSON.stringify(draft));
-      setPuzzleStatus(`Saved move ${{currentMove.moveNumber}} position as puzzle "${{puzzleCase.name}}", answer left empty.`, "ok");
+      closePuzzleModal();
+      setPuzzleStatus(`Saved "${{puzzleCase.name}}" to puzzle draft (${{puzzleCase.category}} / ${{puzzleCase.subcategory}}); answer left empty.`, "ok");
     }}
 
     function populateMatches() {{
@@ -1041,7 +1135,15 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     slider.addEventListener("input", () => render(Number(slider.value)));
     prevButton.addEventListener("click", () => render(Number(slider.value) - 1));
     nextButton.addEventListener("click", () => render(Number(slider.value) + 1));
-    savePuzzleButton.addEventListener("click", saveCurrentPuzzle);
+    savePuzzleButton.addEventListener("click", openPuzzleModal);
+    confirmPuzzleSaveButton.addEventListener("click", savePendingPuzzle);
+    cancelPuzzleSaveButton.addEventListener("click", closePuzzleModal);
+    puzzleModal.addEventListener("click", (event) => {{
+      if (event.target === puzzleModal) closePuzzleModal();
+    }});
+    window.addEventListener("keydown", (event) => {{
+      if (event.key === "Escape" && !puzzleModal.hidden) closePuzzleModal();
+    }});
     openPuzzleAuthorButton.addEventListener("click", () => {{
       location.href = "../viewers/puzzle-author.html";
     }});
