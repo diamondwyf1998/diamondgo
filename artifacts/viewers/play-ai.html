@@ -53,6 +53,7 @@
 </main>
 <script>
 const boardSize = 9;
+const letters = "ABCDEFGHJ";
 const canvas = document.querySelector("#board");
 const ctx = canvas.getContext("2d");
 let history = [];
@@ -65,7 +66,7 @@ let checkpointCatalog = [];
 
 function other(color) { return color === "b" ? "w" : "b"; }
 function actionPoint(action) { return action >= 81 ? null : { row: Math.floor(action / 9), col: action % 9 }; }
-function gtp(action) { const p = actionPoint(action); return p ? `${"ABCDEFGHJ"[p.col]}${9 - p.row}` : "pass"; }
+function gtp(action) { const p = actionPoint(action); return p ? `${letters[p.col]}${9 - p.row}` : "pass"; }
 function actionFromPoint(row, col) { return row * 9 + col; }
 function neighbors(row, col) { return [[row-1,col],[row+1,col],[row,col-1],[row,col+1]].filter(([r,c]) => r>=0 && r<9 && c>=0 && c<9); }
 function groupAt(board, row, col) {
@@ -111,6 +112,18 @@ function draw() {
     const x=margin+i*gap, y=margin+i*gap;
     ctx.beginPath(); ctx.moveTo(margin,y); ctx.lineTo(size-margin,y); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x,margin); ctx.lineTo(x,size-margin); ctx.stroke();
+  }
+  ctx.fillStyle = "#3f2d20";
+  ctx.font = "24px system-ui, -apple-system, Segoe UI, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (let i=0;i<9;i++) {
+    const x=margin+i*gap, y=margin+i*gap;
+    const rank = String(9 - i);
+    ctx.fillText(letters[i], x, margin - 30);
+    ctx.fillText(letters[i], x, size - margin + 30);
+    ctx.fillText(rank, margin - 30, y);
+    ctx.fillText(rank, size - margin + 30, y);
   }
   ctx.fillStyle = "#3f2d20";
   for (const [r,c] of [[2,2],[2,6],[4,4],[6,2],[6,6]]) { ctx.beginPath(); ctx.arc(margin+c*gap, margin+r*gap, 7, 0, Math.PI*2); ctx.fill(); }

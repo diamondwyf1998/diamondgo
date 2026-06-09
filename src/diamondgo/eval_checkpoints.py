@@ -1124,6 +1124,22 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
         board.appendChild(makeSvg("line", {{ x1: state.pad, y1: pos, x2: boardEnd, y2: pos, stroke: "#765933" }}));
         board.appendChild(makeSvg("line", {{ x1: pos, y1: state.pad, x2: pos, y2: boardEnd, stroke: "#765933" }}));
       }}
+      for (let i = 0; i < state.boardSize; i += 1) {{
+        const pos = state.pad + i * state.cell;
+        const file = "ABCDEFGHJ"[i];
+        const rank = String(state.boardSize - i);
+        const labelAttrs = {{
+          "text-anchor": "middle",
+          "dominant-baseline": "middle",
+          "font-size": 13,
+          "font-weight": 700,
+          fill: "#5f4a2d"
+        }};
+        board.appendChild(makeSvg("text", {{ ...labelAttrs, x: pos, y: state.pad - 18 }}, file));
+        board.appendChild(makeSvg("text", {{ ...labelAttrs, x: pos, y: boardEnd + 18 }}, file));
+        board.appendChild(makeSvg("text", {{ ...labelAttrs, x: state.pad - 18, y: pos }}, rank));
+        board.appendChild(makeSvg("text", {{ ...labelAttrs, x: boardEnd + 18, y: pos }}, rank));
+      }}
       current.topActions.filter((item) => item.action < state.boardSize * state.boardSize).slice(0, 5).forEach((item, rank) => {{
         const p = pointFor(item.action);
         const colors = ["#2f6f73", "#8a6fb0", "#b5654d", "#5b7aa4", "#7d7d46"];

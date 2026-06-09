@@ -499,6 +499,19 @@ function draw() {
     ctx.beginPath(); ctx.moveTo(x, margin); ctx.lineTo(x, size - margin); ctx.stroke();
   }
   ctx.fillStyle = "#3f2d20";
+  ctx.font = "24px system-ui, -apple-system, Segoe UI, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (let i = 0; i < boardSize; i++) {
+    const x = margin + i * gap, y = margin + i * gap;
+    const file = "ABCDEFGHJ"[i];
+    const rank = String(boardSize - i);
+    ctx.fillText(file, x, margin - 30);
+    ctx.fillText(file, x, size - margin + 30);
+    ctx.fillText(rank, margin - 30, y);
+    ctx.fillText(rank, size - margin + 30, y);
+  }
+  ctx.fillStyle = "#3f2d20";
   for (const [r, c] of [[2,2],[2,6],[4,4],[6,2],[6,6]]) {
     ctx.beginPath(); ctx.arc(margin + c * gap, margin + r * gap, 7, 0, Math.PI * 2); ctx.fill();
   }
