@@ -688,3 +688,34 @@ needs a shape/distribution metric before treating it as a measured result.
   - New server PIDs at launch: train `230774`, finalizer `230775`.
   - Data reference:
     `docs/training-data-log.md#dual-gpu-2x96-score65-400-sim-7-day-continuation`
+
+### Comparison Experiment: Score6.5 Cleanup 300-Sim Cycle596
+
+- `User request`: Run a new "比较实验" at `300` simulations.
+- `Agent measurement`: The active cleanup run had reached latest cycle `596`.
+  `latest.pt` was snapshotted before evaluation as
+  `latest-cycle-00596.pt` so the comparison target would not move while
+  training continued.
+- `Experiment shape`: `10` games per pair, `5` as Black and `5` as White,
+  both sides at `300` MCTS simulations, `opening_temperature_moves=0`.
+  - Dashboard:
+    `artifacts/compare-experiment-score6p5-cleanup-300sims-cycle596-20260609/dashboard.html`
+  - Game replay dashboard:
+    `artifacts/compare-experiment-score6p5-cleanup-300sims-cycle596-20260609/games_dashboard.html`
+  - Data reference:
+    `docs/training-data-log.md#score65-cleanup-300-sim-comparison-experiment-cycle596`
+- `Result`: latest cycle `596` is very strong in this slice: it beat
+  `cycle-540` by `10/10` and `cycle-500` by `10/10`, with both color splits
+  `5/5`.
+- `Caveat`: `latest596-vs-500` had early first-pass `<=40` in `5/10` games,
+  so inspect games before treating the sweep as a clean tactical-strength
+  result.
+- `Important anomaly`: `cycle-590` lost `0/10` to `cycle-540` at the same
+  search setting, despite `latest596` sweeping `cycle-540`. This suggests
+  either a sharp local checkpoint trough around `590`, or a change between
+  cycles `590` and `596` that greatly improves match play. Do not infer a
+  monotonic curve from sparse checkpoints.
+- `Bridge result`: `cycle-540` vs `cycle-490` became `5/10` at `300` sims,
+  with candidate-as-Black `0/5` and candidate-as-White `5/5`; all games were
+  White wins. This reframes the earlier `100`-sim `540-vs-490 = 6/10` result
+  as strongly color-sensitive rather than a clean strength jump.

@@ -1642,3 +1642,52 @@ Cleanup transition:
   - First cleanup-enabled cycle had not yet completed at the launch check, so
     cleanup counts should be inspected by the 3-hour monitor once metrics start
     arriving.
+
+## Score6.5 Cleanup 300-Sim Comparison Experiment, Cycle596
+
+Date: 2026-06-09.
+
+Purpose:
+
+- Run a new "比较实验" on the active cleanup-enabled `2x96`,
+  `score_komi=6.5`, `400` self-play simulation line, but evaluate matches with
+  both sides at `300` MCTS simulations.
+- Use representative same-line comparisons rather than only a mechanical
+  `n` vs `n+50` slice.
+
+Protocol:
+
+| Field | Value |
+| --- | --- |
+| Server run | `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-max150-7d-after18hplus3h-20260607` |
+| Latest snapshot | `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-max150-7d-after18hplus3h-20260607/eval-snapshots/latest-cycle-00596.pt` |
+| Local combined output | `artifacts/compare-experiment-score6p5-cleanup-300sims-cycle596-20260609` |
+| Dashboard | `artifacts/compare-experiment-score6p5-cleanup-300sims-cycle596-20260609/dashboard.html` |
+| Replay dashboard | `artifacts/compare-experiment-score6p5-cleanup-300sims-cycle596-20260609/games_dashboard.html` |
+| Games per pair | `10` |
+| Color split | `5` candidate Black / `5` candidate White |
+| Candidate simulations | `300` |
+| Opponent simulations | `300` |
+| Max moves | `150` |
+| Opening temperature moves | `0` |
+| Rules/scoring source | Candidate checkpoint config |
+
+Results:
+
+| Pair | Candidate wins | Candidate as Black | Candidate as White | Early first pass <=40 | Mean moves | Terminal cleanup B/W | Notes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `latest596-vs-540` | `10/10` | `5/5` | `5/5` | `0/10` | `101.5` | `0 / 10` | Clean sweep over the 50-ish-cycle older checkpoint. |
+| `latest596-vs-500` | `10/10` | `5/5` | `5/5` | `5/10` | `123.0` | `0 / 25` | Sweep, but early-pass rate is high enough to inspect the games. |
+| `cycle590-vs-540` | `0/10` | `0/5` | `0/5` | `0/10` | `128.0` | `0 / 0` | Major anomaly: saved cycle `590` is much weaker than `540` at this search setting. |
+| `cycle540-vs-490` | `5/10` | `0/5` | `5/5` | `0/10` | `128.5` | `0 / 0` | Pure color split; all games were White wins. |
+
+Interpretation:
+
+- The latest cycle `596` snapshot is much stronger than the older `500/540`
+  checkpoints in this experiment.
+- The saved `cycle-590` checkpoint looks like a local trough, not a reliable
+  proxy for "near latest"; it loses every game to `cycle-540`.
+- `cycle-540` vs `cycle-490` at `300` simulations is dominated by color,
+  unlike the earlier `100`-simulation run where `540` scored `6/10`.
+- High-search comparison therefore supports checking both latest snapshots and
+  nearby saved checkpoints. Sparse saved checkpoints can be misleading.
