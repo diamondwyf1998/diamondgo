@@ -144,6 +144,10 @@ function colorAfterStep() {
   return "b";
 }
 
+function terminalCleanupEnabled() {
+  return Boolean(trace?.config?.terminal_dead_stone_cleanup);
+}
+
 function neighbors(row, col) {
   return [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]].filter(([r, c]) => r >= 0 && r < boardSize && c >= 0 && c < boardSize);
 }
@@ -188,7 +192,101 @@ function positionAt(count) {
       }
     }
   }
-  return { board, blackCaptures, whiteCaptures };
+  const cleanupCounts = terminalCleanupEnabled() && count >= gameMoves.length ? applyTerminalCleanup(board) : { b: 0, w: 0 };
+  return { board, blackCaptures, whiteCaptures, cleanupCounts };
+}
+
+function stoneGroups(board) {
+  const groups = [];
+  const visited = new Set();
+  for (let row = 0; row < boardSize; row++) {
+    for (let col = 0; col < boardSize; col++) {
+      const color = board[row][col];
+      const key = `${row},${col}`;
+      if (!color || visited.has(key)) continue;
+      const stack = [[row, col]];
+      const stones = [];
+      visited.add(key);
+      while (stack.length) {
+        const [r, c] = stack.pop();
+        stones.push([r, c]);
+        for (const [nr, nc] of neighbors(r, c)) {
+          const nextKey = `${nr},${nc}`;
+          if (board[nr][nc] === color && !visited.has(nextKey)) {
+            visited.add(nextKey);
+            stack.push([nr, nc]);
+          }
+        }
+      }
+      groups.push({ color, stones });
+    }
+  }
+  return groups;
+}
+
+function emptyRegion(board, seeds) {
+  const region = [];
+  const borders = new Set();
+  const seen = new Set();
+  const stack = seeds.filter(([row, col]) => !board[row][col]);
+  for (const [row, col] of stack) seen.add(`${row},${col}`);
+  while (stack.length) {
+    const [row, col] = stack.pop();
+    region.push([row, col]);
+    for (const [nr, nc] of neighbors(row, col)) {
+      const color = board[nr][nc];
+      if (color) {
+        borders.add(color);
+        continue;
+      }
+      const key = `${nr},${nc}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        stack.push([nr, nc]);
+      }
+    }
+  }
+  return { region, borders };
+}
+
+function regionTouchesEdge(region) {
+  return region.some(([row, col]) => row === 0 || col === 0 || row === boardSize - 1 || col === boardSize - 1);
+}
+
+function solidEyeCount(board, stones, color) {
+  const seenRegions = new Set();
+  let eyes = 0;
+  for (const [row, col] of stones) {
+    for (const [nr, nc] of neighbors(row, col)) {
+      if (board[nr][nc]) continue;
+      const { region, borders } = emptyRegion(board, [[nr, nc]]);
+      const key = region.map(([r, c]) => `${r},${c}`).sort().join("|");
+      if (seenRegions.has(key)) continue;
+      seenRegions.add(key);
+      if (borders.size === 1 && borders.has(color)) eyes += 1;
+    }
+  }
+  return eyes;
+}
+
+function applyTerminalCleanup(board) {
+  const dead = [];
+  for (const { color, stones } of stoneGroups(board)) {
+    if (solidEyeCount(board, stones, color) >= 2) continue;
+    const removed = board.map(row => row.slice());
+    for (const [row, col] of stones) removed[row][col] = "";
+    const { region, borders } = emptyRegion(removed, stones);
+    const opponent = color === "b" ? "w" : "b";
+    if (region.length && !regionTouchesEdge(region) && borders.size === 1 && borders.has(opponent)) {
+      dead.push({ color, stones });
+    }
+  }
+  const counts = { b: 0, w: 0 };
+  for (const { color, stones } of dead) {
+    for (const [row, col] of stones) board[row][col] = "";
+    counts[color] += stones.length;
+  }
+  return counts;
 }
 
 function boardPointsFor(pos, color) {
@@ -233,15 +331,14 @@ function saveCurrentPuzzle() {
     return;
   }
   const pos = positionAt(step);
-  const nextMove = gameMoves[step] || null;
-  const nextPoint = nextMove ? actionToPointArray(nextMove.chosen_action) : null;
   const cycleLabel = `cycle-${String(cycleSelect.value || "0").padStart(5, "0")}`;
   const gameLabel = `game-${String(gameSelect.value || "1").padStart(2, "0")}`;
   const moveLabel = `move-${String(step).padStart(3, "0")}`;
   const autoName = `${cycleLabel}_${gameLabel}_${moveLabel}`;
   const customName = puzzleNameInput.value.trim();
-  const top3 = nextMove?.top_actions?.slice(0, 3).map(item => item.move).join(", ") || "";
-  const nextMoveText = nextMove ? nextMove.chosen_move || gtpFromAction(Number(nextMove.chosen_action)) : "";
+  const cleanupNote = pos.cleanupCounts.b || pos.cleanupCounts.w
+    ? ` Terminal cleanup removed B ${pos.cleanupCounts.b} / W ${pos.cleanupCounts.w} stones.`
+    : "";
   const puzzleCase = {
     name: customName || autoName,
     category: "selfplay_snapshot",
@@ -249,20 +346,15 @@ function saveCurrentPuzzle() {
     to_play: colorAfterStep(),
     black: boardPointsFor(pos, "b"),
     white: boardPointsFor(pos, "w"),
-    good: nextPoint ? [nextPoint] : [],
+    good: [],
     bad: [],
-    note: [
-      `Source ${datasetInput.value}, ${cycleLabel}, ${gameLabel}, after ${step} moves.`,
-      nextMove ? `Target is next self-play move ${nextMoveText}.` : "No next move was available; target left empty.",
-      top3 ? `Next search top3: ${top3}.` : "",
-    ].filter(Boolean).join(" ")
+    note: `Source ${datasetInput.value}, ${cycleLabel}, ${gameLabel}, after ${step} moves.${cleanupNote}`
   };
   const draft = loadPuzzleDraft();
   if (draft.cases.length === 1 && isEmptyPuzzleCase(draft.cases[0])) draft.cases[0] = puzzleCase;
   else draft.cases.push(puzzleCase);
   localStorage.setItem(puzzleStorageKey, JSON.stringify(draft));
-  const targetText = nextPoint ? `, answer ${nextMoveText}` : ", answer pending";
-  setStatus(`Saved move ${step} position as puzzle "${puzzleCase.name}"${targetText}.`, "ok");
+  setStatus(`Saved move ${step} position as puzzle "${puzzleCase.name}", answer left empty.`, "ok");
 }
 
 function draw() {
@@ -311,7 +403,8 @@ function updateText(pos) {
   const first = gameMoves[0];
   const winner = Number(first?.value_target || 0) > 0 ? "B win" : "W win";
   document.querySelector("#summary").textContent = gameMoves.length ? `${winner}, ${gameMoves.length} moves` : "-";
-  document.querySelector("#captures").textContent = `B ${pos.blackCaptures} / W ${pos.whiteCaptures}`;
+  const cleanupText = pos.cleanupCounts.b || pos.cleanupCounts.w ? `, cleanup B ${pos.cleanupCounts.b} / W ${pos.cleanupCounts.w}` : "";
+  document.querySelector("#captures").textContent = `B ${pos.blackCaptures} / W ${pos.whiteCaptures}${cleanupText}`;
   const actions = step === 0 ? gameMoves[0]?.top_actions || [] : move.top_actions || [];
   document.querySelector("#top").innerHTML = actions.slice(0, 3).map(item => `<li>${item.move} visits=${item.visits} prior=${item.prior} value=${item.value}</li>`).join("");
   document.querySelector("#moves").innerHTML = gameMoves.map((m, i) => `<span class="${i + 1 === step ? "current" : ""}">${i + 1}. ${m.player.toUpperCase()} ${m.chosen_move || gtpFromAction(Number(m.chosen_action))}</span>`).join(" &nbsp; ");

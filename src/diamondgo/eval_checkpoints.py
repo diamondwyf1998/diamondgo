@@ -401,6 +401,8 @@ def dashboard_state(results: list[dict[str, object]], board_size: int) -> dict[s
                     "winner": str(game["winner"]),
                     "candidateWon": bool(game["candidate_won"]),
                     "movesPlayed": int(game["moves_played"]),
+                    "terminalCleanupBlackStones": int(game.get("terminal_cleanup_black_stones", 0)),
+                    "terminalCleanupWhiteStones": int(game.get("terminal_cleanup_white_stones", 0)),
                     "moves": [
                         {
                             "moveNumber": int(move["move_number"]),
@@ -736,6 +738,103 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
       return {{ stones: [...seen], liberties: liberties.size }};
     }}
 
+    function stoneGroups(boardState) {{
+      const groups = [];
+      const visited = new Set();
+      boardState.forEach((stone, action) => {{
+        if (!stone || visited.has(action)) return;
+        const stack = [action];
+        const stones = [];
+        visited.add(action);
+        while (stack.length) {{
+          const current = stack.pop();
+          stones.push(current);
+          neighbors(current).forEach((next) => {{
+            const nextStone = boardState[next];
+            if (nextStone?.color === stone.color && !visited.has(next)) {{
+              visited.add(next);
+              stack.push(next);
+            }}
+          }});
+        }}
+        groups.push({{ color: stone.color, stones }});
+      }});
+      return groups;
+    }}
+
+    function emptyRegion(boardState, seeds) {{
+      const region = [];
+      const borders = new Set();
+      const seen = new Set();
+      const stack = seeds.filter((action) => !boardState[action]);
+      stack.forEach((action) => seen.add(action));
+      while (stack.length) {{
+        const action = stack.pop();
+        region.push(action);
+        neighbors(action).forEach((next) => {{
+          const stone = boardState[next];
+          if (stone) {{
+            borders.add(stone.color);
+            return;
+          }}
+          if (!seen.has(next)) {{
+            seen.add(next);
+            stack.push(next);
+          }}
+        }});
+      }}
+      return {{ region, borders }};
+    }}
+
+    function regionTouchesEdge(region) {{
+      return region.some((action) => {{
+        const row = Math.floor(action / state.boardSize);
+        const col = action % state.boardSize;
+        return row === 0 || col === 0 || row === state.boardSize - 1 || col === state.boardSize - 1;
+      }});
+    }}
+
+    function solidEyeCount(boardState, stones, color) {{
+      const seenRegions = new Set();
+      let eyes = 0;
+      stones.forEach((stoneAction) => {{
+        neighbors(stoneAction).forEach((next) => {{
+          if (boardState[next]) return;
+          const {{ region, borders }} = emptyRegion(boardState, [next]);
+          const key = [...region].sort((a, b) => a - b).join("|");
+          if (seenRegions.has(key)) return;
+          seenRegions.add(key);
+          if (borders.size === 1 && borders.has(color)) eyes += 1;
+        }});
+      }});
+      return eyes;
+    }}
+
+    function applyTerminalCleanup(boardState) {{
+      const dead = [];
+      stoneGroups(boardState).forEach((group) => {{
+        if (solidEyeCount(boardState, group.stones, group.color) >= 2) return;
+        const removed = boardState.map((stone) => stone ? {{ ...stone }} : null);
+        group.stones.forEach((action) => {{ removed[action] = null; }});
+        const {{ region, borders }} = emptyRegion(removed, group.stones);
+        const opponent = group.color === "b" ? "w" : "b";
+        if (region.length && !regionTouchesEdge(region) && borders.size === 1 && borders.has(opponent)) {{
+          dead.push(group);
+        }}
+      }});
+      const counts = {{ b: 0, w: 0 }};
+      dead.forEach((group) => {{
+        group.stones.forEach((action) => {{ boardState[action] = null; }});
+        counts[group.color] += group.stones.length;
+      }});
+      return counts;
+    }}
+
+    function terminalCleanupApplies(game, index) {{
+      if (index < game.moves.length - 1) return false;
+      return Number(game.terminalCleanupBlackStones || 0) > 0 || Number(game.terminalCleanupWhiteStones || 0) > 0;
+    }}
+
     function replayBoard(index) {{
       const boardState = Array(state.boardSize * state.boardSize).fill(null);
       const game = currentGame();
@@ -758,6 +857,7 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
           own.stones.forEach((action) => {{ boardState[action] = null; }});
         }}
       }});
+      if (terminalCleanupApplies(game, index)) applyTerminalCleanup(boardState);
       return boardState;
     }}
 
@@ -822,14 +922,14 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
       }}
       const index = Math.max(0, Math.min(game.moves.length - 1, Number(slider.value)));
       const currentMove = game.moves[index];
-      const nextMove = game.moves[index + 1] || null;
       const boardState = replayBoard(index);
       const matchLabel = `match-${{Number(matchSelect.value) + 1}}`;
       const gameLabel = `game-${{String(game.game).padStart(2, "0")}}`;
       const moveLabel = `move-${{String(currentMove.moveNumber).padStart(3, "0")}}`;
       const autoName = `${{matchLabel}}_${{gameLabel}}_${{moveLabel}}`;
-      const nextPoint = nextMove ? pointArrayFor(nextMove.action) : null;
-      const nextTop = nextMove?.topActions?.slice(0, 5).map(item => item.move).join(", ") || "";
+      const cleanupNote = terminalCleanupApplies(game, index)
+        ? ` Terminal cleanup was applied for this final position: B ${{game.terminalCleanupBlackStones || 0}} / W ${{game.terminalCleanupWhiteStones || 0}} stones.`
+        : "";
       const puzzleCase = {{
         name: puzzleNameInput.value.trim() || autoName,
         category: "eval_match_snapshot",
@@ -837,20 +937,15 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
         to_play: nextPlayerAfter(index),
         black: boardPointsFor(boardState, "b"),
         white: boardPointsFor(boardState, "w"),
-        good: nextPoint ? [nextPoint] : [],
+        good: [],
         bad: [],
-        note: [
-          `Source evaluation dashboard, ${{match.candidate}} vs ${{match.opponent}}, ${{gameLabel}}, after move ${{currentMove.moveNumber}} ${{currentMove.player.toUpperCase()}} ${{moveText(currentMove)}}.`,
-          nextMove ? `Target is next move ${{nextMove.player.toUpperCase()}} ${{moveText(nextMove)}} by ${{nextMove.model}}.` : "No next move was available; target left empty.",
-          nextTop ? `Next search top5: ${{nextTop}}.` : "",
-        ].filter(Boolean).join(" ")
+        note: `Source evaluation dashboard, ${{match.candidate}} vs ${{match.opponent}}, ${{gameLabel}}, after move ${{currentMove.moveNumber}} ${{currentMove.player.toUpperCase()}} ${{moveText(currentMove)}}.${{cleanupNote}}`
       }};
       const draft = loadPuzzleDraft();
       if (draft.cases.length === 1 && isEmptyPuzzleCase(draft.cases[0])) draft.cases[0] = puzzleCase;
       else draft.cases.push(puzzleCase);
       localStorage.setItem(puzzleStorageKey, JSON.stringify(draft));
-      const targetText = nextMove ? `, answer ${{moveText(nextMove)}}` : ", answer pending";
-      setPuzzleStatus(`Saved move ${{currentMove.moveNumber}} position as puzzle "${{puzzleCase.name}}"${{targetText}}.`, "ok");
+      setPuzzleStatus(`Saved move ${{currentMove.moveNumber}} position as puzzle "${{puzzleCase.name}}", answer left empty.`, "ok");
     }}
 
     function populateMatches() {{
