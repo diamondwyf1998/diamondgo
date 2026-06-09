@@ -710,6 +710,8 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
           </select>
         </label>
         <label>Subcategory <input id="modal-puzzle-subcategory" type="text"></label>
+        <label>Good answers <textarea id="modal-puzzle-good" placeholder="Example: E5, D4"></textarea></label>
+        <label>Bad answers <textarea id="modal-puzzle-bad" placeholder="Example: A1 J9"></textarea></label>
         <label>Note <textarea id="modal-puzzle-note"></textarea></label>
       </div>
       <div class="modal-actions">
@@ -739,6 +741,8 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     const modalPuzzleName = document.getElementById("modal-puzzle-name");
     const modalPuzzleCategory = document.getElementById("modal-puzzle-category");
     const modalPuzzleSubcategory = document.getElementById("modal-puzzle-subcategory");
+    const modalPuzzleGood = document.getElementById("modal-puzzle-good");
+    const modalPuzzleBad = document.getElementById("modal-puzzle-bad");
     const modalPuzzleNote = document.getElementById("modal-puzzle-note");
     const cancelPuzzleSaveButton = document.getElementById("cancel-puzzle-save");
     const confirmPuzzleSaveButton = document.getElementById("confirm-puzzle-save");
@@ -764,6 +768,37 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     function pointArrayFor(action) {{
       if (action >= state.boardSize * state.boardSize) return null;
       return [Math.floor(action / state.boardSize), action % state.boardSize];
+    }}
+
+    function pointToGtp(point) {{
+      return `${{"ABCDEFGHJ"[point[1]]}}${{state.boardSize - point[0]}}`;
+    }}
+
+    function formatPointList(points) {{
+      return (points || []).map(pointToGtp).join(", ");
+    }}
+
+    function parsePointList(text) {{
+      const trimmed = text.trim().toUpperCase();
+      if (!trimmed) return [];
+      const points = [];
+      const seen = new Set();
+      const tokens = trimmed.split(/[\\s,;]+/).filter(Boolean);
+      for (const token of tokens) {{
+        const match = token.match(/^([A-HJ])([1-9])$/);
+        if (!match) throw new Error(`Bad point "${{token}}". Use coordinates like E5 or D4.`);
+        const col = "ABCDEFGHJ".indexOf(match[1]);
+        const row = state.boardSize - Number(match[2]);
+        if (row < 0 || row >= state.boardSize || col < 0 || col >= state.boardSize) {{
+          throw new Error(`Point "${{token}}" is outside the ${{state.boardSize}}x${{state.boardSize}} board.`);
+        }}
+        const key = `${{row}},${{col}}`;
+        if (!seen.has(key)) {{
+          seen.add(key);
+          points.push([row, col]);
+        }}
+      }}
+      return points.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
     }}
 
     function moveText(move) {{
@@ -1014,6 +1049,8 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
       modalPuzzleName.value = pendingPuzzleCase.name;
       modalPuzzleCategory.value = pendingPuzzleCase.category;
       modalPuzzleSubcategory.value = pendingPuzzleCase.subcategory;
+      modalPuzzleGood.value = formatPointList(pendingPuzzleCase.good);
+      modalPuzzleBad.value = formatPointList(pendingPuzzleCase.bad);
       modalPuzzleNote.value = pendingPuzzleCase.note;
       puzzleModal.hidden = false;
       modalPuzzleName.focus();
@@ -1027,11 +1064,22 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
 
     function savePendingPuzzle() {{
       if (!pendingPuzzleCase) return;
+      let good;
+      let bad;
+      try {{
+        good = parsePointList(modalPuzzleGood.value);
+        bad = parsePointList(modalPuzzleBad.value);
+      }} catch (err) {{
+        setPuzzleStatus(err.message, "error");
+        return;
+      }}
       const puzzleCase = {{
         ...pendingPuzzleCase,
         name: modalPuzzleName.value.trim() || pendingPuzzleCase.name,
         category: modalPuzzleCategory.value || pendingPuzzleCase.category,
         subcategory: modalPuzzleSubcategory.value.trim() || pendingPuzzleCase.subcategory,
+        good,
+        bad,
         note: modalPuzzleNote.value.trim() || pendingPuzzleCase.note
       }};
       const draft = loadPuzzleDraft();

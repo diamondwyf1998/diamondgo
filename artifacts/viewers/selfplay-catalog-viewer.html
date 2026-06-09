@@ -102,6 +102,8 @@
         </select>
       </label>
       <label>Subcategory <input id="modalPuzzleSubcategory"></label>
+      <label>Good answers <textarea id="modalPuzzleGood" placeholder="Example: E5, D4"></textarea></label>
+      <label>Bad answers <textarea id="modalPuzzleBad" placeholder="Example: A1 J9"></textarea></label>
       <label>Note <textarea id="modalPuzzleNote"></textarea></label>
     </div>
     <div class="modal-actions">
@@ -134,6 +136,8 @@ const puzzleModal = document.querySelector("#puzzleModal");
 const modalPuzzleName = document.querySelector("#modalPuzzleName");
 const modalPuzzleCategory = document.querySelector("#modalPuzzleCategory");
 const modalPuzzleSubcategory = document.querySelector("#modalPuzzleSubcategory");
+const modalPuzzleGood = document.querySelector("#modalPuzzleGood");
+const modalPuzzleBad = document.querySelector("#modalPuzzleBad");
 const modalPuzzleNote = document.querySelector("#modalPuzzleNote");
 const confirmPuzzleSaveButton = document.querySelector("#confirmPuzzleSave");
 const cancelPuzzleSaveButton = document.querySelector("#cancelPuzzleSave");
@@ -174,6 +178,37 @@ function setStatus(message, kind = "") {
 function actionPoint(action) {
   if (action >= boardSize * boardSize) return null;
   return { row: Math.floor(action / boardSize), col: action % boardSize };
+}
+
+function pointToGtp(point) {
+  return `${"ABCDEFGHJ"[point[1]]}${boardSize - point[0]}`;
+}
+
+function formatPointList(points) {
+  return (points || []).map(pointToGtp).join(", ");
+}
+
+function parsePointList(text) {
+  const trimmed = text.trim().toUpperCase();
+  if (!trimmed) return [];
+  const points = [];
+  const seen = new Set();
+  const tokens = trimmed.split(/[\s,;]+/).filter(Boolean);
+  for (const token of tokens) {
+    const match = token.match(/^([A-HJ])([1-9])$/);
+    if (!match) throw new Error(`Bad point "${token}". Use coordinates like E5 or D4.`);
+    const col = "ABCDEFGHJ".indexOf(match[1]);
+    const row = boardSize - Number(match[2]);
+    if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) {
+      throw new Error(`Point "${token}" is outside the ${boardSize}x${boardSize} board.`);
+    }
+    const key = `${row},${col}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      points.push([row, col]);
+    }
+  }
+  return points.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 }
 
 function gtpFromAction(action) {
@@ -405,6 +440,8 @@ function openPuzzleModal() {
   modalPuzzleName.value = pendingPuzzleCase.name;
   modalPuzzleCategory.value = pendingPuzzleCase.category;
   modalPuzzleSubcategory.value = pendingPuzzleCase.subcategory;
+  modalPuzzleGood.value = formatPointList(pendingPuzzleCase.good);
+  modalPuzzleBad.value = formatPointList(pendingPuzzleCase.bad);
   modalPuzzleNote.value = pendingPuzzleCase.note;
   puzzleModal.hidden = false;
   modalPuzzleName.focus();
@@ -418,11 +455,22 @@ function closePuzzleModal() {
 
 function savePendingPuzzle() {
   if (!pendingPuzzleCase) return;
+  let good;
+  let bad;
+  try {
+    good = parsePointList(modalPuzzleGood.value);
+    bad = parsePointList(modalPuzzleBad.value);
+  } catch (err) {
+    setStatus(err.message, "error");
+    return;
+  }
   const puzzleCase = {
     ...pendingPuzzleCase,
     name: modalPuzzleName.value.trim() || pendingPuzzleCase.name,
     category: modalPuzzleCategory.value || pendingPuzzleCase.category,
     subcategory: modalPuzzleSubcategory.value.trim() || pendingPuzzleCase.subcategory,
+    good,
+    bad,
     note: modalPuzzleNote.value.trim() || pendingPuzzleCase.note
   };
   const draft = loadPuzzleDraft();
