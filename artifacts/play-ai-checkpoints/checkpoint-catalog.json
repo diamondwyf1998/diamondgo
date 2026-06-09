@@ -239,5 +239,18 @@
     "channels": 96,
     "residual_blocks": 2,
     "terminal_dead_stone_cleanup": true
+  },
+  {
+    "id": "dualgpu2x96-score6p5-cleanup-cycle-00546-latest",
+    "cycle": 546,
+    "label": "cycle-00546 | dualgpu 2x96 score6p5 cleanup 400sims latest",
+    "checkpoint": "artifacts/play-ai-checkpoints/dualgpu2x96-score6p5-cleanup-400sims-latest-cycle-00546.pt",
+    "filename": "dualgpu2x96-score6p5-cleanup-400sims-latest-cycle-00546.pt",
+    "run": "multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-max150-7d-after18hplus3h-20260607",
+    "score_komi": 6.5,
+    "channels": 96,
+    "residual_blocks": 2,
+    "terminal_dead_stone_cleanup": true,
+    "score_margin_reward_scale": 0.2
   }
 ]

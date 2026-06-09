@@ -589,6 +589,37 @@ needs a shape/distribution metric before treating it as a measured result.
     not cleanly monotonic. The `350-vs-300` and `360-vs-310` wins are still
     color-skewed toward candidate-as-Black, so use color split when judging
     progress.
+- `User request / agent measurement`: On 2026-06-09, another small eval was
+  prepared at latest cycle `546` for the same cleanup run.
+  - Small eval entry:
+    `artifacts/small-eval-score6p5-cleanup-cycle546-20260609/index.html`
+  - Recorded self-play catalog:
+    `artifacts/small-eval-selfplay-score6p5-cleanup-cycle490-546-20260609/index.html`
+  - Latest recorded viewer:
+    `http://127.0.0.1:8765/viewers/selfplay-catalog-viewer.html?dataset=small-eval-selfplay-score6p5-cleanup-cycle490-546-20260609&cycle=546&game=1`
+  - Human-vs-AI:
+    `http://127.0.0.1:8787/viewers/play-ai.html?checkpoint=dualgpu2x96-score6p5-cleanup-cycle-00546-latest&v=small-eval-score6p5-cleanup-546`
+  - Latest metrics at cycle `546`: loss `0.975935`, positions/sec `20.288`,
+    Black win rate `62.5%`, White win rate `37.5%`, mean moves `114.677`,
+    first-pass median `59.5`, early first pass `<=40` was `11/96`, terminal
+    cleanup removed `22` Black stones / `54` White stones.
+  - Important observation: latest recorded cycle `546`, game `1` starts with
+    Black `pass` even though `E5` had far more visits in the recorded top
+    actions. This suggests pass sampling/temperature behavior still needs
+    inspection, even if the overall early-pass rate is not catastrophic.
+- `Agent measurement`: A new same-line `+50 cycle` PK check was run on
+  2026-06-09 using cycle `540` versus cycle `490`, `100` simulations, and `10`
+  games.
+  - Dashboard:
+    `artifacts/pairwise-plus50-cleanup-score6p5-cycle540-vs490-100sims-10games-20260609/dashboard.html`
+  - Game replay dashboard:
+    `artifacts/pairwise-plus50-cleanup-score6p5-cycle540-vs490-100sims-10games-20260609/games_dashboard.html`
+  - Result: cycle `540` scored `6/10`; as Black `5/5`, as White `1/5`.
+  - Pass behavior: first-pass median `66.0`; first pass `<=40` was `1/10`;
+    terminal double-pass games `7/10`.
+  - Interpretation: `540` is somewhat ahead of `490`, but the result is still
+    highly color-skewed. Treat this as "slight improvement with color bias",
+    not a clean strength jump.
 - `User request / technical operation`: When the 18-hour dual-GPU run was close
   to finishing, the user asked to immediately continue for another `3` hours if
   the run had completed. A queue watcher was installed so this would happen
