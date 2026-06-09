@@ -90,8 +90,18 @@ This file records coordination notes for Codex agents working on DiamondGo.
 - `results.json`
 - `report.md`
 - `dashboard.html`
+- `games_dashboard.html`
 
-The dashboard supports checkpoint match selection, game selection, move replay, root value display, and top search candidate display.
+`results.json` must retain every played evaluation game in `games_detail`.
+`games_dashboard.html` is the replay page for those saved games. Keep each
+evaluation in its own output directory; do not merge unrelated evaluation games
+into a shared JSON blob. If a legacy directory has `results.json` but lacks
+`games_dashboard.html`, run `python scripts/rebuild_eval_dashboards.py <dir>` to
+rebuild the replay page in that same directory.
+
+The dashboard supports checkpoint match selection, game selection, move replay,
+root value display, top search candidate display, and saving the displayed
+position into the puzzle-author draft with an empty `good` answer.
 
 Current server dashboard:
 

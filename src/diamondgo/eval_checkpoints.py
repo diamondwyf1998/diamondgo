@@ -1113,7 +1113,9 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         results.append(result)
         (out_dir / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
         (out_dir / "report.md").write_text(markdown_report(results), encoding="utf-8")
-        (out_dir / "dashboard.html").write_text(render_eval_dashboard(results, config.board_size), encoding="utf-8")
+        dashboard = render_eval_dashboard(results, config.board_size)
+        (out_dir / "dashboard.html").write_text(dashboard, encoding="utf-8")
+        (out_dir / "games_dashboard.html").write_text(dashboard, encoding="utf-8")
         print(json.dumps({key: value for key, value in result.items() if key != "games_detail"}), flush=True)
         previous_model = candidate_model
         previous_name = candidate_name
@@ -1124,6 +1126,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "report_path": str(out_dir / "report.md"),
         "results_path": str(out_dir / "results.json"),
         "dashboard_path": str(out_dir / "dashboard.html"),
+        "games_dashboard_path": str(out_dir / "games_dashboard.html"),
         "sample_sgf_dir": str(out_dir / "sample-sgf"),
     }
 

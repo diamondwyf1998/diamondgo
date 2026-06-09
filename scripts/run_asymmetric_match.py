@@ -176,7 +176,9 @@ def main() -> None:
         )
         results.append(result)
         (out_dir / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
-        (out_dir / "dashboard.html").write_text(eval_checkpoints.render_eval_dashboard(results, config.board_size), encoding="utf-8")
+        dashboard = eval_checkpoints.render_eval_dashboard(results, config.board_size)
+        (out_dir / "dashboard.html").write_text(dashboard, encoding="utf-8")
+        (out_dir / "games_dashboard.html").write_text(dashboard, encoding="utf-8")
         print(
             f"[asym] {result['candidate']} vs {result['opponent']}: "
             f"{result['candidate_wins']}/{result['games']}",
@@ -193,6 +195,7 @@ def main() -> None:
         },
         "results": [{key: value for key, value in item.items() if key != "games_detail"} for item in results],
         "dashboard_path": str(out_dir / "dashboard.html"),
+        "games_dashboard_path": str(out_dir / "games_dashboard.html"),
         "results_path": str(out_dir / "results.json"),
     }
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
