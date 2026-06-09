@@ -1691,3 +1691,54 @@ Interpretation:
   unlike the earlier `100`-simulation run where `540` scored `6/10`.
 - High-search comparison therefore supports checking both latest snapshots and
   nearby saved checkpoints. Sparse saved checkpoints can be misleading.
+
+## Score6.5 Cleanup vs Old 4x64 300-Sim Comparison, Cycle602
+
+Date: 2026-06-10.
+
+Purpose:
+
+- Compare the active score6.5 cleanup `2x96` line with representative older
+  `4x64` checkpoints.
+- Keep this as a cross-run comparison rather than same-cycle matching; the old
+  runs use different training regimes and, in some cases, different scoring
+  settings.
+
+Protocol:
+
+| Field | Value |
+| --- | --- |
+| Server run | `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-max150-7d-after18hplus3h-20260607` |
+| Latest snapshot | `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-max150-7d-after18hplus3h-20260607/eval-snapshots/latest-cycle-00602.pt` |
+| Local combined output | `artifacts/compare-experiment-score6p5-cleanup-vs-old4x64-300sims-cycle602-20260610` |
+| Dashboard | `artifacts/compare-experiment-score6p5-cleanup-vs-old4x64-300sims-cycle602-20260610/dashboard.html` |
+| Replay dashboard | `artifacts/compare-experiment-score6p5-cleanup-vs-old4x64-300sims-cycle602-20260610/games_dashboard.html` |
+| Games per pair | `10` |
+| Color split | `5` candidate Black / `5` candidate White |
+| Candidate simulations | `300` |
+| Opponent simulations | `300` |
+| Max moves | `150` |
+| Opening temperature moves | `0` |
+| Rules/scoring source | Candidate checkpoint config: current cleanup line, score komi `6.5` |
+
+Results:
+
+| Pair | Candidate wins | Candidate as Black | Candidate as White | Early first pass <=40 | First pass median | Double-pass median | Seconds |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `latest602-vs-old-score2p5-300` | `5/10` | `5/5` | `0/5` | `0/10` | `54.5` | `60.0` | `508.590` |
+| `latest602-vs-old-score5p5-530` | `5/10` | `5/5` | `0/5` | `0/10` | `57.5` | `73.0` | `480.522` |
+| `latest602-vs-old-score5p5-590` | `10/10` | `5/5` | `5/5` | `0/10` | `58.5` | `66.0` | `437.108` |
+| `latest602-vs-old-score5p5-650` | `10/10` | `5/5` | `5/5` | `0/10` | `56.5` | `54.0` | `413.458` |
+
+Interpretation:
+
+- The current cycle `602` model is clearly stronger than old 4x64
+  `score5.5` cycles `590` and `650` under this 300-simulation evaluation.
+- The `5/10` results against old `score2.5 cycle300` and old `score5.5
+  cycle530` are not neutral results: all candidate wins came as Black and all
+  candidate losses came as White.
+- Since these are cross-run comparisons with current candidate scoring/rules,
+  read the color split as a matchup artifact to inspect, not as simple Elo-like
+  equality.
+- There were no early first-pass `<=40` games in this old-version comparison,
+  so the result is cleaner than the earlier early-pass-polluted evaluations.

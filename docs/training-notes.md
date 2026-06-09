@@ -719,3 +719,28 @@ needs a shape/distribution metric before treating it as a measured result.
   with candidate-as-Black `0/5` and candidate-as-White `5/5`; all games were
   White wins. This reframes the earlier `100`-sim `540-vs-490 = 6/10` result
   as strongly color-sensitive rather than a clean strength jump.
+
+### Old 4x64 Comparison: Score6.5 Cleanup Cycle602
+
+- `User request`: In addition to same-line comparisons, compare the current
+  score6.5 cleanup model with older 4x64 checkpoints.
+- `Agent measurement`: The active cleanup run had advanced to cycle `602`.
+  `latest.pt` was snapshotted as `latest-cycle-00602.pt` before the comparison
+  so training would not move the evaluated candidate.
+- `Experiment shape`: `10` games per pair, `5` as Black and `5` as White,
+  both sides at `300` MCTS simulations, `opening_temperature_moves=0`.
+  - Dashboard:
+    `artifacts/compare-experiment-score6p5-cleanup-vs-old4x64-300sims-cycle602-20260610/dashboard.html`
+  - Game replay dashboard:
+    `artifacts/compare-experiment-score6p5-cleanup-vs-old4x64-300sims-cycle602-20260610/games_dashboard.html`
+  - Data reference:
+    `docs/training-data-log.md#score65-cleanup-vs-old-4x64-300-sim-comparison-cycle602`
+- `Result`: cycle `602` scored `5/10` against old 4x64 `score2.5 cycle300`
+  and old 4x64 `score5.5 cycle530`, then `10/10` against old 4x64
+  `score5.5 cycle590` and `cycle650`.
+- `Important caveat`: the two `5/10` results were pure color splits:
+  candidate-as-Black `5/5`, candidate-as-White `0/5`. This is not a clean
+  "equal strength" signal; it says the matchup is heavily color/rule/komi
+  sensitive under the current candidate scoring setup.
+- `Useful signal`: no pair had early first-pass `<=40`, so this comparison is
+  not obviously polluted by the earlier early-pass failure mode.
