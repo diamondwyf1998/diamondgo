@@ -744,3 +744,17 @@ needs a shape/distribution metric before treating it as a measured result.
   sensitive under the current candidate scoring setup.
 - `Useful signal`: no pair had early first-pass `<=40`, so this comparison is
   not obviously polluted by the earlier early-pass failure mode.
+- `Follow-up`: The user noticed that many replayed games had identical
+  positions. This was real: the greedy comparison used
+  `opening_temperature_moves=0`, so each candidate/opponent/color combination
+  mostly repeated one line.
+  - A display/diagnostic rerun used `opening_temperature_moves=12` with the
+    same `300` simulations per side.
+  - New replay dashboard:
+    `artifacts/compare-experiment-score6p5-cleanup-vs-old4x64-300sims-opening12-cycle602-20260610/games_dashboard.html`
+  - Diversity improved from only `2/10` unique first-20-move sequences per pair
+    in the greedy run to `10/10` unique first-20-move sequences per completed
+    pair in the opening-temperature run.
+  - This should be the default for human-facing showcase/evaluation games.
+    Keep greedy `opening_temperature_moves=0` only when intentionally measuring
+    deterministic best-line strength.

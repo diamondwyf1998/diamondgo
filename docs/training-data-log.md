@@ -1742,3 +1742,56 @@ Interpretation:
   equality.
 - There were no early first-pass `<=40` games in this old-version comparison,
   so the result is cleaner than the earlier early-pass-polluted evaluations.
+
+## Score6.5 Cleanup vs Old 4x64 300-Sim Opening-Temperature Comparison, Cycle602
+
+Date: 2026-06-10.
+
+Purpose:
+
+- Repeat the old 4x64 comparison after the user observed that many greedy
+  replay games showed identical positions.
+- Use this as a human-facing display/diagnostic comparison, not as a direct
+  replacement for deterministic greedy strength.
+
+Protocol:
+
+| Field | Value |
+| --- | --- |
+| Candidate | `latest-cycle-00602` from the score6.5 cleanup `2x96` line |
+| Local output | `artifacts/compare-experiment-score6p5-cleanup-vs-old4x64-300sims-opening12-cycle602-20260610` |
+| Dashboard | `artifacts/compare-experiment-score6p5-cleanup-vs-old4x64-300sims-opening12-cycle602-20260610/dashboard.html` |
+| Replay dashboard | `artifacts/compare-experiment-score6p5-cleanup-vs-old4x64-300sims-opening12-cycle602-20260610/games_dashboard.html` |
+| Games per pair | `10` |
+| Candidate simulations | `300` |
+| Opponent simulations | `300` |
+| Opening temperature moves | `12` |
+| Opening sampling | Sample from MCTS visit distribution, temperature `1.0` |
+| Later moves | Max-visit |
+
+Greedy duplicate check:
+
+- Previous greedy old-version comparison used `opening_temperature_moves=0`.
+- In each of the four old-version pairs, first-8, first-12, and first-20 move
+  sequences had only `2/10` unique lines: essentially one line for candidate
+  Black and one line for candidate White.
+
+Opening-temperature results:
+
+| Pair | Candidate wins | Candidate as Black | Candidate as White | Early first pass <=40 | Unique first 12 | Unique first 20 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `latest602-vs-old-score2p5-300` | `9/10` | `5/5` | `4/5` | `1/10` | `10/10` | `10/10` |
+| `latest602-vs-old-score5p5-530` | `8/10` | `5/5` | `3/5` | `5/10` | `10/10` | `10/10` |
+| `latest602-vs-old-score5p5-590` | `7/10` | `3/5` | `4/5` | `2/10` | `10/10` | `10/10` |
+| `latest602-vs-old-score5p5-650` | `4/10` | `3/5` | `1/5` | `2/10` | `10/10` | `10/10` |
+
+Interpretation:
+
+- Opening-temperature sampling fixed the replay diversity problem: every game
+  in every pair had a distinct first-20-move sequence.
+- The result profile changed substantially relative to greedy evaluation,
+  especially against old `score5.5 cycle650` (`10/10` greedy, `4/10`
+  opening-temperature). Treat this as a robustness/opening-sensitivity signal.
+- For future human-facing "展示" and "小/大测评" game samples, use an opening
+  temperature window by default. Reserve `opening_temperature_moves=0` for
+  deliberate deterministic best-line comparisons.
