@@ -758,3 +758,28 @@ needs a shape/distribution metric before treating it as a measured result.
   - This should be the default for human-facing showcase/evaluation games.
     Keep greedy `opening_temperature_moves=0` only when intentionally measuring
     deterministic best-line strength.
+
+### Small Eval: Score6.5 Cleanup Cycle770
+
+- `User request`: Run a "small eval" for the active score6.5 cleanup line.
+- `Agent measurement`: The active server run had reached cycle `770`.
+- `Display bundle`:
+  `artifacts/small-eval-score6p5-cleanup-cycle770-20260611/index.html`
+  - Recorded self-play viewer:
+    `artifacts/small-eval-selfplay-score6p5-cleanup-cycle700-770-20260611/index.html`
+  - Play AI:
+    `http://127.0.0.1:8787/viewers/play-ai.html?checkpoint=dualgpu2x96-score6p5-cleanup-cycle-00770-latest&v=small-eval-score6p5-cleanup-770`
+  - Pairwise replay:
+    `artifacts/pairwise-plus50-cleanup-score6p5-cycle770-vs720-100sims-opening12-10games-20260611/games_dashboard.html`
+  - Data reference:
+    `docs/training-data-log.md#small-eval-score65-cleanup-cycle770`
+- `Self-play snapshot`: Recorded cycles `700`, `730`, `760`, and `770`
+  were loaded from training cycle records, not regenerated. At cycle `770`,
+  Black won `64/96`, early first pass `<=40` occurred in `19/96`, and terminal
+  cleanup removed `10` black stones / `46` white stones.
+- `Pairwise plus-50`: cycle `770` vs cycle `720`, `100` sims each, `10` games,
+  `opening_temperature_moves=12`. Result was `5/10`: candidate as Black `4/5`,
+  candidate as White `1/5`, with `10/10` unique first-12-move lines.
+- `Interpretation`: The latest checkpoint is playable and the recorded games
+  are available for inspection, but the plus-50 slice does not show a clean
+  strength jump. The color split is still prominent.

@@ -1795,3 +1795,61 @@ Interpretation:
 - For future human-facing "展示" and "小/大测评" game samples, use an opening
   temperature window by default. Reserve `opening_temperature_moves=0` for
   deliberate deterministic best-line comparisons.
+
+## Small Eval Score6.5 Cleanup Cycle770
+
+Date: 2026-06-11.
+
+Purpose:
+
+- Run the standard light "small eval" for the active score6.5 cleanup line:
+  recent recorded self-play, latest human-vs-AI checkpoint, and a small
+  plus-50 pairwise check.
+
+Artifacts:
+
+| Item | Path |
+| --- | --- |
+| Small eval entry | `artifacts/small-eval-score6p5-cleanup-cycle770-20260611/index.html` |
+| Recorded self-play bundle | `artifacts/small-eval-selfplay-score6p5-cleanup-cycle700-770-20260611` |
+| Self-play viewer | `artifacts/viewers/selfplay-catalog-viewer.html?dataset=small-eval-selfplay-score6p5-cleanup-cycle700-770-20260611&cycle=770&game=1` |
+| Play AI checkpoint | `artifacts/play-ai-checkpoints/dualgpu2x96-score6p5-cleanup-400sims-latest-cycle-00770.pt` |
+| Play AI URL | `http://127.0.0.1:8787/viewers/play-ai.html?checkpoint=dualgpu2x96-score6p5-cleanup-cycle-00770-latest&v=small-eval-score6p5-cleanup-770` |
+| Pairwise output | `artifacts/pairwise-plus50-cleanup-score6p5-cycle770-vs720-100sims-opening12-10games-20260611` |
+
+Recorded self-play metrics:
+
+| Cycle | Games | Mean moves | Black wins | Early first pass <=40 | Terminal cleanup B/W | Black score margin mean | Abs margin mean |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `700` | `96` | `116.354` | `60/96` | `13/96` | `6 / 30` | `0.583` | `6.229` |
+| `730` | `96` | `111.417` | `65/96` | `10/96` | `4 / 42` | `2.240` | `7.188` |
+| `760` | `96` | `111.438` | `64/96` | `16/96` | `13 / 43` | `1.573` | `5.365` |
+| `770` | `96` | `114.135` | `64/96` | `19/96` | `10 / 46` | `2.625` | `5.812` |
+
+Plus-50 pairwise:
+
+| Field | Value |
+| --- | --- |
+| Candidate | `cycle-00770` |
+| Opponent | `cycle-00720` |
+| Games | `10` |
+| Candidate simulations | `100` |
+| Opponent simulations | `100` |
+| Opening temperature moves | `12` |
+| Candidate wins | `5/10` |
+| Candidate as Black | `4/5` |
+| Candidate as White | `1/5` |
+| Early first pass <=40 | `2/10` |
+| First pass median | `49.0` |
+| Double-pass median | `70.0` |
+| Unique first-12 lines | `10/10` |
+
+Notes:
+
+- The self-play bundle uses recorded training traces from `cycle-records`; no
+  new self-play was generated for these showcase games.
+- The local play server on port `8787` was restarted with
+  `dualgpu2x96-score6p5-cleanup-cycle-00770-latest`, CPU device, and default
+  `100` simulations. The UI still exposes simulation adjustment.
+- The plus-50 result is color-sensitive and does not show a clean monotonic
+  improvement over cycle `720`.
