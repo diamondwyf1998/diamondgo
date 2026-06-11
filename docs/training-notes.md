@@ -783,3 +783,36 @@ needs a shape/distribution metric before treating it as a measured result.
 - `Interpretation`: The latest checkpoint is playable and the recorded games
   are available for inspection, but the plus-50 slice does not show a clean
   strength jump. The color split is still prominent.
+
+### Training Control: MCTS Doubled From 400 To 800
+
+- `User request`: Double the active training MCTS count.
+- `Technical operation`: The active score6.5 cleanup run was not overwritten.
+  The old `400`-simulation training process and its finalizer were stopped,
+  its `latest.pt` was backed up, and a new `800`-simulation continuation was
+  started from the same line.
+- `Transition point`: Before stopping, the old run had latest metric cycle
+  `834`; the latest regular checkpoint file was `cycle-00830.pt`. The new
+  continuation resumes from the old run's `latest.pt`, so later raw cycle IDs
+  are not directly comparable to the earlier 400-sim segment without noting
+  the search-budget change.
+- `Backup`:
+  `/root/autodl-tmp/diamondgo-checkpoint-backups/score6p5_cleanup_400sims_to800_20260611-113012_latest.pt`
+- `New run`:
+  `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-800sims-max150-after400-20260611`
+- `New scripts`:
+  `tools/server/run_cont_dualgpu_2x96_score6p5_cleanup_margin0p2_800sims_after400_20260611.sh`
+  and
+  `tools/server/finalize_cont_dualgpu_2x96_score6p5_cleanup_margin0p2_800sims_after400_20260611.sh`
+- `Preserved config`: `score_komi=6.5`, `input_komi=false`,
+  `terminal_dead_stone_cleanup=true`, `score_margin_reward_scale=0.2`,
+  `2x96`, `12` workers, `8` games/worker, `max_moves=150`, same noise,
+  temperature, replay, batch, and optimizer settings.
+- `Changed config`: self-play simulations per move changed from `400` to
+  `800`.
+- `Time handling`: The continuation keeps the original 7-day experiment end
+  time (`2026-06-14T23:05:43+08:00`) instead of silently starting a new full
+  7-day clock. At launch this became `5015` remaining minutes.
+- `Immediate resource check`: The new Python process started successfully with
+  `simulations=800`; GPU memory rose to about `10.8 GiB` on GPU0 and `6.0 GiB`
+  on GPU1, still within the 12 GiB cards.

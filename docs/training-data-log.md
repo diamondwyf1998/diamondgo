@@ -1853,3 +1853,64 @@ Notes:
   `100` simulations. The UI still exposes simulation adjustment.
 - The plus-50 result is color-sensitive and does not show a clean monotonic
   improvement over cycle `720`.
+
+## Score6.5 Cleanup Training Search-Budget Change To 800 Sims
+
+Date: 2026-06-11.
+
+Purpose:
+
+- Continue the active score6.5 cleanup experiment with doubled self-play MCTS
+  (`400` -> `800` simulations per move) while preserving all existing scripts,
+  checkpoints, and the original 7-day end time.
+
+Transition:
+
+| Field | Value |
+| --- | --- |
+| Previous run | `artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-max150-7d-after18hplus3h-20260607` |
+| Previous latest metric cycle before stop | `834` |
+| Previous latest regular checkpoint | `cycle-00830.pt` |
+| Resume checkpoint | previous run `latest.pt` |
+| Backup checkpoint | `/root/autodl-tmp/diamondgo-checkpoint-backups/score6p5_cleanup_400sims_to800_20260611-113012_latest.pt` |
+| New run | `artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-800sims-max150-after400-20260611` |
+| New train PID at launch | `793478` |
+| New finalizer PID at launch | `793479` |
+| Original experiment end | `2026-06-14T23:05:43+08:00` |
+| Remaining time at launch | `5015` minutes |
+
+Configuration:
+
+| Field | Value |
+| --- | --- |
+| Model | `2x96`, `356957` trainable params |
+| Rules backend | `sgfmill` |
+| `komi` metadata | `0.5` |
+| `score_komi` | `6.5` |
+| Input komi | `false` |
+| Terminal cleanup | `true`, conservative interior obvious-dead only |
+| Margin reward scale | `0.2` |
+| Self-play simulations | `800` |
+| Workers | `12` |
+| Games per worker | `8` |
+| Games per cycle | `96` |
+| Max moves | `150` |
+| Train steps per cycle | `64` |
+| Batch size | `256` |
+| Replay size | `100000` |
+| Root noise | Dirichlet `alpha=0.15`, fraction `0.25` |
+| Root policy temperature | `1.1` |
+| Move temperature | `1.0` for first `16` moves, then `0.25` |
+| Augmentation | Random dihedral board symmetries |
+| Checkpoints | every `10` cycles, dense early window preserved |
+| Complete SGF/traces | every `5` cycles |
+
+Launch check:
+
+- New `800`-sim Python process started successfully with `simulations=800` in
+  `config.json`.
+- Immediate GPU memory was about `10.8 GiB / 12 GiB` on GPU0 and
+  `6.0 GiB / 12 GiB` on GPU1.
+- This is a deliberate intervention point. Downstream plots should annotate
+  the transition; changes after this point mix training progress with higher
+  search budget.
