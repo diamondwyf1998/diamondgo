@@ -816,3 +816,34 @@ needs a shape/distribution metric before treating it as a measured result.
 - `Immediate resource check`: The new Python process started successfully with
   `simulations=800`; GPU memory rose to about `10.8 GiB` on GPU0 and `6.0 GiB`
   on GPU1, still within the 12 GiB cards.
+
+### Training Control: Score Komi Raised To 7.5
+
+- `User request`: Change the active training komi to `7.5`.
+- `Technical operation`: The active `score_komi=6.5`, `800`-simulation
+  continuation was stopped and preserved. Its `latest.pt` and `metrics.jsonl`
+  were backed up, then a new continuation was started from that `latest.pt`
+  with `score_komi=7.5`.
+- `Transition point`: Before stopping, the `score6.5/800` segment had latest
+  metric cycle `927`; the latest regular checkpoint file was `cycle-00920.pt`
+  and the latest recorded SGF was `cycle-00925.sgf`.
+- `Backup`:
+  `/root/autodl-tmp/diamondgo-checkpoint-backups/score6p5_cleanup_800sims_to_score7p5_20260612-185546_latest.pt`
+- `New run`:
+  `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score7p5-cleanup-margin0p2-800sims-max150-after6p5-20260612`
+- `New scripts`:
+  `tools/server/run_cont_dualgpu_2x96_score7p5_cleanup_margin0p2_800sims_after6p5_20260612.sh`
+  and
+  `tools/server/finalize_cont_dualgpu_2x96_score7p5_cleanup_margin0p2_800sims_after6p5_20260612.sh`
+- `Preserved config`: `input_komi=false`, `komi_metadata=0.5`,
+  `terminal_dead_stone_cleanup=true`, `score_margin_reward_scale=0.2`,
+  `2x96`, `800` self-play simulations, `12` workers, `8` games/worker,
+  `max_moves=150`, same noise, temperature, replay, batch, and optimizer
+  settings.
+- `Changed config`: `score_komi` changed from `6.5` to `7.5`.
+- `Time handling`: The continuation keeps the original experiment end time
+  (`2026-06-14T23:05:43+08:00`). At launch this became `3129` remaining
+  minutes.
+- `Immediate resource check`: The new process started successfully with
+  `score_komi=7.5`; GPU memory was high at about `11.8 GiB / 12 GiB` on GPU0
+  and `7.6 GiB / 12 GiB` on GPU1, so monitor for OOM or stalled metrics.

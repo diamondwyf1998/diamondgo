@@ -1914,3 +1914,65 @@ Launch check:
 - This is a deliberate intervention point. Downstream plots should annotate
   the transition; changes after this point mix training progress with higher
   search budget.
+
+## Score6.5 Cleanup 800-Sim Training Komi Change To 7.5
+
+Date: 2026-06-12.
+
+Purpose:
+
+- Raise scoring komi from `6.5` to `7.5` while preserving the active
+  cleanup-enabled `800`-simulation experiment.
+
+Transition:
+
+| Field | Value |
+| --- | --- |
+| Previous run | `artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-800sims-max150-after400-20260611` |
+| Previous latest metric cycle before stop | `927` |
+| Previous latest regular checkpoint | `cycle-00920.pt` |
+| Previous latest recorded SGF | `cycle-00925.sgf` |
+| Previous latest black win rate | `66.67%` |
+| Previous recent-12 black win rate | `67.54%` |
+| Resume checkpoint | previous run `latest.pt` |
+| Backup checkpoint | `/root/autodl-tmp/diamondgo-checkpoint-backups/score6p5_cleanup_800sims_to_score7p5_20260612-185546_latest.pt` |
+| New run | `artifacts/multiworker-9x9-cont-dualgpu-2x96-score7p5-cleanup-margin0p2-800sims-max150-after6p5-20260612` |
+| New train PID at launch | `918748` |
+| New finalizer PID at launch | `918749` |
+| Original experiment end | `2026-06-14T23:05:43+08:00` |
+| Remaining time at launch | `3129` minutes |
+
+Configuration:
+
+| Field | Value |
+| --- | --- |
+| Model | `2x96`, `356957` trainable params |
+| Rules backend | `sgfmill` |
+| `komi` metadata | `0.5` |
+| `score_komi` | `7.5` |
+| Input komi | `false` |
+| Terminal cleanup | `true`, conservative interior obvious-dead only |
+| Margin reward scale | `0.2` |
+| Self-play simulations | `800` |
+| Workers | `12` |
+| Games per worker | `8` |
+| Games per cycle | `96` |
+| Max moves | `150` |
+| Train steps per cycle | `64` |
+| Batch size | `256` |
+| Replay size | `100000` |
+| Root noise | Dirichlet `alpha=0.15`, fraction `0.25` |
+| Root policy temperature | `1.1` |
+| Move temperature | `1.0` for first `16` moves, then `0.25` |
+| Augmentation | Random dihedral board symmetries |
+| Checkpoints | every `10` cycles, dense early window preserved |
+| Complete SGF/traces | every `5` cycles |
+
+Launch check:
+
+- New Python process started successfully with `score_komi=7.5` in
+  `config.json`.
+- Immediate GPU memory was high: about `11.8 GiB / 12 GiB` on GPU0 and
+  `7.6 GiB / 12 GiB` on GPU1.
+- This is a second deliberate intervention point after the `400 -> 800` search
+  change. Downstream plots should annotate both transitions separately.
