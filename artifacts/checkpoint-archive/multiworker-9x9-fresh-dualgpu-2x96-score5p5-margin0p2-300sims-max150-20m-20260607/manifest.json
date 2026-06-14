@@ -1,0 +1,21 @@
+{
+  "archive_name": "multiworker-9x9-fresh-dualgpu-2x96-score5p5-margin0p2-300sims-max150-20m-20260607",
+  "source_run_dir": "C:\\Users\\diamo\\Documents\\diamondgo\\artifacts\\_server-final-preserve-20260614\\extract\\multiworker-9x9-fresh-dualgpu-2x96-score5p5-margin0p2-300sims-max150-20m-20260607",
+  "created_at": "2026-06-14T05:28:13.945303+00:00",
+  "checkpoint_count": 1,
+  "total_checkpoint_bytes": 4349785,
+  "entries": [
+    {
+      "kind": "cycle",
+      "cycle": 5,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score5p5-margin0p2-300sims-max150-20m-20260607/cycle-00005.pt",
+      "bytes": 4349785
+    },
+    {
+      "kind": "latest",
+      "cycle": null,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score5p5-margin0p2-300sims-max150-20m-20260607/latest.pt",
+      "bytes": 4345142
+    }
+  ]
+}

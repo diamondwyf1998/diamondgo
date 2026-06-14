@@ -1,0 +1,183 @@
+{
+  "archive_name": "multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607",
+  "source_run_dir": "C:\\Users\\diamo\\Documents\\diamondgo\\artifacts\\_server-final-preserve-20260614\\extract\\multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607",
+  "created_at": "2026-06-14T05:28:30.183866+00:00",
+  "checkpoint_count": 28,
+  "total_checkpoint_bytes": 121797820,
+  "entries": [
+    {
+      "kind": "cycle",
+      "cycle": 5,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00005.pt",
+      "bytes": 4349849
+    },
+    {
+      "kind": "cycle",
+      "cycle": 10,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00010.pt",
+      "bytes": 4349849
+    },
+    {
+      "kind": "cycle",
+      "cycle": 15,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00015.pt",
+      "bytes": 4349849
+    },
+    {
+      "kind": "cycle",
+      "cycle": 20,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00020.pt",
+      "bytes": 4349977
+    },
+    {
+      "kind": "cycle",
+      "cycle": 25,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00025.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 30,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00030.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 35,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00035.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 40,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00040.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 45,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00045.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 50,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00050.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 60,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00060.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 70,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00070.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 80,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00080.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 90,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00090.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 100,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00100.pt",
+      "bytes": 4349977
+    },
+    {
+      "kind": "cycle",
+      "cycle": 110,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00110.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 120,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00120.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 130,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00130.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 140,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00140.pt",
+      "bytes": 4349849
+    },
+    {
+      "kind": "cycle",
+      "cycle": 150,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00150.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 160,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00160.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 170,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00170.pt",
+      "bytes": 4349977
+    },
+    {
+      "kind": "cycle",
+      "cycle": 180,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00180.pt",
+      "bytes": 4349913
+    },
+    {
+      "kind": "cycle",
+      "cycle": 190,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00190.pt",
+      "bytes": 4349977
+    },
+    {
+      "kind": "cycle",
+      "cycle": 200,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00200.pt",
+      "bytes": 4349977
+    },
+    {
+      "kind": "cycle",
+      "cycle": 210,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00210.pt",
+      "bytes": 4349977
+    },
+    {
+      "kind": "cycle",
+      "cycle": 220,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00220.pt",
+      "bytes": 4349977
+    },
+    {
+      "kind": "cycle",
+      "cycle": 230,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/cycle-00230.pt",
+      "bytes": 4349977
+    },
+    {
+      "kind": "latest",
+      "cycle": null,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607/latest.pt",
+      "bytes": 4345334
+    }
+  ]
+}

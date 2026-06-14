@@ -1,0 +1,39 @@
+{
+  "archive_name": "multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607",
+  "source_run_dir": "C:\\Users\\diamo\\Documents\\diamondgo\\artifacts\\_server-final-preserve-20260614\\extract\\multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607",
+  "created_at": "2026-06-14T05:28:19.837717+00:00",
+  "checkpoint_count": 4,
+  "total_checkpoint_bytes": 17401188,
+  "entries": [
+    {
+      "kind": "cycle",
+      "cycle": 240,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607/cycle-00240.pt",
+      "bytes": 4350297
+    },
+    {
+      "kind": "cycle",
+      "cycle": 250,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607/cycle-00250.pt",
+      "bytes": 4350297
+    },
+    {
+      "kind": "cycle",
+      "cycle": 260,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607/cycle-00260.pt",
+      "bytes": 4350297
+    },
+    {
+      "kind": "cycle",
+      "cycle": 270,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607/cycle-00270.pt",
+      "bytes": 4350297
+    },
+    {
+      "kind": "latest",
+      "cycle": null,
+      "path": "artifacts/checkpoint-archive/multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607/latest.pt",
+      "bytes": 4345654
+    }
+  ]
+}
