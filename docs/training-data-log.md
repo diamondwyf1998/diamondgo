@@ -1854,6 +1854,55 @@ Notes:
 - The plus-50 result is color-sensitive and does not show a clean monotonic
   improvement over cycle `720`.
 
+## Server Expiration Checkpoint Preservation
+
+Date: 2026-06-14.
+
+Purpose:
+
+- Preserve checkpoint weights before the rented server expires.
+- Keep the raw server tarballs locally and upload extracted `.pt` weights to
+  GitHub through Git LFS under `artifacts/checkpoint-archive/`.
+
+Local verified raw bundles:
+
+| Run | Bundle size | SHA256 status |
+| --- | ---: | --- |
+| `multiworker-9x9-fresh-dualgpu-2x96-score5p5-margin0p2-300sims-max150-20m-20260607` | `7.58 MB` | matched server `SHA256SUMS.txt` |
+| `multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607` | `19.20 MB` | matched server `SHA256SUMS.txt` |
+| `multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607` | `111.34 MB` | matched server `SHA256SUMS.txt`; transferred via verified chunks after direct scp corruption |
+| `multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-max150-7d-after18hplus3h-20260607` | `219.82 MB` | matched server `SHA256SUMS.txt` |
+| `multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-800sims-max150-after400-20260611` | `42.35 MB` | matched server `SHA256SUMS.txt` |
+
+Git LFS checkpoint archive:
+
+| Run | Cycle checkpoints | LFS entries including latest | Latest cycle |
+| --- | ---: | ---: | ---: |
+| `multiworker-9x9-fresh-dualgpu-2x96-score5p5-margin0p2-300sims-max150-20m-20260607` | `1` | `2` | `5` |
+| `multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607` | `4` | `5` | `270` |
+| `multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607` | `28` | `29` | `230` |
+| `multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-max150-7d-after18hplus3h-20260607` | `56` | `57` | `830` |
+| `multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-800sims-max150-after400-20260611` | `10` | `11` | `930` |
+
+Recovery:
+
+- Clone and fetch LFS objects:
+  `git clone ssh://git@ssh.github.com:443/diamondwyf1998/diamondgo.git && cd diamondgo && git lfs pull`
+- Check manifests under:
+  `artifacts/checkpoint-archive/<run-name>/manifest.json`
+- Example latest 800-sim checkpoint:
+  `artifacts/checkpoint-archive/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-800sims-max150-after400-20260611/latest.pt`
+- Example latest 400-sim checkpoint:
+  `artifacts/checkpoint-archive/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-max150-7d-after18hplus3h-20260607/latest.pt`
+
+Notes:
+
+- `cycle-records` for the main 400-sim run were about `1.5 GB` on the server,
+  so checkpoint weights were prioritized for GitHub preservation.
+- The raw tarballs remain locally at
+  `artifacts/_server-final-preserve-20260614/`, but that directory is a local
+  emergency backup and is not the canonical GitHub recovery path.
+
 ## Score6.5 Cleanup Training Search-Budget Change To 800 Sims
 
 Date: 2026-06-11.
