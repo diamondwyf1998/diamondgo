@@ -1,6 +1,6 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>DiamondGo puzzle author</title>
+<title>DiamondGo skill test lab</title>
 <style>
   :root {
     color: #172026;
@@ -63,6 +63,13 @@
     align-items: end;
   }
   .toolbar, .casebar { margin-top: 12px; }
+  .testbar {
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) 110px auto auto;
+    gap: 8px;
+    align-items: end;
+    margin: 12px 0;
+  }
   .panel {
     min-width: 0;
     background: #fff;
@@ -119,18 +126,37 @@
   }
   .status.error { color: #9f1239; font-weight: 700; }
   .status.ok { color: #166534; font-weight: 700; }
+  .test-result {
+    border: 1px solid #e4e7eb;
+    border-radius: 8px;
+    background: #fbfaf6;
+    padding: 10px;
+    margin: 12px 0;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .test-result h3 { margin: 0 0 8px; font-size: 15px; }
+  .test-result ol { margin: 6px 0 0; padding-left: 22px; }
+  .test-result li { margin: 4px 0; }
+  .test-result table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  .test-result th, .test-result td { border-bottom: 1px solid #e4e7eb; padding: 5px 6px; text-align: left; vertical-align: top; }
+  .test-result th { background: #eef2f0; color: #334e68; }
+  .hit { color: #166534; font-weight: 750; }
+  .miss { color: #9f1239; font-weight: 750; }
+  .muted { color: #627d98; }
   .small { font-size: 12px; color: #627d98; }
   @media (max-width: 920px) {
     main { grid-template-columns: 1fr; }
     .fields, .stats { grid-template-columns: 1fr 1fr; }
+    .testbar { grid-template-columns: 1fr 1fr; }
   }
   @media (max-width: 560px) {
     main { padding: 12px; }
-    .fields, .stats { grid-template-columns: 1fr; }
+    .fields, .stats, .testbar { grid-template-columns: 1fr; }
   }
 </style>
 <header>
-  <h1>DiamondGo puzzle author</h1>
+  <h1>DiamondGo skill test lab</h1>
   <button id="newCase">New</button>
   <button id="duplicateCase">Duplicate</button>
   <button id="deleteCase" class="warn">Delete</button>
@@ -178,6 +204,16 @@
       <button id="saveFields">Save fields</button>
       <button id="renderJson">Refresh JSON</button>
     </div>
+    <div class="testbar">
+      <label>Model <select id="checkpointSelect"></select></label>
+      <label>Sims <input id="simulations" type="number" min="1" max="400" value="100"></label>
+      <button id="testCurrent">Test current</button>
+      <button id="testAll">Test all</button>
+    </div>
+    <div id="testResult" class="test-result">
+      <h3>Test result</h3>
+      <div class="muted">Open this page through the play server to run model tests.</div>
+    </div>
     <div class="case-list" id="caseList"></div>
     <label>Export / import
       <textarea id="jsonBox" spellcheck="false"></textarea>
@@ -203,9 +239,14 @@ const fields = {
   to_play: document.querySelector("#toPlay"),
   note: document.querySelector("#note")
 };
+const checkpointSelect = document.querySelector("#checkpointSelect");
+const simulationsInput = document.querySelector("#simulations");
+const testResult = document.querySelector("#testResult");
 let tool = "black";
 let cases = [];
 let current = 0;
+let serverInfo = null;
+let checkpointCatalog = [];
 
 function pointKey(row, col) { return `${row},${col}`; }
 function gtp(row, col) { return `${letters[col]}${boardSize - row}`; }
@@ -308,6 +349,126 @@ function validate(item) {
   if (overlaps.length) return `Overlap at ${[...new Set(overlaps)].map(k => gtp(...k.split(",").map(Number))).join(", ")}`;
   if (!item.good.length) return "No target point yet";
   return "";
+}
+function htmlEscape(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+function rankSummary(result) {
+  const ranks = result.good_ranks || {};
+  const text = Object.entries(ranks).map(([move, rank]) => `${move}: #${rank}`).join(", ");
+  return text || "-";
+}
+function resultClass(result) {
+  if (result.top1_good) return "hit";
+  if (result.top3_good || result.top10_good) return "hit";
+  return "miss";
+}
+function resultLabel(result) {
+  if (result.top1_good) return "top1 hit";
+  if (result.top3_good) return "top3 hit";
+  if (result.top10_good) return "top10 hit";
+  return "miss";
+}
+function renderSingleResult(result) {
+  const actions = (result.top_actions || []).slice(0, 8)
+    .map(item => `<li>${htmlEscape(item.move)} visits=${htmlEscape(item.visits)} prior=${htmlEscape(item.prior)} value=${htmlEscape(item.value)}</li>`)
+    .join("");
+  testResult.innerHTML = `
+    <h3>${htmlEscape(result.case)}</h3>
+    <div><b>Status</b>: <span class="${resultClass(result)}">${resultLabel(result)}</span></div>
+    <div><b>Target</b>: ${htmlEscape((result.good || []).join(", ") || "-")} | <b>Top1</b>: ${htmlEscape(result.top1 || "-")} | <b>Rank</b>: ${htmlEscape(rankSummary(result))}</div>
+    <div><b>Root value</b>: ${htmlEscape(result.root_value)} | <b>Sims</b>: ${htmlEscape(result.simulations)}</div>
+    <ol>${actions}</ol>
+  `;
+}
+function renderBatchResult(data) {
+  const rows = (data.results || []).map(result => `
+    <tr>
+      <td>${htmlEscape(result.case)}</td>
+      <td>${htmlEscape((result.good || []).join(", ") || "-")}</td>
+      <td class="${resultClass(result)}">${htmlEscape(result.top1 || "-")} / ${resultLabel(result)}</td>
+      <td>${htmlEscape(rankSummary(result))}</td>
+    </tr>
+  `).join("");
+  const summary = Object.entries(data.category_summary || {})
+    .map(([category, item]) => `${category}: ${item.top1_good}/${item.top3_good}/${item.cases}`)
+    .join(" | ");
+  testResult.innerHTML = `
+    <h3>Batch test</h3>
+    <div><b>Summary</b>: ${htmlEscape(summary || "-")}</div>
+    <table>
+      <tr><th>Case</th><th>Target</th><th>Top1</th><th>Rank</th></tr>
+      ${rows}
+    </table>
+  `;
+}
+async function apiJson(path, payload = null) {
+  const options = payload
+    ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
+    : {};
+  const response = await fetch(path, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `${path} ${response.status}`);
+  return data;
+}
+async function loadModelInfo() {
+  checkpointSelect.innerHTML = "";
+  try {
+    serverInfo = await apiJson("/api/info");
+    const checkpoints = await apiJson("/api/checkpoints").catch(() => ({ checkpoints: [], current: "" }));
+    checkpointCatalog = checkpoints.checkpoints || [];
+    if (checkpointCatalog.length) {
+      for (const item of checkpointCatalog) {
+        const option = document.createElement("option");
+        option.value = item.id;
+        option.textContent = item.label || item.id;
+        checkpointSelect.append(option);
+      }
+      if (checkpoints.current) checkpointSelect.value = checkpoints.current;
+    } else {
+      const option = document.createElement("option");
+      option.value = serverInfo.checkpoint_id || "";
+      option.textContent = serverInfo.checkpoint_label || serverInfo.checkpoint_name || "current checkpoint";
+      checkpointSelect.append(option);
+    }
+    simulationsInput.value = String(serverInfo.default_simulations || simulationsInput.value || 100);
+    testResult.innerHTML = `<h3>Test result</h3><div class="muted">Model ready: ${htmlEscape(serverInfo.checkpoint_label || serverInfo.checkpoint_name)} / ${htmlEscape(serverInfo.channels)}x${htmlEscape(serverInfo.residual_blocks)}</div>`;
+  } catch (_err) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "play server unavailable";
+    checkpointSelect.append(option);
+    testResult.innerHTML = `<h3>Test result</h3><div class="muted">Open through the play server, for example http://127.0.0.1:8787/viewers/puzzle-author.html, to run model tests.</div>`;
+  }
+}
+async function maybeLoadCheckpoint() {
+  const id = checkpointSelect.value;
+  if (!id || !checkpointCatalog.length) return;
+  serverInfo = await apiJson("/api/load_checkpoint", { id });
+}
+async function testCurrentCase() {
+  syncFieldsToCase();
+  await maybeLoadCheckpoint();
+  const result = await apiJson("/api/evaluate_case", {
+    case: normalizeCase(activeCase(), current),
+    simulations: Number(simulationsInput.value || 100),
+  });
+  renderSingleResult(result);
+  setStatus(`当前题目「${result.case}」已完成测试：${resultLabel(result)}。`, result.top1_good || result.top3_good ? "ok" : "error");
+}
+async function testAllCases() {
+  syncFieldsToCase();
+  await maybeLoadCheckpoint();
+  const data = await apiJson("/api/evaluate_cases", {
+    cases: casePayload().cases,
+    simulations: Number(simulationsInput.value || 100),
+  });
+  renderBatchResult(data);
+  setStatus(`当前题集已完成测试：${data.case_count} 题。`, "ok");
 }
 function refreshUi() {
   const item = activeCase();
@@ -558,6 +719,30 @@ document.querySelector("#loadJson").addEventListener("click", () => {
     setStatus(err.message, "error");
   }
 });
+checkpointSelect.addEventListener("change", async () => {
+  try {
+    await maybeLoadCheckpoint();
+    setStatus("当前模型已切换，可以开始测试。", "ok");
+  } catch (err) {
+    setStatus(err.message, "error");
+  }
+});
+document.querySelector("#testCurrent").addEventListener("click", async () => {
+  try {
+    await testCurrentCase();
+  } catch (err) {
+    setStatus(err.message, "error");
+    testResult.innerHTML = `<h3>Test result</h3><div class="miss">${htmlEscape(err.message)}</div>`;
+  }
+});
+document.querySelector("#testAll").addEventListener("click", async () => {
+  try {
+    await testAllCases();
+  } catch (err) {
+    setStatus(err.message, "error");
+    testResult.innerHTML = `<h3>Batch test</h3><div class="miss">${htmlEscape(err.message)}</div>`;
+  }
+});
 document.querySelector("#resetStorage").addEventListener("click", () => {
   localStorage.removeItem(storageKey);
   cases = [emptyCase(0)];
@@ -583,4 +768,5 @@ try {
   syncFieldsFromCase();
   refreshUi();
 }
+loadModelInfo();
 </script>

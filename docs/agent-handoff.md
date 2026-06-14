@@ -70,6 +70,14 @@ This file records coordination notes for Codex agents working on DiamondGo.
   the same puzzle-author draft protocol. They save the displayed position after
   the selected move, set `category` to `eval_match_snapshot`, and leave `good`
   empty.
+- `artifacts/viewers/puzzle-author.html` is the reusable skill-test lab. It
+  edits case metadata, board stones, good/bad answer points, imports/exports
+  the shared JSON format, and can run either the current case or the whole case
+  set when opened through `src/diamondgo/play_server.py`. The play server
+  exposes `/api/evaluate_case` and `/api/evaluate_cases`; both accept the same
+  `{name, category, subcategory, to_play, black, white, good, bad, note}` case
+  shape plus an optional `simulations` value. Keep future tactical-test UI work
+  on this page instead of creating a new one-off authoring/testing frontend.
 - Replay frontends should mirror the training terminal cleanup rule when a
   trace/config indicates `terminal_dead_stone_cleanup=true` or an evaluation
   game records terminal cleanup counts. This cleanup is terminal-only and

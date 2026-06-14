@@ -5,7 +5,7 @@ import pytest
 pytest.importorskip("sgfmill")
 
 from diamondgo.batched_demo import BatchedConfig
-from diamondgo.play_server import PlayState
+from diamondgo.play_server import PlayState, normalize_case, point_to_gtp
 from diamondgo.rules import SgfmillRules
 
 
@@ -50,3 +50,39 @@ def test_play_server_history_uses_sgfmill_ko_rules() -> None:
     assert state._ko_forbidden == (0, 0)
     assert not state.legal_actions()[0]
     assert play_state.validate_move({"history": history, "action": 0})["legal"] is False
+
+
+def test_play_server_can_build_state_from_custom_case() -> None:
+    play_state = _rules_only_play_state()
+    case = normalize_case(
+        {
+            "name": "capture_test",
+            "to_play": "b",
+            "black": [[0, 1], [1, 0]],
+            "white": [[1, 1]],
+            "good": [[2, 1]],
+        },
+        board_size=5,
+    )
+
+    state = play_state.state_from_case(case)
+
+    assert isinstance(state, SgfmillRules)
+    assert state.to_play == "b"
+    assert state.board.board[0][1] == "b"
+    assert state.board.board[1][1] == "w"
+    assert state.legal_actions()[11]
+    assert point_to_gtp((2, 1), 5) == "B3"
+
+
+def test_custom_case_rejects_target_on_occupied_point() -> None:
+    with pytest.raises(ValueError, match="target overlaps"):
+        normalize_case(
+            {
+                "name": "bad_case",
+                "black": [[1, 1]],
+                "white": [],
+                "good": [[1, 1]],
+            },
+            board_size=5,
+        )
