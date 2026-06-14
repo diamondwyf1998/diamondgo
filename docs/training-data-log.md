@@ -1886,14 +1886,24 @@ Git LFS checkpoint archive:
 
 Recovery:
 
-- Clone and fetch LFS objects:
-  `git clone ssh://git@ssh.github.com:443/diamondwyf1998/diamondgo.git && cd diamondgo && git lfs pull`
+- Clone and fetch LFS objects through the Codex deploy key. Prefer keeping the
+  Git remote host as `github.com` and routing SSH to port `443` through
+  `GIT_SSH_COMMAND`, because a literal `ssh.github.com` remote can make Git LFS
+  infer the unusable endpoint `https://ssh.github.com/.../info/lfs`.
+  - PowerShell:
+    `$env:GIT_SSH_COMMAND='ssh -i C:/Users/diamo/Documents/diamondgo/.codex-ssh/diamondgo_autodl_ed25519 -o IdentitiesOnly=yes -o HostName=ssh.github.com -p 443'; git clone git@github.com:diamondwyf1998/diamondgo.git; cd diamondgo; git lfs pull`
+  - Linux/macOS:
+    `GIT_SSH_COMMAND='ssh -i /path/to/diamondgo_autodl_ed25519 -o IdentitiesOnly=yes -o HostName=ssh.github.com -p 443' git clone git@github.com:diamondwyf1998/diamondgo.git && cd diamondgo && git lfs pull`
 - Check manifests under:
   `artifacts/checkpoint-archive/<run-name>/manifest.json`
 - Example latest 800-sim checkpoint:
   `artifacts/checkpoint-archive/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-800sims-max150-after400-20260611/latest.pt`
 - Example latest 400-sim checkpoint:
   `artifacts/checkpoint-archive/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-max150-7d-after18hplus3h-20260607/latest.pt`
+- Recovery smoke test completed on 2026-06-14: a fresh shallow clone pulled
+  `cycle-00930.pt` through Git LFS and `torch.load(..., map_location="cpu")`
+  read `cycle=930`, `score_komi=6.5`, `channels=96`, and
+  `residual_blocks=2`.
 
 Notes:
 
