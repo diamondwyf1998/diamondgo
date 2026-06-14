@@ -1,6 +1,7 @@
 import numpy as np
+import pytest
 
-from diamondgo.rules import WHITE, SimpleAreaRules
+from diamondgo.rules import WHITE, SgfmillRules, SimpleAreaRules
 
 
 def test_terminal_cleanup_removes_enclosed_single_eye_group() -> None:
@@ -40,6 +41,45 @@ def test_terminal_cleanup_keeps_two_eye_group_and_edge_group() -> None:
     state.board = board
 
     assert state.terminal_cleanup_counts() == {"b": 0, "w": 0}
+
+
+def test_terminal_cleanup_keeps_edge_group_to_avoid_false_positive() -> None:
+    board = np.array(
+        [
+            [1, -1, -1, 1, 0],
+            [1, -1, -1, 1, 0],
+            [1, 1, 1, 1, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+        ],
+        dtype=np.int8,
+    )
+    state = SimpleAreaRules(size=5, score_komi=0.0, terminal_dead_stone_cleanup=True)
+    state.board = board
+
+    assert state.terminal_cleanup_counts() == {"b": 0, "w": 0}
+
+
+def test_sgfmill_terminal_cleanup_uses_board_array_for_scoring() -> None:
+    pytest.importorskip("sgfmill")
+    board = np.array(
+        [
+            [-1, -1, -1, -1, -1],
+            [-1, 1, 1, 1, -1],
+            [-1, 1, 0, 1, -1],
+            [-1, 1, 1, 1, -1],
+            [-1, -1, -1, -1, -1],
+        ],
+        dtype=np.int8,
+    )
+    without_cleanup = SgfmillRules(size=5, score_komi=0.0)
+    with_cleanup = SgfmillRules(size=5, score_komi=0.0, terminal_dead_stone_cleanup=True)
+    without_cleanup.board_array = board.copy()
+    with_cleanup.board_array = board.copy()
+
+    assert with_cleanup.terminal_cleanup_counts() == {"b": 8, "w": 0}
+    assert with_cleanup.terminal_score_margin() == -25.0
+    assert with_cleanup.terminal_score_margin() < float(board.sum())
 
 
 def test_score_margin_reward_adds_signed_fourth_root_bonus() -> None:

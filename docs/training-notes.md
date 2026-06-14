@@ -22,6 +22,21 @@ Human-readable record rule:
   `artifacts/viewers/` plus JSON/server data over newly copied standalone HTML,
   so labels, encoding, controls, and checkpoint identity do not drift between
   experiments.
+- When the user asks for "大测评展示", prepare the complete display bundle:
+  latest training-result summary, evaluation dashboards/reports, training
+  curves, recorded self-play game viewer, and human-vs-AI play page loaded with
+  the latest checkpoint. Prefer recorded training games when they exist; only
+  generate new showcase games when recorded games are unavailable.
+- When the user asks for "小测评", prepare a light display bundle without a
+  full evaluation matrix: sample several recorded self-play checkpoints from
+  the newest active run, open the reusable self-play viewer, and load the
+  latest checkpoint into the human-vs-AI play page.
+- When the user asks for "比较实验", pick representative checkpoints and choose
+  reference opponents that best answer the current comparison question. Start
+  with approximately `1x` and `2x` training-progress opponents when they are
+  meaningful, but do not treat those ratios as fixed. If those pairings are
+  unavailable, unfair, or uninformative, choose other sensible ratios/checkpoints
+  and clearly label the rationale and approximation.
 
 Source labels:
 
@@ -431,3 +446,214 @@ needs a shape/distribution metric before treating it as a measured result.
     rented server expires.
   - Data reference:
     `docs/training-data-log.md#score-komi-45-continuation-configuration`
+
+### Dual-GPU 2x96 Score-Komi 4.5 Fresh Run
+
+- `Technical operation`: A new server run was started on the dual-GPU machine
+  with a larger but shallower model: `2` residual blocks x `96` channels,
+  `score_komi=4.5`, no komi input, `250` self-play simulations, `12` workers,
+  `8` games per worker, and `96` games/cycle. This is a fresh run rather than a
+  continuation from the previous `4x64` line.
+  - Data reference:
+    `docs/training-data-log.md#dual-gpu-2x96-score45-recorded-self-play-cycles-5-160`
+- `User observation/request`: For new checkpoints, use already recorded
+  self-play games when possible instead of regenerating display games. This
+  keeps the displayed games tied to the actual training run and avoids mixing
+  display artifacts with new ad hoc samples.
+- `Agent measurement`: Recorded self-play for cycles
+  `5,25,50,80,110,140,160` was pulled into a reusable catalog and opened in the
+  shared self-play viewer.
+  - Local catalog:
+    `artifacts/selfplay-recorded-dualgpu-2x96-score4p5-20260607`
+  - Viewer example:
+    `http://127.0.0.1:8765/viewers/selfplay-catalog-viewer.html?dataset=selfplay-recorded-dualgpu-2x96-score4p5-20260607&cycle=160&game=20`
+  - Black remains favored in these recorded cycles. Black win rate ranges from
+    `54.17%` at cycle `5` to `75.00%` at cycle `160`, with cycle `50` already
+    at `70.83%`.
+  - Early pass before move `40` drops quickly from `31.25%` at cycle `5` to
+    roughly `5-9%` in the middle/late sampled cycles, though it is not gone.
+- `Agent measurement`: A reusable cross-run match script was added so future
+  comparisons do not hardcode "same cycle" as the only pairing mode.
+  - Script:
+    `scripts/run_cross_run_matches.py`
+  - It supports explicit checkpoint pairs, same-cycle pairing when requested,
+    and close/approximate pair lists.
+  - Data reference:
+    `docs/training-data-log.md#cross-run-matches-dual-gpu-2x96-score45-vs-old-4x64-score25`
+- `Agent measurement`: In 10-game cross-run matches against the earlier
+  no-komi-input `4x64`, `score_komi=2.5` line, the new `2x96`,
+  `score_komi=4.5` line is already competitive at similar early checkpoint
+  counts, but not yet stronger than much later old checkpoints.
+  - Exact available same-cycle result: new cycle `80` beat old cycle `80` by
+    `8/10`.
+  - Exact available double-cycle result: new cycle `50` versus old cycle `100`
+    was `5/10`.
+  - Close same-ish results were `7/10`, `6/10`, `5/10`, and `8/10` for
+    `new50-vs-old60`, `new110-vs-old100`, `new140-vs-old150`, and
+    `new160-vs-old150`.
+  - Close double-ish results were weaker: `4/10`, `1/10`, `3/10`, and `3/10`
+    for `new80-vs-old150`, `new110-vs-old200`, `new140-vs-old300`, and
+    `new160-vs-old300`.
+  - Interpretation: the fresh `2x96` run is learning useful play quickly, but
+    the current evidence does not show it surpassing the older line at about
+    twice the training age. The sample size is small, and color asymmetry is
+    still visible, so these numbers should guide follow-up tests rather than
+    settle strength.
+- `Correction / preflight record`: Before the exact/close same-era comparison,
+  an earlier preflight match was run against the much later old `4x64`,
+  `score_komi=5.5` continuation. This was not the comparison the user wanted
+  for same-cycle progress, but it is still useful as a sanity check against a
+  substantially more trained previous line.
+  - Pairs were `new50-vs-old530`, `new80-vs-old560`, `new110-vs-old590`,
+    `new140-vs-old620`, and `new160-vs-old650`, all `10` games each.
+  - Candidate wins were `0/10`, `3/10`, `1/10`, `3/10`, and `1/10`.
+  - Interpretation: this should be read as "early new line is far behind a
+    much later old continuation", not as evidence about same-cycle learning
+    speed.
+  - Data reference:
+    `docs/training-data-log.md#preflight-cross-run-matches-dual-gpu-2x96-score45-vs-late-old-4x64-score55`
+
+### Comparison Experiment: Dual-GPU 2x96 After18h vs Old 4x64
+
+- `User request`: Run a "比较实验": pick several checkpoints and compare
+  against approximately `1x` and `2x` training-progress old checkpoints. If
+  exact pairings are unavailable, choose close reasonable substitutes.
+- `Agent measurement`: Four candidate checkpoints from the after18h
+  dual-GPU `2x96`, `score_komi=4.5` line were tested: cycles
+  `240,250,260,270`. Each pair used `10` games, `5` as Black and `5` as White,
+  with both sides at `100` simulations.
+  - `1x` approximate opponents: old `4x64`, `score_komi=2.5` cycles
+    `250,250,250,300`.
+  - `2x` approximate opponents: old `4x64` cycles `500,500,520,530`; these
+    come from later score-komi `6.5/5.5` lines, so they are not clean same-rule
+    architecture comparisons.
+  - Dashboard:
+    `artifacts/compare-experiment-1x-2x-dualgpu2x96-20260607/dashboard.html`
+  - Game replay dashboard:
+    `artifacts/compare-experiment-1x-2x-dualgpu2x96-20260607/games_dashboard.html`
+  - Data reference:
+    `docs/training-data-log.md#comparison-experiment-dual-gpu-2x96-after18h-vs-old-4x64`
+- `Agent measurement`: Results are noisy and not monotonic. Against `1x`
+  approximate opponents the new line scores `4/10`, `2/10`, `6/10`, `4/10`.
+  Against `2x` approximate opponents it scores `7/10`, `3/10`, `7/10`,
+  `3/10`.
+- `Interpretation`: This quick comparison does not support a simple "later new
+  checkpoint is always stronger" story. The strongest pair results are cycles
+  `240` and `260`, while cycles `250` and `270` are weak. Because the `2x`
+  opponents mix later score-komi settings, treat the experiment as a practical
+  progress probe rather than a clean scientific isolation of architecture.
+- `Agent measurement`: The stronger-looking comparison pairs were rerun at
+  `300` simulations for both sides.
+  - Dashboard:
+    `artifacts/compare-experiment-strong-300sims-dualgpu2x96-combined-20260607/dashboard.html`
+  - Game replay dashboard:
+    `artifacts/compare-experiment-strong-300sims-dualgpu2x96-combined-20260607/games_dashboard.html`
+  - `new240` looks more stable at higher search: `7/10` against old `250` and
+    `5/10` against old `500`.
+  - `new260` does not preserve its 100-sim strength: it is `5/10` against old
+    `250` and `0/10` against old `520`.
+  - Interpretation: the 100-sim comparison overestimated at least some
+    `new260` matchups. Higher-search comparisons should be used before calling
+    a checkpoint clearly stronger.
+
+### Small Eval: Score6.5 Cleanup 400-Sim Active Run
+
+- `User request`: Do a "小测评" for the new training line: inspect a few
+  recorded self-play checkpoints and load the latest model into human-vs-AI.
+- `Technical operation`: The active server run is the cleanup continuation:
+  `2x96`, `score_komi=6.5`, terminal dead-stone cleanup enabled, `400`
+  self-play simulations, `12` workers, `96` games/cycle.
+- `Agent measurement`: A lightweight local display was prepared from recorded
+  self-play cycles `300,330,360,365`; no new showcase games were generated.
+  - Small eval entry:
+    `artifacts/small-eval-score6p5-cleanup-400sims-20260608/index.html`
+  - Recorded self-play catalog:
+    `artifacts/small-eval-selfplay-score6p5-cleanup-400sims-20260608/index.html`
+  - Latest recorded viewer:
+    `http://127.0.0.1:8765/viewers/selfplay-catalog-viewer.html?dataset=small-eval-selfplay-score6p5-cleanup-400sims-20260608&cycle=365&game=1`
+  - Human-vs-AI:
+    `http://127.0.0.1:8787/viewers/play-ai.html?checkpoint=dualgpu2x96-score6p5-cleanup-cycle-00366-latest&v=small-eval-score6p5-cleanup-366`
+- `Agent measurement`: At the pulled latest checkpoint/metrics snapshot,
+  `latest.pt` is cycle `366`. Latest metrics show Black win rate `65.6%`,
+  early first-pass `<40` rate `5.2%`, mean moves `123.385`, loss `0.959`, and
+  terminal cleanup counts `17` Black stones / `58` White stones.
+- `Agent measurement`: A same-line `+50 cycle` PK check was run on the cleanup
+  line, using `100` simulations and `10` games per pair.
+  - Dashboard:
+    `artifacts/pairwise-plus50-cleanup-score6p5-100sims-10games-20260608/dashboard.html`
+  - Game replay dashboard:
+    `artifacts/pairwise-plus50-cleanup-score6p5-100sims-10games-20260608/games_dashboard.html`
+  - Later checkpoints score `8/10`, `5/10`, `6/10`, and `6/10` for
+    `330-vs-280`, `340-vs-290`, `350-vs-300`, and `360-vs-310`.
+  - Interpretation: the line shows some improvement over +50 cycles, but it is
+    not cleanly monotonic. The `350-vs-300` and `360-vs-310` wins are still
+    color-skewed toward candidate-as-Black, so use color split when judging
+    progress.
+- `User request / technical operation`: When the 18-hour dual-GPU run was close
+  to finishing, the user asked to immediately continue for another `3` hours if
+  the run had completed. A queue watcher was installed so this would happen
+  automatically.
+  - The original 18h finalizer was intentionally stopped; otherwise it would
+    have started eval immediately and competed with the requested continuation
+    training.
+  - The continuation started from the 18h `latest.pt` at `2026-06-07 17:52
+    +08`, finished at `20:57 +08`, and then ran eval/tactical probes.
+  - All important artifacts were copied back locally under
+    `artifacts/server-runs/20260607-dualgpu-2x96-18h-plus3h/`.
+  - The 18h segment ended at cycle `236` with `2.45M` total positions; the +3h
+    continuation ended at cycle `272` with `2.86M` total positions.
+  - The final continuation self-play snapshot is still strongly Black-favored:
+    cycle `272` has Black `76.04%`, White `23.96%`, and a `black` color-bias
+    alert.
+  - The valid continuation `n+50` eval slice is `cycle-272` vs `cycle-250`,
+    where `cycle-272` won `17/20`. This match had first-pass `<=40` in only
+    `1/20` games, which is much healthier than the vs-initial slices.
+  - Caveat: the `step-200` and `step-500` "vs previous" continuation reports
+    are effectively vs initial because the continuation checkpoint directory
+    does not contain a selected previous checkpoint at those step intervals.
+  - Tactical probes remain weak at `cycle-272`: only the white one-stone
+    capture probe is top1/top3; black capture and both atari-escape probes
+    fail.
+  - Data reference:
+    `docs/training-data-log.md#dual-gpu-2x96-score45-18h--3h-continuation`
+- `User request / technical operation`: After the 18h+3h result, the user asked
+  to raise the scoring komi to `6.5`, raise self-play search to `400` MCTS
+  simulations, and start a `7` day continuation.
+  - This continues from the `cycle-272` latest checkpoint of the
+    `score_komi=4.5`, `250`-simulation dual-GPU line.
+  - Kept constant for comparability: `2x96` model, `input_komi=false`,
+    `komi_metadata=0.5`, `score_margin_reward_scale=0.2`, `max_moves=150`,
+    `12` workers, `96` games/cycle, `record_every=5`.
+  - Changed for this run: `score_komi=6.5`, `selfplay_simulations=400`,
+    `time_limit_minutes=10080`.
+  - Started on the server at `2026-06-07 22:23:53 +08`.
+  - Server PIDs at launch: train `225750`, finalizer `225751`.
+  - A server-side `status_3h.log` was added in the run directory because
+    remote training continues even if the local Codex app or user computer is
+    offline; app heartbeat checks may be delayed while the local environment is
+    unavailable.
+  - Initial GPU snapshot showed the process had entered self-play: GPU0 about
+    `41%` / `4118 MiB`, GPU1 about `33%` / `1991 MiB`.
+  - Data reference:
+    `docs/training-data-log.md#dual-gpu-2x96-score65-400-sim-7-day-continuation`
+- `User observation / technical operation`: The user observed that terminal
+  dead stones were already causing problems and asked to add clear obvious-dead
+  cleanup into the active training round, but only after testing it first.
+  - The active no-cleanup run was left running during implementation/testing.
+  - Tests passed for the conservative cleanup path: `5 passed, 2 skipped` in
+    terminal reward/play-server focused tests, plus a tiny CPU `sgfmill`
+    training smoke with `terminal_dead_stone_cleanup=true`.
+  - A more aggressive edge-cleanup idea was tested and rejected because it can
+    falsely kill edge groups; this is exactly the kind of hidden label bug we
+    want the notes to preserve.
+  - The cleanup being used is intentionally conservative: it only removes a
+    whole group with fewer than two solid eyes when removing it creates a
+    non-edge-touching empty region bordered only by opponent stones. It does
+    not solve edge deaths, seki, ko, or complex life-and-death.
+  - After tests passed, the no-cleanup score6.5/400 segment was stopped at
+    cycle `276`, backed up to
+    `/root/autodl-tmp/diamondgo-checkpoint-backups/score6p5_400sims_precleanup_cycle276_latest.pt`,
+    and a cleanup-enabled 7-day continuation was launched from that checkpoint.
+  - New server PIDs at launch: train `230774`, finalizer `230775`.
+  - Data reference:
+    `docs/training-data-log.md#dual-gpu-2x96-score65-400-sim-7-day-continuation`

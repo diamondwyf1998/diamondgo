@@ -53,6 +53,8 @@ def make_config(raw: dict[str, Any], args: argparse.Namespace, cycle: int) -> Ba
         "komi": float(raw.get("komi", 0.5)),
         "score_komi": float(raw.get("score_komi", raw.get("komi", 0.5))),
         "input_komi": bool(raw.get("input_komi", False)),
+        "terminal_dead_stone_cleanup": bool(raw.get("terminal_dead_stone_cleanup", False)),
+        "score_margin_reward_scale": float(raw.get("score_margin_reward_scale", 0.0)),
         "channels": int(raw.get("channels", 64)),
         "residual_blocks": int(raw.get("residual_blocks", 4)),
         "simulations": int(args.simulations),

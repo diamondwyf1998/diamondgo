@@ -1057,3 +1057,588 @@ Expected interpretation:
 - Because replay is rebuilt after the resume boundary, the model weights start
   from cycle `410`, but training examples come from new `score_komi=4.5`
   self-play.
+
+## Dual-GPU 2x96 Score4.5 Recorded Self-Play, Cycles 5-160
+
+Source run:
+
+- Server directory:
+  `/root/diamondgo/artifacts/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607`
+- Local recorded catalog:
+  `artifacts/selfplay-recorded-dualgpu-2x96-score4p5-20260607`
+- Local catalog index:
+  `artifacts/selfplay-recorded-dualgpu-2x96-score4p5-20260607/index.html`
+- Shared self-play viewer example:
+  `http://127.0.0.1:8765/viewers/selfplay-catalog-viewer.html?dataset=selfplay-recorded-dualgpu-2x96-score4p5-20260607&cycle=160&game=20`
+
+Configuration:
+
+| Field | Value |
+| --- | --- |
+| Fresh start | `true` |
+| Input komi | `false` |
+| Input planes | `3`: own stones, opponent stones, side-to-play |
+| Score komi | `4.5` |
+| Score margin reward scale | `0.2` |
+| Channels / residual blocks | `96 / 2` |
+| MCTS simulations | `250` for training self-play |
+| Workers | `12` |
+| Games per worker / cycle | `8 / 96` |
+| Self-play devices | `cuda:0,cuda:1` |
+| Max moves | `150` |
+| Root Dirichlet noise | alpha `0.15`, fraction `0.25` |
+| Root policy temperature | `1.1` |
+| Move temperature | `1.0` through move `16`, then `0.25` |
+| Checkpoint interval | every `5` cycles through cycle `50`, then every `10` cycles |
+| Recorded self-play interval | every `5` cycles |
+
+Recorded-cycle summary:
+
+| Cycle | Games | Positions | Black wins | White wins | Black win rate | Mean moves | Early pass `<40` | Capture fraction | Mean Black margin |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `5` | `96` | `9512` | `52` | `44` | `54.17%` | `99.083` | `31.25%` | `0.1340` | `+3.802` |
+| `25` | `96` | `10877` | `54` | `42` | `56.25%` | `113.302` | `13.54%` | `0.2102` | `+1.240` |
+| `50` | `96` | `10403` | `68` | `28` | `70.83%` | `108.365` | `8.33%` | `0.1728` | `+2.312` |
+| `80` | `96` | `10976` | `65` | `31` | `67.71%` | `114.333` | `5.21%` | `0.1535` | `+2.615` |
+| `110` | `96` | `9996` | `61` | `35` | `63.54%` | `104.125` | `8.33%` | `0.1414` | `+0.906` |
+| `140` | `96` | `9485` | `63` | `33` | `65.62%` | `98.802` | `7.29%` | `0.1264` | `+0.719` |
+| `160` | `96` | `10593` | `72` | `24` | `75.00%` | `110.344` | `9.38%` | `0.1560` | `+2.010` |
+
+Observed interpretation:
+
+- The run is still Black-favored despite `score_komi=4.5`, especially from
+  cycle `50` onward.
+- Early pass is much more common in the first recorded cycle than later. This
+  suggests the early-pass pathology is still worth monitoring, but it is not
+  dominating the sampled later self-play in the same way as the earlier failed
+  eval slices.
+- The catalog viewer should be the default display path for this run because
+  it reuses recorded training games instead of creating new showcase games.
+
+## Cross-Run Matches, Dual-GPU 2x96 Score4.5 vs Old 4x64 Score2.5
+
+Reusable script:
+
+- `scripts/run_cross_run_matches.py`
+- Commit introducing the script: `8850431 Add reusable cross-run match script`
+
+The script supports explicit checkpoint pairs and close/approximate pair lists.
+It does not require hardcoded same-cycle comparisons.
+
+Match settings:
+
+| Field | Value |
+| --- | --- |
+| Candidate line | fresh dual-GPU `2x96`, `score_komi=4.5` |
+| Opponent line | earlier fresh no-komi-input `4x64`, `score_komi=2.5` |
+| Games per pair | `10` |
+| Color split | candidate Black `5`, candidate White `5` |
+| Candidate simulations | `100` |
+| Opponent simulations | `100` |
+| Match rules source | candidate config |
+| Match score komi | `4.5` |
+| Match max moves | `150` |
+
+Artifacts:
+
+- Exact/available pair dashboard:
+  `artifacts/crossrun-exact-and-x2-20260607/dashboard.html`
+- Exact/available pair games:
+  `artifacts/crossrun-exact-and-x2-20260607/games_dashboard.html`
+- Close-pair dashboard:
+  `artifacts/crossrun-close-20260607/dashboard.html`
+- Close-pair games:
+  `artifacts/crossrun-close-20260607/games_dashboard.html`
+
+Availability note:
+
+- The old server was no longer reachable, so exact same-cycle and exact
+  double-cycle tests were limited by locally/server-side archived checkpoint
+  inventory.
+- Exact available same-cycle: old cycle `80`.
+- Exact available double-cycle: new cycle `50` versus old cycle `100`.
+- Additional close-pair tests use nearby old checkpoints where exact
+  counterparts were unavailable.
+
+Exact/available pairs:
+
+| Pair | Candidate wins | Candidate as Black | Candidate as White | Early pass `<40` |
+| --- | ---: | ---: | ---: | ---: |
+| `new80-vs-old80` | `8/10` | `5/5` | `3/5` | `20.00%` |
+| `new50-vs-old100` | `5/10` | `2/5` | `3/5` | `0.00%` |
+
+Close same-ish pairs:
+
+| Pair | Candidate wins | Candidate as Black | Candidate as White | Early pass `<40` |
+| --- | ---: | ---: | ---: | ---: |
+| `new50-vs-old60` | `7/10` | `3/5` | `4/5` | `10.00%` |
+| `new110-vs-old100` | `6/10` | `3/5` | `3/5` | `10.00%` |
+| `new140-vs-old150` | `5/10` | `3/5` | `2/5` | `10.00%` |
+| `new160-vs-old150` | `8/10` | `4/5` | `4/5` | `30.00%` |
+
+Close double-ish pairs:
+
+| Pair | Candidate wins | Candidate as Black | Candidate as White | Early pass `<40` |
+| --- | ---: | ---: | ---: | ---: |
+| `new80-vs-old150` | `4/10` | `4/5` | `0/5` | `0.00%` |
+| `new110-vs-old200` | `1/10` | `1/5` | `0/5` | `10.00%` |
+| `new140-vs-old300` | `3/10` | `1/5` | `2/5` | `10.00%` |
+| `new160-vs-old300` | `3/10` | `3/5` | `0/5` | `10.00%` |
+
+Observed interpretation:
+
+- At similar early checkpoint counts, the fresh `2x96`, `score_komi=4.5` line
+  looks competitive with or ahead of the old `4x64`, `score_komi=2.5` line.
+- Against roughly double-age old checkpoints, the new line is clearly not
+  consistently ahead yet.
+- The color split is still informative. Several weak results are especially
+  weak when the new model is White, so future reports should keep color-split
+  win rates rather than only aggregate wins.
+- Each pair has only `10` games, so these are quick diagnostic matches rather
+  than final strength estimates.
+
+## Preflight Cross-Run Matches, Dual-GPU 2x96 Score4.5 vs Late Old 4x64 Score5.5
+
+Context:
+
+- This was the first cross-run comparison run before the user clarified that
+  the desired first report was same-cycle or close-cycle comparison.
+- It is retained as a preflight record because it measures the new early
+  `2x96`, `score_komi=4.5` line against a much later old `4x64`,
+  `score_komi=5.5` continuation.
+- It should not be mixed with the same-ish or double-ish `score_komi=2.5`
+  comparison above.
+
+Artifacts:
+
+- Server directory:
+  `/root/diamondgo/artifacts/crossrun-dualgpu2x96-score4p5-vs-old4x64-score5p5-20260607`
+- Local dashboard:
+  `artifacts/crossrun-dualgpu2x96-score4p5-vs-old4x64-score5p5-20260607/dashboard.html`
+- Local games dashboard:
+  `artifacts/crossrun-dualgpu2x96-score4p5-vs-old4x64-score5p5-20260607/games_dashboard.html`
+- Local summary:
+  `artifacts/crossrun-dualgpu2x96-score4p5-vs-old4x64-score5p5-20260607/summary.json`
+
+Match settings:
+
+| Field | Value |
+| --- | --- |
+| Candidate line | fresh dual-GPU `2x96`, `score_komi=4.5` |
+| Opponent line | late continuation `4x64`, `score_komi=5.5` |
+| Games per pair | `10` |
+| Color split | candidate Black `5`, candidate White `5` |
+| Candidate simulations | `100` |
+| Opponent simulations | `100` |
+| Match rules source | candidate config |
+| Match score komi | `4.5` |
+| Match max moves | `150` |
+
+Preflight pairs:
+
+| Pair | Candidate wins | Candidate as Black | Candidate as White | Early pass `<40` |
+| --- | ---: | ---: | ---: | ---: |
+| `new050-vs-old530` | `0/10` | `0/5` | `0/5` | `30.00%` |
+| `new080-vs-old560` | `3/10` | `1/5` | `2/5` | `20.00%` |
+| `new110-vs-old590` | `1/10` | `0/5` | `1/5` | `30.00%` |
+| `new140-vs-old620` | `3/10` | `1/5` | `2/5` | `10.00%` |
+| `new160-vs-old650` | `1/10` | `0/5` | `1/5` | `0.00%` |
+
+Observed interpretation:
+
+- The new early `2x96` run is far behind the late old `4x64`,
+  `score_komi=5.5` continuation in this preflight matchup.
+- Because the opponent checkpoints are hundreds of cycles later, this is mostly
+  a "late old line remains much stronger" check, not a fair architecture or
+  same-training-age comparison.
+
+## Comparison Experiment, Dual-GPU 2x96 After18h vs Old 4x64
+
+Definition:
+
+- "比较实验" means selecting representative candidate checkpoints and choosing
+  reference opponents that best answer the current comparison question.
+- Approximately `1x` and `2x` training-progress opponents are useful default
+  starting points, but they are not required. If those ratios are unavailable,
+  unfair, or not informative, choose other sensible ratios/checkpoints.
+- Exact cycle matches are preferred when they fit the question. Otherwise, use
+  the nearest reasonable checkpoint and record the approximation/rationale.
+
+Artifacts:
+
+- Server output:
+  `/root/diamondgo/artifacts/compare-experiment-1x-2x-dualgpu2x96-20260607`
+- Local dashboard:
+  `artifacts/compare-experiment-1x-2x-dualgpu2x96-20260607/dashboard.html`
+- Local games dashboard:
+  `artifacts/compare-experiment-1x-2x-dualgpu2x96-20260607/games_dashboard.html`
+- Raw summary:
+  `artifacts/compare-experiment-1x-2x-dualgpu2x96-20260607/summary.json`
+
+Match settings:
+
+| Field | Value |
+| --- | --- |
+| Candidate line | after18h continuation dual-GPU `2x96`, `score_komi=4.5` |
+| Candidate checkpoints | `240, 250, 260, 270` |
+| Opponent line for `1x` | old `4x64`, `score_komi=2.5` |
+| Opponent line for `2x` | old `4x64`, later score-komi `6.5/5.5` lines |
+| Games per pair | `10` |
+| Color split | candidate Black `5`, candidate White `5` |
+| Candidate simulations | `100` |
+| Opponent simulations | `100` |
+| Match rules source | candidate config |
+| Match score komi | `4.5` |
+| Match max moves | `150` |
+
+Results:
+
+| Pair type | Pair | Candidate wins | Candidate as Black | Candidate as White | Early pass `<40` |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `1x approximate` | `new240-vs-old250` | `4/10` | `2/5` | `2/5` | `10.00%` |
+| `1x approximate` | `new250-vs-old250` | `2/10` | `1/5` | `1/5` | `0.00%` |
+| `1x approximate` | `new260-vs-old250` | `6/10` | `5/5` | `1/5` | `10.00%` |
+| `1x approximate` | `new270-vs-old300` | `4/10` | `2/5` | `2/5` | `0.00%` |
+| `2x approximate` | `new240-vs-old500` | `7/10` | `5/5` | `2/5` | `10.00%` |
+| `2x approximate` | `new250-vs-old500` | `3/10` | `1/5` | `2/5` | `0.00%` |
+| `2x approximate` | `new260-vs-old520` | `7/10` | `4/5` | `3/5` | `0.00%` |
+| `2x approximate` | `new270-vs-old530` | `3/10` | `3/5` | `0/5` | `0.00%` |
+
+Observed interpretation:
+
+- The results are not monotonic by candidate checkpoint. Cycles `240` and
+  `260` look stronger than cycles `250` and `270` in this quick test.
+- The `1x` block is a cleaner near-age comparison than the `2x` block.
+- The `2x` block should be read cautiously because the old `500/520/530`
+  opponents come from later score-komi settings, not from the exact same old
+  `score_komi=2.5` line.
+- Color split remains important. `new260-vs-old250` is `5/5` as Black but only
+  `1/5` as White; `new270-vs-old530` is `3/5` as Black and `0/5` as White.
+
+### 300-Sim Rerun Of Stronger Comparison Pairs
+
+Reason:
+
+- The 100-sim comparison made cycles `240` and `260` look like the stronger
+  candidate checkpoints.
+- The user asked to rerun the stronger comparison-experiment cases at
+  `300` simulations.
+
+Artifacts:
+
+- Partial server output:
+  `/root/diamondgo/artifacts/compare-experiment-strong-300sims-dualgpu2x96-20260607`
+- Missing-pair server output:
+  `/root/diamondgo/artifacts/compare-experiment-strong-300sims-dualgpu2x96-missing-20260607`
+- Local combined dashboard:
+  `artifacts/compare-experiment-strong-300sims-dualgpu2x96-combined-20260607/dashboard.html`
+- Local combined games dashboard:
+  `artifacts/compare-experiment-strong-300sims-dualgpu2x96-combined-20260607/games_dashboard.html`
+- Local combined summary:
+  `artifacts/compare-experiment-strong-300sims-dualgpu2x96-combined-20260607/summary.json`
+
+Run note:
+
+- The first SSH session was reset after three pairs had completed. The missing
+  fourth pair was rerun separately and then merged locally into the combined
+  dashboard above.
+
+Settings:
+
+| Field | Value |
+| --- | --- |
+| Games per pair | `10` |
+| Color split | candidate Black `5`, candidate White `5` |
+| Candidate simulations | `300` |
+| Opponent simulations | `300` |
+| Match rules source | candidate config |
+| Match score komi | `4.5` |
+| Match max moves | `150` |
+
+Results:
+
+| Pair | Candidate wins | Candidate as Black | Candidate as White | Early pass `<40` |
+| --- | ---: | ---: | ---: | ---: |
+| `new240-vs-old250` | `7/10` | `5/5` | `2/5` | `10.00%` |
+| `new240-vs-old500` | `5/10` | `3/5` | `2/5` | `20.00%` |
+| `new260-vs-old250` | `5/10` | `4/5` | `1/5` | `0.00%` |
+| `new260-vs-old520` | `0/10` | `0/5` | `0/5` | `0.00%` |
+
+Observed interpretation:
+
+- Cycle `240` is more stable under higher search than cycle `260` in these
+  selected comparisons.
+- Cycle `260` looked good at 100 sims, but the high-search rerun undermines
+  that conclusion, especially the `new260-vs-old520` case changing from `7/10`
+  at 100 sims to `0/10` at 300 sims.
+- The color split is still a warning sign: `new260-vs-old250` remains mostly a
+  Black-side result (`4/5` as Black, `1/5` as White).
+
+## Dual-GPU 2x96 Score4.5 18h + 3h Continuation
+
+Context:
+
+- The 18-hour fresh dual-GPU `2x96`, `score_komi=4.5`, `250`-simulation run
+  was allowed to finish, then a queue watcher immediately launched a 3-hour
+  continuation from the 18-hour run's `latest.pt`.
+- The original 18-hour finalizer was intentionally stopped before it could run,
+  so eval would not compete with the requested continuation training. Eval and
+  tactical probes were run after the +3h continuation instead.
+- The continuation preserves checkpoint cycle numbering from the resumed
+  checkpoint. The run ended at cycle `272`, not at a fresh cycle `36`.
+
+Artifacts:
+
+- Local archive:
+  `artifacts/server-runs/20260607-dualgpu-2x96-18h-plus3h/diamondgo-dualgpu-2x96-18h-plus3h-20260607.tar.gz`
+- Local extracted root:
+  `artifacts/server-runs/20260607-dualgpu-2x96-18h-plus3h/artifacts/`
+- 18h training directory:
+  `artifacts/server-runs/20260607-dualgpu-2x96-18h-plus3h/artifacts/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607`
+- +3h continuation directory:
+  `artifacts/server-runs/20260607-dualgpu-2x96-18h-plus3h/artifacts/multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607`
+- Continuation eval suite:
+  `artifacts/server-runs/20260607-dualgpu-2x96-18h-plus3h/artifacts/eval-suite-cont-dualgpu-2x96-score4p5-margin0p2-250sims-train-100sims-eval-3h-after18h-20260607`
+- Continuation tactical probes:
+  `artifacts/server-runs/20260607-dualgpu-2x96-18h-plus3h/artifacts/tactical-cont-dualgpu-2x96-score4p5-margin0p2-250sims-train-100sims-eval-3h-after18h-20260607`
+
+Training settings:
+
+| Field | Value |
+| --- | --- |
+| Architecture | `2` residual blocks x `96` channels |
+| Parameters | `356,957` |
+| Input komi | `false` |
+| Komi metadata | `0.5` |
+| Score komi | `4.5` |
+| Terminal dead-stone cleanup | `false` |
+| Score margin reward scale | `0.2` |
+| Rules backend | `sgfmill` |
+| Self-play simulations | `250` |
+| Workers | `12` |
+| Self-play devices | `cuda:0,cuda:1` |
+| Trainer device | `cuda:0` |
+| Games per worker | `8` |
+| Games per cycle | `96` |
+| Max moves | `150` |
+| Train steps per cycle | `64` |
+| Batch size | `256` |
+| Replay size | `100,000` |
+| Learning rate | `0.001` |
+| Weight decay | `0.0001` |
+| `c_puct` | `1.5` |
+| Root noise | Dirichlet alpha `0.15`, fraction `0.25` |
+| Root policy temperature | `1.1` |
+| Move temperature | `1.0` for first `16` moves, then `0.25` |
+| Augmentation | Random dihedral transforms |
+| SGF/trace archive | Every `5` cycles |
+
+Training results:
+
+| Segment | Start time | End time | Final cycle | Segment cycles | Total positions at end | Recent speed | Checkpoints | SGF/trace records |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 18h fresh run | `2026-06-06 23:51 +08` | `2026-06-07 17:52 +08` | `236` | `236` | `2,452,260` | `38.53 pos/s` over cycles `232-236` | `28` | `47/47` |
+| +3h continuation | `2026-06-07 17:52 +08` | `2026-06-07 20:57 +08` | `272` | `36` | `2,857,846` | `36.82 pos/s` over cycles `268-272` | `4` | `7/7` |
+
+Final self-play snapshot:
+
+| Segment | Cycle | Games | Positions | Black win rate | White win rate | Early pass `<40` | Mean moves | Max-move games | Color alert |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 18h final | `236` | `96` | `11,252` | `64.58%` | `35.42%` | `16.67%` | `117.208` | `32` | none |
+| +3h final | `272` | `96` | `11,026` | `76.04%` | `23.96%` | `12.50%` | `114.854` | `33` | `black` |
+| +3h recent 5 | `268-272` | `480` | n/a | `75.83%` | `24.17%` | `15.62%` | n/a | n/a | n/a |
+
+GPU monitor during the +3h continuation:
+
+| GPU | Mean util | Recent mean util | Max util | Max memory |
+| ---: | ---: | ---: | ---: | ---: |
+| `0` | `38.21%` | `37.62%` | `90%` | `4017 MiB` |
+| `1` | `36.11%` | `35.37%` | `87%` | `1991 MiB` |
+
+Continuation eval settings:
+
+| Field | Value |
+| --- | --- |
+| Eval simulations | `100` |
+| Games per match | `20` |
+| Max moves | `150` |
+| Sample SGFs per match | `2` |
+| Opponents requested | `initial,previous` |
+| Step tiers requested | `50,200,500` |
+
+Important eval caveat:
+
+- `eval_suite` chooses "previous" from the checkpoints available inside the
+  checkpoint directory being evaluated. In this continuation directory,
+  checkpoint files are `cycle-00240`, `cycle-00250`, `cycle-00260`,
+  `cycle-00270`, plus `latest` cycle `272`.
+- Therefore, the useful n+50-style continuation comparison is
+  `cycle-00272` versus `cycle-00250` in the `step-00050-vs-previous` report.
+- The `step-00200-vs-previous` and `step-00500-vs-previous` reports include
+  only `latest`, so their "previous" opponent is effectively still the initial
+  model. Do not read those two as true previous-checkpoint comparisons.
+
+Eval results:
+
+| Eval report | Candidate | Opponent | Win rate | Wins | Black wins | White wins | First pass median | First pass `<40` |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `step-00050-vs-initial` | `cycle-00250` | `cycle-00000` | `55.0%` | `11/20` | `1/10` | `10/10` | `30.5` | `17/20` |
+| `step-00050-vs-initial` | `cycle-00272` | `cycle-00000` | `85.0%` | `17/20` | `7/10` | `10/10` | `30.0` | `15/20` |
+| `step-00050-vs-previous` | `cycle-00250` | `cycle-00000` | `55.0%` | `11/20` | `1/10` | `10/10` | `30.5` | `17/20` |
+| `step-00050-vs-previous` | `cycle-00272` | `cycle-00250` | `85.0%` | `17/20` | `10/10` | `7/10` | `57.0` | `1/20` |
+| `step-00200-vs-initial` | `cycle-00272` | `cycle-00000` | `75.0%` | `15/20` | `5/10` | `10/10` | `33.0` | `15/20` |
+| `step-00500-vs-initial` | `cycle-00272` | `cycle-00000` | `75.0%` | `15/20` | `5/10` | `10/10` | `33.0` | `15/20` |
+
+Tactical probe results for continuation latest:
+
+| Case | Target | Top1 | Top3 | Rank |
+| --- | --- | --- | --- | ---: |
+| `black_capture_one_stone` | `C8` | false | false | n/a |
+| `white_capture_one_stone` | `F5` | true | true | `1` |
+| `black_escape_atari` | `D7` | false | false | `5` |
+| `white_escape_atari` | `F3` | false | false | n/a |
+
+Observed interpretation:
+
+- The +3h continuation did continue learning by the eval metric:
+  `cycle-272` beat `cycle-250` by `17/20` in the valid `step-50 vs previous`
+  match.
+- The color issue is still substantial. Final self-play is about
+  `76%` Black wins, and eval versus initial often has the candidate winning all
+  White games. This should be read together with the pass metrics, not as a
+  clean strength number.
+- The `cycle-272 vs cycle-250` eval has much healthier pass timing than the
+  initial-opponent eval: first-pass `<=40` is `1/20`, while vs initial remains
+  `15/20`.
+- Tactical probes are still weak. Only `white_capture_one_stone` is top1/top3;
+  the black capture and both atari-escape probes fail. This supports the user's
+  earlier concern that higher aggregate win rate does not necessarily mean the
+  model has learned the local tactics we care about.
+
+## Dual-GPU 2x96 Score6.5 400-Sim 7-Day Continuation
+
+Context:
+
+- After the 18h+3h continuation ended at cycle `272`, the user asked to raise
+  scoring komi to `6.5`, raise self-play MCTS simulations to `400`, and start a
+  7-day continuation.
+- This is a continuation from the `score_komi=4.5`, `250`-simulation
+  `cycle-272` latest checkpoint, not a fresh run.
+- The change is intentionally narrow: scoring komi and search count change;
+  model architecture, no-komi input, margin reward, worker layout, max moves,
+  and recording cadence stay aligned with the previous dual-GPU run.
+
+Start snapshot:
+
+| Field | Value |
+| --- | --- |
+| Launch time | `2026-06-07 22:23:53 +08` |
+| Server train PID | `225750` |
+| Server finalizer PID | `225751` |
+| Resume checkpoint | `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607/latest.pt` |
+| Output directory | `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-margin0p2-400sims-max150-7d-after18hplus3h-20260607` |
+| Eval output directory | `/root/diamondgo/artifacts/eval-suite-cont-dualgpu-2x96-score6p5-margin0p2-400sims-train-100sims-eval-7d-after18hplus3h-20260607` |
+| Tactical output directory | `/root/diamondgo/artifacts/tactical-cont-dualgpu-2x96-score6p5-margin0p2-400sims-train-100sims-eval-7d-after18hplus3h-20260607` |
+
+Training settings:
+
+| Field | Value |
+| --- | --- |
+| Architecture | `2` residual blocks x `96` channels |
+| Parameters | `356,957` |
+| Input komi | `false` |
+| Komi metadata | `0.5` |
+| Score komi | `6.5` |
+| Terminal dead-stone cleanup | `false` |
+| Score margin reward scale | `0.2` |
+| Rules backend | `sgfmill` |
+| Self-play simulations | `400` |
+| Workers | `12` |
+| Self-play devices | `cuda:0,cuda:1` |
+| Trainer device | `cuda:0` |
+| Games per worker | `8` |
+| Games per cycle | `96` |
+| Max moves | `150` |
+| Train steps per cycle | `64` |
+| Batch size | `256` |
+| Replay size | `100,000` |
+| Learning rate | `0.001` |
+| Weight decay | `0.0001` |
+| `c_puct` | `1.5` |
+| Root noise | Dirichlet alpha `0.15`, fraction `0.25` |
+| Root policy temperature | `1.1` |
+| Move temperature | `1.0` for first `16` moves, then `0.25` |
+| Augmentation | Random dihedral transforms |
+| SGF/trace archive | Every `5` cycles |
+| Time limit | `10080` minutes, 7 days |
+
+Monitoring:
+
+- Codex heartbeat monitoring was scheduled every `3` hours.
+- The server training script also appends a local status snapshot every `3`
+  hours to:
+  `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-margin0p2-400sims-max150-7d-after18hplus3h-20260607/status_3h.log`
+- This server-side log matters because remote training continues even if the
+  user's local computer or Codex app is offline; local heartbeat checks may not
+  fire while the local environment is unavailable.
+
+Initial launch check:
+
+- About one minute after launch, both training and finalizer shells were alive.
+- GPU snapshot was roughly GPU0 `41%`, `4118 MiB`; GPU1 `33%`, `1991 MiB`.
+- No cycle metrics had completed yet, which is expected because `400`
+  simulations should make each cycle longer than the previous `250`-simulation
+  run.
+
+Cleanup transition:
+
+- User observation: terminal dead stones are already causing visible problems,
+  so the active 7-day run should include obvious-dead cleanup.
+- Safety constraint from user: do not pause the active training until cleanup
+  behavior is tested.
+- Tests run before pausing:
+  - `PYTHONPATH=src pytest -q tests/test_terminal_rewards.py tests/test_play_server_rules.py`
+    passed: `5 passed, 2 skipped`.
+  - CPU smoke:
+    `python -m diamondgo.multiworker_train ... --terminal-dead-stone-cleanup`
+    completed one tiny `sgfmill` cycle and serialized
+    `terminal_dead_stone_cleanup=true` into the checkpoint config.
+  - Full `pytest` through the `pytest.exe` shim failed because that shim used
+    an Anaconda environment without `torch`; this was an environment mismatch,
+    not a cleanup test failure. The torch-using smoke path ran with the active
+    `python` interpreter.
+- Important failed experiment before the switch:
+  - An attempted broader edge cleanup rule was tested and rejected because it
+    falsely marked edge groups as dead in positions where an outside edge group
+    surrounds an interior group.
+  - Therefore the enabled cleanup remains conservative: it removes only groups
+    that have fewer than two solid eyes, whose removal creates an empty region
+    not touching the board edge, bordered only by opponent stones.
+- The no-cleanup score6.5/400 segment was stopped after reaching checkpoint
+  cycle `276`.
+  - Backup checkpoint:
+    `/root/autodl-tmp/diamondgo-checkpoint-backups/score6p5_400sims_precleanup_cycle276_latest.pt`
+  - Old train PID: `225750`
+  - Old finalizer PID: `225751`
+  - Old no-cleanup output remains preserved at:
+    `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-margin0p2-400sims-max150-7d-after18hplus3h-20260607`
+- Cleanup-enabled continuation launched from that backup at
+  `2026-06-07 23:05:43 +08`.
+  - Train PID: `230774`
+  - Finalizer PID: `230775`
+  - Output directory:
+    `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-max150-7d-after18hplus3h-20260607`
+  - Eval directory:
+    `/root/diamondgo/artifacts/eval-suite-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-train-100sims-eval-7d-after18hplus3h-20260607`
+  - Tactical directory:
+    `/root/diamondgo/artifacts/tactical-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-train-100sims-eval-7d-after18hplus3h-20260607`
+- Launch check for cleanup run:
+  - `config.json` confirms `terminal_dead_stone_cleanup=true`,
+    `score_komi=6.5`, `input_komi=false`, `simulations=400`,
+    `max_moves=150`, `workers=12`, `games_per_worker=8`, and
+    `record_every=5`.
+  - GPU snapshot shortly after launch: GPU0 about `52%`, `7626 MiB`; GPU1
+    about `35%`, `3981 MiB`.
+  - First cleanup-enabled cycle had not yet completed at the launch check, so
+    cleanup counts should be inspected by the 3-hour monitor once metrics start
+    arriving.

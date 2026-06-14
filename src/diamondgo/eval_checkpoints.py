@@ -401,6 +401,8 @@ def dashboard_state(results: list[dict[str, object]], board_size: int) -> dict[s
                     "winner": str(game["winner"]),
                     "candidateWon": bool(game["candidate_won"]),
                     "movesPlayed": int(game["moves_played"]),
+                    "terminalCleanupBlackStones": int(game.get("terminal_cleanup_black_stones", 0)),
+                    "terminalCleanupWhiteStones": int(game.get("terminal_cleanup_white_stones", 0)),
                     "moves": [
                         {
                             "moveNumber": int(move["move_number"]),
@@ -521,13 +523,16 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
       gap: 10px;
       margin-bottom: 14px;
     }}
-    select {{
+    select, input[type="text"] {{
       height: 34px;
       border: 1px solid #b8c4c0;
       border-radius: 6px;
       background: #fff;
       color: #203033;
       padding: 0 8px;
+    }}
+    input[type="text"] {{
+      min-width: 220px;
     }}
     .board-wrap {{
       padding: 12px;
@@ -542,6 +547,13 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
       gap: 10px;
       align-items: center;
       margin-top: 14px;
+    }}
+    .authoring {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 12px;
     }}
     button {{
       min-width: 42px;
@@ -567,6 +579,13 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     }}
     .box b {{ display: block; color: #657174; font-size: 12px; margin-bottom: 4px; }}
     .box span {{ font-size: 18px; }}
+    .status {{
+      min-height: 20px;
+      color: #657174;
+      font-size: 13px;
+    }}
+    .status.ok {{ color: #166534; font-weight: 700; }}
+    .status.error {{ color: #9f1239; font-weight: 700; }}
     .candidate-list {{
       display: grid;
       gap: 9px;
@@ -624,6 +643,12 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
             <input id="move-slider" type="range" min="0" value="0">
             <span id="move-count"></span>
           </div>
+          <div class="authoring">
+            <input id="puzzle-name" type="text" placeholder="Optional puzzle name">
+            <button type="button" id="save-puzzle">Save as puzzle</button>
+            <button type="button" id="open-puzzle-author">Open author</button>
+          </div>
+          <div id="puzzle-status" class="status"></div>
         </div>
         <div class="panel">
           <div class="box"><b>Game</b><span id="game-info"></span></div>
@@ -650,6 +675,11 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     const moveInfo = document.getElementById("move-info");
     const rootValue = document.getElementById("root-value");
     const candidateList = document.getElementById("candidate-list");
+    const puzzleNameInput = document.getElementById("puzzle-name");
+    const savePuzzleButton = document.getElementById("save-puzzle");
+    const openPuzzleAuthorButton = document.getElementById("open-puzzle-author");
+    const puzzleStatus = document.getElementById("puzzle-status");
+    const puzzleStorageKey = "diamondgo-puzzle-author-v1";
 
     function makeSvg(name, attributes = {{}}, text = "") {{
       const node = document.createElementNS("http://www.w3.org/2000/svg", name);
@@ -665,6 +695,15 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
         x: state.pad + col * state.cell,
         y: state.pad + row * state.cell
       }};
+    }}
+
+    function pointArrayFor(action) {{
+      if (action >= state.boardSize * state.boardSize) return null;
+      return [Math.floor(action / state.boardSize), action % state.boardSize];
+    }}
+
+    function moveText(move) {{
+      return move?.move || (move ? String(move.action) : "");
     }}
 
     function neighbors(action) {{
@@ -699,6 +738,103 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
       return {{ stones: [...seen], liberties: liberties.size }};
     }}
 
+    function stoneGroups(boardState) {{
+      const groups = [];
+      const visited = new Set();
+      boardState.forEach((stone, action) => {{
+        if (!stone || visited.has(action)) return;
+        const stack = [action];
+        const stones = [];
+        visited.add(action);
+        while (stack.length) {{
+          const current = stack.pop();
+          stones.push(current);
+          neighbors(current).forEach((next) => {{
+            const nextStone = boardState[next];
+            if (nextStone?.color === stone.color && !visited.has(next)) {{
+              visited.add(next);
+              stack.push(next);
+            }}
+          }});
+        }}
+        groups.push({{ color: stone.color, stones }});
+      }});
+      return groups;
+    }}
+
+    function emptyRegion(boardState, seeds) {{
+      const region = [];
+      const borders = new Set();
+      const seen = new Set();
+      const stack = seeds.filter((action) => !boardState[action]);
+      stack.forEach((action) => seen.add(action));
+      while (stack.length) {{
+        const action = stack.pop();
+        region.push(action);
+        neighbors(action).forEach((next) => {{
+          const stone = boardState[next];
+          if (stone) {{
+            borders.add(stone.color);
+            return;
+          }}
+          if (!seen.has(next)) {{
+            seen.add(next);
+            stack.push(next);
+          }}
+        }});
+      }}
+      return {{ region, borders }};
+    }}
+
+    function regionTouchesEdge(region) {{
+      return region.some((action) => {{
+        const row = Math.floor(action / state.boardSize);
+        const col = action % state.boardSize;
+        return row === 0 || col === 0 || row === state.boardSize - 1 || col === state.boardSize - 1;
+      }});
+    }}
+
+    function solidEyeCount(boardState, stones, color) {{
+      const seenRegions = new Set();
+      let eyes = 0;
+      stones.forEach((stoneAction) => {{
+        neighbors(stoneAction).forEach((next) => {{
+          if (boardState[next]) return;
+          const {{ region, borders }} = emptyRegion(boardState, [next]);
+          const key = [...region].sort((a, b) => a - b).join("|");
+          if (seenRegions.has(key)) return;
+          seenRegions.add(key);
+          if (borders.size === 1 && borders.has(color)) eyes += 1;
+        }});
+      }});
+      return eyes;
+    }}
+
+    function applyTerminalCleanup(boardState) {{
+      const dead = [];
+      stoneGroups(boardState).forEach((group) => {{
+        if (solidEyeCount(boardState, group.stones, group.color) >= 2) return;
+        const removed = boardState.map((stone) => stone ? {{ ...stone }} : null);
+        group.stones.forEach((action) => {{ removed[action] = null; }});
+        const {{ region, borders }} = emptyRegion(removed, group.stones);
+        const opponent = group.color === "b" ? "w" : "b";
+        if (region.length && !regionTouchesEdge(region) && borders.size === 1 && borders.has(opponent)) {{
+          dead.push(group);
+        }}
+      }});
+      const counts = {{ b: 0, w: 0 }};
+      dead.forEach((group) => {{
+        group.stones.forEach((action) => {{ boardState[action] = null; }});
+        counts[group.color] += group.stones.length;
+      }});
+      return counts;
+    }}
+
+    function terminalCleanupApplies(game, index) {{
+      if (index < game.moves.length - 1) return false;
+      return Number(game.terminalCleanupBlackStones || 0) > 0 || Number(game.terminalCleanupWhiteStones || 0) > 0;
+    }}
+
     function replayBoard(index) {{
       const boardState = Array(state.boardSize * state.boardSize).fill(null);
       const game = currentGame();
@@ -721,6 +857,7 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
           own.stones.forEach((action) => {{ boardState[action] = null; }});
         }}
       }});
+      if (terminalCleanupApplies(game, index)) applyTerminalCleanup(boardState);
       return boardState;
     }}
 
@@ -731,6 +868,84 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     function currentGame() {{
       const match = currentMatch();
       return match.gamesDetail[Number(gameSelect.value)] || match.gamesDetail[0];
+    }}
+
+    function setPuzzleStatus(message, kind = "") {{
+      puzzleStatus.textContent = message;
+      puzzleStatus.className = `status ${{kind}}`;
+    }}
+
+    function boardPointsFor(boardState, color) {{
+      const points = [];
+      boardState.forEach((stone, action) => {{
+        if (stone?.color === color) points.push(pointArrayFor(action));
+      }});
+      return points.filter(Boolean);
+    }}
+
+    function nextPlayerAfter(index) {{
+      const game = currentGame();
+      const nextMove = game.moves[index + 1];
+      if (nextMove?.player) return nextMove.player;
+      const current = game.moves[index];
+      if (current?.player) return current.player === "b" ? "w" : "b";
+      return "b";
+    }}
+
+    function loadPuzzleDraft() {{
+      try {{
+        const saved = JSON.parse(localStorage.getItem(puzzleStorageKey) || "null");
+        if (saved && Array.isArray(saved.cases)) {{
+          return {{ version: 1, board_size: state.boardSize, cases: saved.cases }};
+        }}
+      }} catch (_err) {{
+        // Use a fresh draft if localStorage contains an old or broken value.
+      }}
+      return {{ version: 1, board_size: state.boardSize, cases: [] }};
+    }}
+
+    function isEmptyPuzzleCase(item) {{
+      return item
+        && !item.black?.length
+        && !item.white?.length
+        && !item.good?.length
+        && !item.bad?.length
+        && !item.note;
+    }}
+
+    function saveCurrentPuzzle() {{
+      const match = currentMatch();
+      const game = currentGame();
+      if (!game || !game.moves.length) {{
+        setPuzzleStatus("No evaluation game is loaded yet.", "error");
+        return;
+      }}
+      const index = Math.max(0, Math.min(game.moves.length - 1, Number(slider.value)));
+      const currentMove = game.moves[index];
+      const boardState = replayBoard(index);
+      const matchLabel = `match-${{Number(matchSelect.value) + 1}}`;
+      const gameLabel = `game-${{String(game.game).padStart(2, "0")}}`;
+      const moveLabel = `move-${{String(currentMove.moveNumber).padStart(3, "0")}}`;
+      const autoName = `${{matchLabel}}_${{gameLabel}}_${{moveLabel}}`;
+      const cleanupNote = terminalCleanupApplies(game, index)
+        ? ` Terminal cleanup was applied for this final position: B ${{game.terminalCleanupBlackStones || 0}} / W ${{game.terminalCleanupWhiteStones || 0}} stones.`
+        : "";
+      const puzzleCase = {{
+        name: puzzleNameInput.value.trim() || autoName,
+        category: "eval_match_snapshot",
+        subcategory: `${{match.candidate}} vs ${{match.opponent}}`,
+        to_play: nextPlayerAfter(index),
+        black: boardPointsFor(boardState, "b"),
+        white: boardPointsFor(boardState, "w"),
+        good: [],
+        bad: [],
+        note: `Source evaluation dashboard, ${{match.candidate}} vs ${{match.opponent}}, ${{gameLabel}}, after move ${{currentMove.moveNumber}} ${{currentMove.player.toUpperCase()}} ${{moveText(currentMove)}}.${{cleanupNote}}`
+      }};
+      const draft = loadPuzzleDraft();
+      if (draft.cases.length === 1 && isEmptyPuzzleCase(draft.cases[0])) draft.cases[0] = puzzleCase;
+      else draft.cases.push(puzzleCase);
+      localStorage.setItem(puzzleStorageKey, JSON.stringify(draft));
+      setPuzzleStatus(`Saved move ${{currentMove.moveNumber}} position as puzzle "${{puzzleCase.name}}", answer left empty.`, "ok");
     }}
 
     function populateMatches() {{
@@ -826,6 +1041,10 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     slider.addEventListener("input", () => render(Number(slider.value)));
     prevButton.addEventListener("click", () => render(Number(slider.value) - 1));
     nextButton.addEventListener("click", () => render(Number(slider.value) + 1));
+    savePuzzleButton.addEventListener("click", saveCurrentPuzzle);
+    openPuzzleAuthorButton.addEventListener("click", () => {{
+      location.href = "../viewers/puzzle-author.html";
+    }});
     populateMatches();
     populateGames();
   </script>
@@ -894,7 +1113,9 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         results.append(result)
         (out_dir / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
         (out_dir / "report.md").write_text(markdown_report(results), encoding="utf-8")
-        (out_dir / "dashboard.html").write_text(render_eval_dashboard(results, config.board_size), encoding="utf-8")
+        dashboard = render_eval_dashboard(results, config.board_size)
+        (out_dir / "dashboard.html").write_text(dashboard, encoding="utf-8")
+        (out_dir / "games_dashboard.html").write_text(dashboard, encoding="utf-8")
         print(json.dumps({key: value for key, value in result.items() if key != "games_detail"}), flush=True)
         previous_model = candidate_model
         previous_name = candidate_name
@@ -905,6 +1126,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "report_path": str(out_dir / "report.md"),
         "results_path": str(out_dir / "results.json"),
         "dashboard_path": str(out_dir / "dashboard.html"),
+        "games_dashboard_path": str(out_dir / "games_dashboard.html"),
         "sample_sgf_dir": str(out_dir / "sample-sgf"),
     }
 

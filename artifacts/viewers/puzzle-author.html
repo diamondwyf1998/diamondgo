@@ -412,16 +412,25 @@ function applyTool(row, col) {
   persist();
   refreshUi();
 }
-function loadPayload(payload) {
+function loadPayload(payload, focus = "first") {
   const rawCases = Array.isArray(payload) ? payload : payload.cases;
   if (!Array.isArray(rawCases) || rawCases.length === 0) {
     throw new Error("JSON needs a non-empty cases array");
   }
   cases = rawCases.map((item, index) => normalizeCase(item, index));
-  current = 0;
+  current = focus === "last" ? cases.length - 1 : 0;
   syncFieldsFromCase();
   persist();
   refreshUi();
+}
+function loadSavedDraft(focus = "last") {
+  const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+  if (saved) loadPayload(saved, focus);
+  else {
+    cases = [emptyCase(0)];
+    syncFieldsFromCase();
+    refreshUi();
+  }
 }
 function pythonCase(item) {
   const clean = normalizeCase(item);
@@ -544,15 +553,18 @@ document.querySelector("#resetStorage").addEventListener("click", () => {
   persist();
   refreshUi();
 });
+window.addEventListener("storage", event => {
+  if (event.key !== storageKey || !event.newValue) return;
+  try {
+    loadPayload(JSON.parse(event.newValue), "last");
+    setStatus("当前题目草稿已从自对弈页面更新。", "ok");
+  } catch (err) {
+    setStatus(err.message, "error");
+  }
+});
 
 try {
-  const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
-  if (saved) loadPayload(saved);
-  else {
-    cases = [emptyCase(0)];
-    syncFieldsFromCase();
-    refreshUi();
-  }
+  loadSavedDraft();
 } catch (_err) {
   cases = [emptyCase(0)];
   syncFieldsFromCase();

@@ -217,9 +217,8 @@ document.querySelector("#undo").addEventListener("click", () => {
 });
 document.querySelector("#pass").addEventListener("click", () => playHuman(81));
 document.querySelector("#humanColor").addEventListener("change", () => document.querySelector("#newGame").click());
-document.querySelector("#checkpoint").addEventListener("change", async event => {
+async function loadCheckpointById(id) {
   if (busy) return;
-  const id = event.target.value;
   if (!id) return;
   busy = true;
   document.querySelector("#status").textContent = "Loading checkpoint...";
@@ -244,6 +243,9 @@ document.querySelector("#checkpoint").addEventListener("change", async event => 
     busy = false;
     document.querySelector("#newGame").click();
   }
+}
+document.querySelector("#checkpoint").addEventListener("change", async event => {
+  await loadCheckpointById(event.target.value);
 });
 async function loadCheckpoints() {
   try {
@@ -267,6 +269,11 @@ async function loadCheckpoints() {
       select.append(option);
     }
     if (data.current) select.value = data.current;
+    const requested = new URLSearchParams(location.search).get("checkpoint");
+    if (requested && checkpointCatalog.some(item => item.id === requested) && requested !== select.value) {
+      select.value = requested;
+      await loadCheckpointById(requested);
+    }
   } catch (err) {
     document.querySelector("#checkpoint").innerHTML = "";
   }
