@@ -2025,3 +2025,51 @@ Launch check:
   `7.6 GiB / 12 GiB` on GPU1.
 - This is a second deliberate intervention point after the `400 -> 800` search
   change. Downstream plots should annotate both transitions separately.
+
+## Server Final Preservation Before Expiry
+
+Date: 2026-06-14.
+
+Purpose:
+
+- Stop remaining server-side training work and preserve the important outputs
+  locally before the rented server expires.
+
+Stop state:
+
+| Field | Value |
+| --- | --- |
+| Stop time on server | `2026-06-14T12:02:27+08:00` |
+| GPU compute apps after stop | none |
+| GPU memory after stop | about `1 MiB / 12 GiB` on each GPU |
+| DiamondGo train/eval/finalizer processes after stop | none |
+| Last complete score6.5/800 metric cycle | `927` |
+| Score7.5/800 status | started, then stopped before first full cycle |
+| Score7.5/800 metrics/checkpoints/SGFs | none produced |
+
+Local preserved artifacts:
+
+| Item | Local path |
+| --- | --- |
+| Final preserve directory | `artifacts/server-final-preserve-20260614/` |
+| SHA manifest | `artifacts/server-final-preserve-20260614/SHA256SUMS.txt` |
+| Server final summary | `artifacts/server-final-preserve-20260614/server-final-summary.txt` |
+| Transition backup checkpoints | `artifacts/server-final-preserve-20260614/checkpoint-backups-selected.tar.gz` |
+| Score7.5/800 metadata | `artifacts/server-final-preserve-20260614/score7p5-800sims-after6p5-metadata.tar.gz` |
+| Score6.5 cleanup 400-sim checkpoints | `artifacts/server-final-preserve-20260614/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-max150-7d-after18hplus3h-20260607-checkpoints.tar.gz` |
+| Score6.5 cleanup 400-sim cycle records | `artifacts/server-final-preserve-20260614/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-400sims-max150-7d-after18hplus3h-20260607-cycle-records.tar.gz` |
+| Score6.5 cleanup 800-sim checkpoints | `artifacts/server-final-preserve-20260614/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-800sims-max150-after400-20260611-checkpoints.tar.gz` |
+| Score6.5 cleanup 800-sim cycle records | `artifacts/server-final-preserve-20260614/multiworker-9x9-cont-dualgpu-2x96-score6p5-cleanup-margin0p2-800sims-max150-after400-20260611-cycle-records.tar.gz` |
+| Dual-GPU 4.5/250 18h checkpoints | `artifacts/server-final-preserve-20260614/multiworker-9x9-fresh-dualgpu-2x96-score4p5-margin0p2-250sims-max150-18h-20260607-checkpoints.tar.gz` |
+| Dual-GPU 4.5/250 +3h checkpoints | `artifacts/server-final-preserve-20260614/multiworker-9x9-cont-dualgpu-2x96-score4p5-margin0p2-250sims-max150-3h-after18h-20260607-checkpoints.tar.gz` |
+| Short score5.5/300 20m checkpoints | `artifacts/server-final-preserve-20260614/multiworker-9x9-fresh-dualgpu-2x96-score5p5-margin0p2-300sims-max150-20m-20260607-checkpoints.tar.gz` |
+
+Verification:
+
+- All preserved `.tar.gz` files listed in `SHA256SUMS.txt` were downloaded to
+  the local preserve directory and SHA256-verified.
+- Total local preserve size is about `626.7 MB`.
+- The server-side source checkout reported old HEAD `7199135`; this is not the
+  authoritative code state because recent operational scripts were copied to
+  the server manually. The authoritative source and notes are the GitHub
+  commits through the preservation note commit.

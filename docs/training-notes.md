@@ -847,3 +847,27 @@ needs a shape/distribution metric before treating it as a measured result.
 - `Immediate resource check`: The new process started successfully with
   `score_komi=7.5`; GPU memory was high at about `11.8 GiB / 12 GiB` on GPU0
   and `7.6 GiB / 12 GiB` on GPU1, so monitor for OOM or stalled metrics.
+
+### Server Expiry Stop And Final Preservation
+
+- `User request`: Stop the server work and make sure repository/artifacts are
+  uploaded because the server expires today.
+- `Technical operation`: All DiamondGo training/eval/finalizer wrapper
+  processes and leftover GPU Python workers were stopped. A final GPU check
+  showed no compute apps and about `1 MiB` used on each GPU.
+- `Important result`: The `score7.5/800` continuation did start successfully,
+  but it did not finish a full cycle before the stop request. It produced
+  config/log metadata only, no metrics row, no checkpoint, and no SGF.
+- `Last complete active-training data before the stop`: the preceding
+  `score6.5/800` segment reached latest metric cycle `927`; latest regular
+  checkpoint was `cycle-00920.pt`, latest recorded SGF was `cycle-00925.sgf`,
+  and recent-12 black win rate was about `67.54%`.
+- `Local final preserve`: downloaded and SHA-verified under
+  `artifacts/server-final-preserve-20260614/`, total about `626.7 MB`.
+  Contents include selected checkpoint archives, transition checkpoint
+  backups, cycle-record archives for the main cleanup runs, and the
+  `score7.5/800` metadata archive.
+- `Server git caveat`: the server working copy still reported old HEAD
+  `7199135`; operational scripts had been copied to the server directly.
+  The authoritative source/docs/scripts are on GitHub via local commits through
+  `7d2785e` and later preservation notes.
