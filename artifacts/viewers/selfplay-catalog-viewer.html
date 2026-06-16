@@ -23,6 +23,12 @@
   .stat b { display: block; font-size: 12px; color: #627d98; margin-bottom: 3px; }
   ol { margin: 8px 0 0; padding-left: 22px; }
   li { margin: 7px 0; }
+  .mcts-wrap { max-height: 320px; overflow: auto; border: 1px solid #e4e7eb; border-radius: 6px; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid #edf1f5; text-align: right; font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  th { position: sticky; top: 0; background: #fbfaf6; color: #52606d; font-size: 12px; z-index: 1; }
+  .muted { color: #627d98; font-size: 12px; }
   .move-list { max-height: 260px; overflow: auto; border-top: 1px solid #e4e7eb; margin-top: 12px; padding-top: 8px; font-size: 13px; line-height: 1.8; }
   .current { color: #0b7285; font-weight: 750; }
   #status { min-height: 22px; color: #52606d; font-size: 13px; }
@@ -75,12 +81,19 @@
     <div class="stat-grid">
       <div class="stat"><b>Current</b><span id="current">-</span></div>
       <div class="stat"><b>Root value</b><span id="root">-</span></div>
+      <div class="stat"><b>Black value</b><span id="blackValue">-</span></div>
+      <div class="stat"><b>Judgement</b><span id="judgement">-</span></div>
       <div class="stat"><b>Result</b><span id="summary">-</span></div>
       <div class="stat"><b>Captures</b><span id="captures">-</span></div>
     </div>
     <label>Puzzle name <input id="puzzleName" placeholder="Optional name before saving"></label>
-    <h3>Top 3 candidates</h3>
+    <h3>Stored MCTS candidates</h3>
     <ol id="top"></ol>
+    <div class="mcts-wrap"><table>
+      <thead><tr><th>Move</th><th>Visits</th><th>Visit%</th><th>Prior</th><th>Value</th></tr></thead>
+      <tbody id="mctsRows"><tr><td colspan="5" class="muted">No move selected.</td></tr></tbody>
+    </table></div>
+    <p class="muted">Old records may contain only the top few actions; new records save the full root candidate list.</p>
     <div id="status"></div>
     <div class="move-list" id="moves"></div>
   </aside>
@@ -215,6 +228,32 @@ function gtpFromAction(action) {
   const p = actionPoint(action);
   if (!p) return "pass";
   return `${"ABCDEFGHJ"[p.col]}${boardSize - p.row}`;
+}
+
+function fmt(value, digits = 4) {
+  return Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : "-";
+}
+
+function pct(value) {
+  return Number.isFinite(Number(value)) ? `${(Number(value) * 100).toFixed(1)}%` : "-";
+}
+
+function actionVisitPct(item, actions) {
+  if (Number.isFinite(Number(item.visit_pct))) return Number(item.visit_pct);
+  const total = actions.reduce((sum, action) => sum + Number(action.visits || 0), 0);
+  return Number(item.visits || 0) / Math.max(total, 1);
+}
+
+function blackValueForMove(move) {
+  if (!move || move.root_value === undefined) return null;
+  return move.player === "b" ? Number(move.root_value) : -Number(move.root_value);
+}
+
+function judgementText(move) {
+  const blackValue = blackValueForMove(move);
+  if (!Number.isFinite(blackValue)) return "-";
+  const favorite = blackValue > 0.08 ? "Black better" : blackValue < -0.08 ? "White better" : "Even-ish";
+  return `${favorite} (${fmt(blackValue)})`;
 }
 
 function colorAfterStep() {
@@ -537,13 +576,18 @@ function updateText(pos) {
   const move = gameMoves[Math.max(0, step - 1)];
   document.querySelector("#current").textContent = step === 0 ? "Start" : `${step}/${gameMoves.length} ${move.player.toUpperCase()} ${move.chosen_move || gtpFromAction(Number(move.chosen_action))}`;
   document.querySelector("#root").textContent = step === 0 ? "-" : Number(move.root_value || 0).toFixed(4);
+  document.querySelector("#blackValue").textContent = step === 0 ? "-" : fmt(blackValueForMove(move));
+  document.querySelector("#judgement").textContent = step === 0 ? "-" : judgementText(move);
   const first = gameMoves[0];
   const winner = Number(first?.value_target || 0) > 0 ? "B win" : "W win";
   document.querySelector("#summary").textContent = gameMoves.length ? `${winner}, ${gameMoves.length} moves` : "-";
   const cleanupText = pos.cleanupCounts.b || pos.cleanupCounts.w ? `, cleanup B ${pos.cleanupCounts.b} / W ${pos.cleanupCounts.w}` : "";
   document.querySelector("#captures").textContent = `B ${pos.blackCaptures} / W ${pos.whiteCaptures}${cleanupText}`;
   const actions = step === 0 ? gameMoves[0]?.top_actions || [] : move.top_actions || [];
-  document.querySelector("#top").innerHTML = actions.slice(0, 3).map(item => `<li>${item.move} visits=${item.visits} prior=${item.prior} value=${item.value}</li>`).join("");
+  document.querySelector("#top").innerHTML = actions.slice(0, 8).map(item => `<li>${item.move} visits=${item.visits} (${pct(actionVisitPct(item, actions))}) prior=${item.prior} value=${item.value}</li>`).join("");
+  document.querySelector("#mctsRows").innerHTML = actions.length ? actions.map(item => `
+    <tr><td>${item.move}</td><td>${item.visits}</td><td>${pct(actionVisitPct(item, actions))}</td><td>${fmt(item.prior)}</td><td>${fmt(item.value)}</td></tr>
+  `).join("") : `<tr><td colspan="5" class="muted">No MCTS candidates stored for this move.</td></tr>`;
   document.querySelector("#moves").innerHTML = gameMoves.map((m, i) => `<span class="${i + 1 === step ? "current" : ""}">${i + 1}. ${m.player.toUpperCase()} ${m.chosen_move || gtpFromAction(Number(m.chosen_action))}</span>`).join(" &nbsp; ");
 }
 

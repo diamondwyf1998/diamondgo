@@ -21,6 +21,7 @@ from diamondgo.multiworker_train import (
     make_selfplay_config,
     summarize_cycle,
     to_overnight_config,
+    trace_examples_for_cycle,
 )
 from diamondgo.overnight_train import (
     load_checkpoint,
@@ -181,12 +182,27 @@ def run(config: DualGpuConfig, out_dir: Path, resume: str = "") -> dict[str, obj
 
         write_start = time.perf_counter()
         first_worker_config = make_selfplay_config(base, config.seed + cycle * 10_000 + 1)
-        cycle_trace = build_trace(first_worker_config, examples)
-        write_sgf(out_dir / "latest-cycle.sgf", first_worker_config, examples)
+        trace_examples = trace_examples_for_cycle(
+            examples,
+            cycle,
+            config.full_trace_every,
+            config.full_trace_games,
+            config.trace_top_actions_limit,
+        )
+        cycle_trace = build_trace(first_worker_config, trace_examples)
+        cycle_trace["trace_top_actions"] = {
+            "full_trace_every": config.full_trace_every,
+            "full_trace_games": config.full_trace_games,
+            "trace_top_actions_limit": config.trace_top_actions_limit,
+            "full_trace_this_cycle": bool(
+                config.full_trace_every > 0 and cycle % config.full_trace_every == 0
+            ),
+        }
+        write_sgf(out_dir / "latest-cycle.sgf", first_worker_config, trace_examples)
         write_json(out_dir / "latest-cycle-trace.json", cycle_trace)
         if config.record_every > 0 and cycle % config.record_every == 0:
             records_dir = out_dir / "cycle-records"
-            write_sgf(records_dir / f"cycle-{cycle:05d}.sgf", first_worker_config, examples)
+            write_sgf(records_dir / f"cycle-{cycle:05d}.sgf", first_worker_config, trace_examples)
             write_json(records_dir / f"cycle-{cycle:05d}-trace.json", cycle_trace)
         write_seconds = time.perf_counter() - write_start
         total_seconds = time.perf_counter() - cycle_start
@@ -276,6 +292,7 @@ def main() -> None:
         komi=args.komi,
         score_komi=args.score_komi,
         input_komi=args.input_komi,
+        history_moves=args.history_moves,
         terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
         score_margin_reward_scale=args.score_margin_reward_scale,
         workers=args.workers,
@@ -303,6 +320,9 @@ def main() -> None:
         early_checkpoint_cycles=args.early_checkpoint_cycles,
         early_checkpoint_every=args.early_checkpoint_every,
         record_every=args.record_every,
+        full_trace_every=args.full_trace_every,
+        full_trace_games=args.full_trace_games,
+        trace_top_actions_limit=args.trace_top_actions_limit,
         selfplay_devices=args.selfplay_devices,
     )
     summary = run(config, Path(args.out_dir), resume=args.resume)

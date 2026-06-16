@@ -11,6 +11,7 @@ class BoardConfig:
     size: int = 9
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
+    history_moves: int = 0
     terminal_dead_stone_cleanup: bool = False
     score_margin_reward_scale: float = 0.0
     rules_backend: str = "sgfmill"
@@ -57,3 +58,7 @@ class ExperimentConfig:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def input_plane_count(input_komi: bool, history_moves: int = 0) -> int:
+    return 3 + max(0, int(history_moves)) + (1 if input_komi else 0)

@@ -13,7 +13,7 @@ import numpy as np
 import torch
 
 from diamondgo.batched_demo import BatchedConfig, run_batched_mcts
-from diamondgo.config import ModelConfig
+from diamondgo.config import ModelConfig, input_plane_count
 from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES, DEFAULT_9X9_SCORE_KOMI
 from diamondgo.demo_cpu import action_to_gtp, make_rules
 from diamondgo.model import PolicyValueNet
@@ -25,6 +25,7 @@ class MatchConfig:
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
     input_komi: bool = True
+    history_moves: int = 0
     terminal_dead_stone_cleanup: bool = False
     score_margin_reward_scale: float = 0.0
     channels: int = 32
@@ -73,6 +74,7 @@ def config_from_payload(payload: dict[str, object], device: str, simulations: in
         komi=float(raw.get("komi", DEFAULT_9X9_KOMI)),
         score_komi=float(raw.get("score_komi", raw.get("komi", DEFAULT_9X9_SCORE_KOMI))),
         input_komi=bool(raw.get("input_komi", True)),
+        history_moves=int(raw.get("history_moves", 0)),
         terminal_dead_stone_cleanup=bool(raw.get("terminal_dead_stone_cleanup", False)),
         score_margin_reward_scale=float(raw.get("score_margin_reward_scale", 0.0)),
         channels=int(raw.get("channels", 32)),
@@ -91,7 +93,7 @@ def make_eval_model(config: MatchConfig) -> PolicyValueNet:
     model = PolicyValueNet(
         board_size=config.board_size,
         config=ModelConfig(channels=config.channels, residual_blocks=config.residual_blocks),
-        input_planes=4 if config.input_komi else 3,
+        input_planes=input_plane_count(config.input_komi, config.history_moves),
     )
     model.to(torch.device(config.device))
     model.eval()
@@ -162,8 +164,10 @@ def write_match_sgf(
             "top actions:",
         ]
         for item in move["top_actions"]:
+            visit_pct = item.get("visit_pct", 0.0)
             comment_lines.append(
-                f"- {item['move']}: visits={item['visits']} prior={item['prior']} value={item['value']}"
+                f"- {item['move']}: visits={item['visits']} visit_pct={visit_pct} "
+                f"prior={item['prior']} value={item['value']}"
             )
         nodes.append(
             f";{color}[{sgf_action(int(move['action']), config.board_size)}]"
@@ -179,6 +183,7 @@ def batched_config(config: MatchConfig, active_games: int) -> BatchedConfig:
         komi=config.komi,
         score_komi=config.score_komi,
         input_komi=config.input_komi,
+        history_moves=config.history_moves,
         terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
         score_margin_reward_scale=config.score_margin_reward_scale,
         channels=config.channels,
@@ -257,7 +262,7 @@ def play_match(
                     "action": action,
                     "move": action_to_gtp(action, config.board_size),
                     "root_value": round(root.value, 4),
-                    "top_actions": root.top_actions(config.board_size),
+                    "top_actions": root.top_actions(config.board_size, limit=None),
                 }
             )
             state.play_action(action)
@@ -389,6 +394,25 @@ def markdown_report(results: list[dict[str, object]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def dashboard_top_actions(move: dict[str, object], board_size: int) -> list[dict[str, object]]:
+    raw_actions = list(move["top_actions"])
+    total_visits = sum(int(item["visits"]) for item in raw_actions)
+    rows = []
+    for item in raw_actions:
+        visits = int(item["visits"])
+        rows.append(
+            {
+                "move": str(item["move"]),
+                "action": gtp_to_action(str(item["move"]), board_size),
+                "visits": visits,
+                "visitPct": float(item.get("visit_pct", visits / max(total_visits, 1))),
+                "prior": float(item["prior"]),
+                "value": float(item["value"]),
+            }
+        )
+    return rows
+
+
 def dashboard_state(results: list[dict[str, object]], board_size: int) -> dict[str, object]:
     matches = []
     for match_index, result in enumerate(results):
@@ -411,16 +435,7 @@ def dashboard_state(results: list[dict[str, object]], board_size: int) -> dict[s
                             "action": int(move["action"]),
                             "move": str(move["move"]),
                             "rootValue": float(move["root_value"]),
-                            "topActions": [
-                                {
-                                    "move": str(item["move"]),
-                                    "action": gtp_to_action(str(item["move"]), board_size),
-                                    "visits": int(item["visits"]),
-                                    "prior": float(item["prior"]),
-                                    "value": float(item["value"]),
-                                }
-                                for item in move["top_actions"]
-                            ],
+                            "topActions": dashboard_top_actions(move, board_size),
                         }
                         for move in game["moves"]
                     ],
@@ -639,6 +654,31 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
       font-weight: 700;
       background: #2f6f73;
     }}
+    .mcts-table-wrap {{
+      max-height: 320px;
+      overflow: auto;
+      border: 1px solid #e8eeee;
+      border-radius: 6px;
+      margin-top: 8px;
+    }}
+    .mcts-table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }}
+    .mcts-table th, .mcts-table td {{
+      padding: 6px 8px;
+      border-bottom: 1px solid #edf1f5;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }}
+    .mcts-table th:first-child, .mcts-table td:first-child {{ text-align: left; }}
+    .mcts-table th {{
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #faf8f4;
+    }}
     @media (max-width: 900px) {{
       .viewer, .selectors {{ grid-template-columns: 1fr; }}
     }}
@@ -685,9 +725,17 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
           <div class="box"><b>Game</b><span id="game-info"></span></div>
           <div class="box"><b>Current move</b><span id="move-info"></span></div>
           <div class="box"><b>Root value</b><span id="root-value"></span></div>
+          <div class="box"><b>Black value</b><span id="black-value"></span></div>
+          <div class="box"><b>Judgement</b><span id="judgement"></span></div>
           <div class="box">
-            <b>Top 5 search candidates before this move</b>
+            <b>Stored search candidates before this move</b>
             <div id="candidate-list" class="candidate-list"></div>
+            <div class="mcts-table-wrap">
+              <table class="mcts-table">
+                <thead><tr><th>Move</th><th>Visits</th><th>Visit%</th><th>Prior</th><th>Value</th></tr></thead>
+                <tbody id="mcts-rows"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -732,7 +780,10 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     const gameInfo = document.getElementById("game-info");
     const moveInfo = document.getElementById("move-info");
     const rootValue = document.getElementById("root-value");
+    const blackValue = document.getElementById("black-value");
+    const judgement = document.getElementById("judgement");
     const candidateList = document.getElementById("candidate-list");
+    const mctsRows = document.getElementById("mcts-rows");
     const puzzleNameInput = document.getElementById("puzzle-name");
     const savePuzzleButton = document.getElementById("save-puzzle");
     const openPuzzleAuthorButton = document.getElementById("open-puzzle-author");
@@ -772,6 +823,26 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
 
     function pointToGtp(point) {{
       return `${{"ABCDEFGHJ"[point[1]]}}${{state.boardSize - point[0]}}`;
+    }}
+
+    function fmt(value, digits = 4) {{
+      return Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : "-";
+    }}
+
+    function pct(value) {{
+      return Number.isFinite(Number(value)) ? `${{(Number(value) * 100).toFixed(1)}}%` : "-";
+    }}
+
+    function blackValueForMove(move) {{
+      if (!move || move.rootValue === undefined) return null;
+      return move.player === "b" ? Number(move.rootValue) : -Number(move.rootValue);
+    }}
+
+    function judgementText(move) {{
+      const blackEval = blackValueForMove(move);
+      if (!Number.isFinite(blackEval)) return "-";
+      const favorite = blackEval > 0.08 ? "Black better" : blackEval < -0.08 ? "White better" : "Even-ish";
+      return `${{favorite}} (${{fmt(blackEval)}})`;
     }}
 
     function formatPointList(points) {{
@@ -1178,7 +1249,9 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
       gameInfo.textContent = `Game ${{game.game}}, candidate ${{game.candidateColor.toUpperCase()}}, winner ${{game.winner.toUpperCase()}}`;
       moveInfo.textContent = `${{move.player.toUpperCase()}} ${{move.move}} by ${{move.model}}`;
       rootValue.textContent = move.rootValue.toFixed(4);
-      candidateList.replaceChildren(...move.topActions.slice(0, 5).map((item, rank) => {{
+      blackValue.textContent = fmt(blackValueForMove(move));
+      judgement.textContent = judgementText(move);
+      candidateList.replaceChildren(...move.topActions.slice(0, 8).map((item, rank) => {{
         const row = document.createElement("div");
         row.className = "candidate";
         const rankNode = document.createElement("span");
@@ -1187,8 +1260,18 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
         const moveNode = document.createElement("b");
         moveNode.textContent = item.move;
         const detailNode = document.createElement("span");
-        detailNode.textContent = `visits=${{item.visits}} prior=${{item.prior}} value=${{item.value}}`;
+        detailNode.textContent = `visits=${{item.visits}} (${{pct(item.visitPct)}}) prior=${{item.prior}} value=${{item.value}}`;
         row.replaceChildren(rankNode, moveNode, detailNode);
+        return row;
+      }}));
+      mctsRows.replaceChildren(...move.topActions.map((item) => {{
+        const row = document.createElement("tr");
+        const cells = [item.move, item.visits, pct(item.visitPct), fmt(item.prior), fmt(item.value)];
+        row.replaceChildren(...cells.map((value) => {{
+          const cell = document.createElement("td");
+          cell.textContent = String(value);
+          return cell;
+        }}));
         return row;
       }}));
       drawBoard(safeIndex);

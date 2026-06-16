@@ -871,3 +871,35 @@ needs a shape/distribution metric before treating it as a measured result.
   `7199135`; operational scripts had been copied to the server directly.
   The authoritative source/docs/scripts are on GitHub via local commits through
   `7d2785e` and later preservation notes.
+
+## 2026-06-16
+
+### Planned Comparison: Previous-Two-Move Input
+
+- `User request`: Prepare the next comparison experiment with only one new
+  model trick: add the previous two moves as neural-network input planes.
+- `Technical operation`: Added optional `history_moves` plumbing through rules,
+  model construction, training configs, checkpoint configs, eval loaders,
+  tactical eval, and the play server. The default is `0`, so old scripts and
+  checkpoints keep their old input shape.
+- `Input encoding`: with `--no-input-komi --history-moves 2`, the network input
+  has `5` planes: own stones, opponent stones, to-play-black, previous move,
+  and previous-previous move. A pass move is encoded as an all-zero history
+  plane.
+- `Training-script plan`: new scripts were added instead of overwriting old
+  ones:
+  - `tools/server/run_fresh_dualgpu_2x96_history2_score6p5_cleanup_nomargin_800sims.sh`
+  - `tools/server/finalize_fresh_dualgpu_2x96_history2_score6p5_cleanup_nomargin_800sims.sh`
+- `Planned config`: fresh start, `2x96`, `score_komi=6.5`, `komi=0.5` metadata,
+  `input_komi=false`, `history_moves=2`, conservative terminal dead-stone
+  cleanup enabled, score-margin reward disabled (`0.0`), `800` self-play
+  simulations by default, `12` workers, `8` games per worker, `96` games/cycle,
+  `max_moves=150`, same root noise/temperature/augmentation settings as the
+  recent dual-GPU line.
+- `Trace policy`: full root search-tree distributions are now optional in
+  training records. The planned run keeps normal cycle SGF/trace records every
+  `5` cycles, but only keeps full root distributions every `20` cycles and only
+  for the first `5` games; other records keep the top `5` actions.
+- `Comparison caution`: because the input shape changes, compare this run by
+  total positions/games/wall-clock plus eval results. Raw cycle IDs alone are
+  not a clean proxy for equal training exposure.

@@ -90,6 +90,9 @@ def make_config(raw: dict[str, Any], device: str, simulations: int) -> BatchedCo
         "komi": float(raw.get("komi", DEFAULT_9X9_KOMI)),
         "score_komi": float(raw.get("score_komi", raw.get("komi", DEFAULT_9X9_SCORE_KOMI))),
         "input_komi": bool(raw.get("input_komi", True)),
+        "history_moves": int(raw.get("history_moves", 0)),
+        "terminal_dead_stone_cleanup": bool(raw.get("terminal_dead_stone_cleanup", False)),
+        "score_margin_reward_scale": float(raw.get("score_margin_reward_scale", 0.0)),
         "channels": int(raw.get("channels", 32)),
         "residual_blocks": int(raw.get("residual_blocks", 2)),
         "simulations": simulations,
@@ -122,6 +125,9 @@ def make_state(case: dict[str, Any], config: BatchedConfig) -> SgfmillRules:
         komi=config.komi,
         score_komi=config.score_komi,
         input_komi=config.input_komi,
+        history_moves=config.history_moves,
+        terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
+        score_margin_reward_scale=config.score_margin_reward_scale,
     )
     for row, col in case["black"]:
         state.board.board[row][col] = BLACK
@@ -209,6 +215,7 @@ def eval_checkpoint(
         "komi": config.komi,
         "score_komi": config.score_komi,
         "input_komi": config.input_komi,
+        "history_moves": config.history_moves,
         "channels": config.channels,
         "residual_blocks": config.residual_blocks,
         "category_summary": summarize(rows),

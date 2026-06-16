@@ -2083,3 +2083,63 @@ Verification:
   authoritative code state because recent operational scripts were copied to
   the server manually. The authoritative source and notes are the GitHub
   commits through the preservation note commit.
+
+## Planned History-2 Input Ablation
+
+Date: 2026-06-16.
+
+Purpose:
+
+- Prepare a clean comparison run that adds only previous-two-move input planes
+  as the new model-side trick, while keeping the improved training harness.
+
+Source/config changes:
+
+| Field | Value |
+| --- | --- |
+| Optional feature | `history_moves` |
+| Default | `0`, preserving old checkpoints and scripts |
+| Planned value | `2` |
+| Input planes with `--no-input-komi` | `5` |
+| History plane 1 | immediately previous move location |
+| History plane 2 | move before that |
+| Pass history | all-zero history plane |
+| Terminal cleanup | `true` |
+| Score margin reward | `0.0`, deliberately off for this initial ablation |
+
+Planned training defaults in the new server script:
+
+| Field | Value |
+| --- | --- |
+| Script | `tools/server/run_fresh_dualgpu_2x96_history2_score6p5_cleanup_nomargin_800sims.sh` |
+| Finalizer | `tools/server/finalize_fresh_dualgpu_2x96_history2_score6p5_cleanup_nomargin_800sims.sh` |
+| Fresh start | `true` |
+| Model | `2x96` |
+| `komi` metadata | `0.5` |
+| `score_komi` | `6.5` |
+| `input_komi` | `false` |
+| `history_moves` | `2` |
+| Rules backend | `sgfmill` |
+| Terminal dead-stone cleanup | `true`, conservative obvious-dead only |
+| Self-play simulations | `800` by default, overridable with `SIMULATIONS=...` |
+| Workers | `12` |
+| Games per worker | `8` |
+| Games per cycle | `96` |
+| Max moves | `150` |
+| Train steps per cycle | `64` |
+| Batch size | `256` |
+| Replay size | `100000` |
+| Root noise | Dirichlet `alpha=0.15`, fraction `0.25` |
+| Root policy temperature | `1.1` |
+| Move temperature | `1.0` for first `16` moves, then `0.25` |
+| Augmentation | random dihedral board symmetries |
+| Checkpoint cadence | every `10` cycles, dense first `50` cycles every `5` |
+| SGF/trace record cadence | every `5` cycles |
+| Full root-search trace cadence | every `20` cycles, first `5` games only |
+| Non-full trace candidate list | top `5` actions |
+
+Comparison note:
+
+- This run changes the first convolution input shape. Use total positions,
+  total games, wall-clock, and eval results for comparisons; raw cycle numbers
+  alone are not enough.

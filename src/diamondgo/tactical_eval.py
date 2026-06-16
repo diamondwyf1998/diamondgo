@@ -81,6 +81,7 @@ def make_case_state(
     komi: float,
     score_komi: float,
     input_komi: bool,
+    history_moves: int,
     terminal_dead_stone_cleanup: bool,
     score_margin_reward_scale: float,
 ) -> SgfmillRules:
@@ -89,6 +90,7 @@ def make_case_state(
         komi=komi,
         score_komi=score_komi,
         input_komi=input_komi,
+        history_moves=history_moves,
         terminal_dead_stone_cleanup=terminal_dead_stone_cleanup,
         score_margin_reward_scale=score_margin_reward_scale,
     )
@@ -113,6 +115,7 @@ def load_model_config(checkpoint: Path, device: str) -> tuple[BatchedConfig, tor
         komi=float(raw.get("komi", DEFAULT_9X9_KOMI)),
         score_komi=float(raw.get("score_komi", raw.get("komi", DEFAULT_9X9_SCORE_KOMI))),
         input_komi=bool(raw.get("input_komi", True)),
+        history_moves=int(raw.get("history_moves", 0)),
         terminal_dead_stone_cleanup=bool(raw.get("terminal_dead_stone_cleanup", False)),
         score_margin_reward_scale=float(raw.get("score_margin_reward_scale", 0.0)),
         channels=int(raw.get("channels", 32)),
@@ -155,6 +158,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             config.komi,
             config.score_komi,
             config.input_komi,
+            config.history_moves,
             config.terminal_dead_stone_cleanup,
             config.score_margin_reward_scale,
         )
@@ -192,6 +196,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "komi": config.komi,
         "score_komi": config.score_komi,
         "input_komi": config.input_komi,
+        "history_moves": config.history_moves,
         "cases": rows,
         "top1_hits": sum(1 for item in rows if item["top1_hit"]),
         "top3_hits": sum(1 for item in rows if item["top3_hit"]),
@@ -206,6 +211,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         f"- komi: {config.komi}",
         f"- score_komi: {config.score_komi}",
         f"- input_komi: {config.input_komi}",
+        f"- history_moves: {config.history_moves}",
         "",
         "| case | target | top1 | top3 | rank |",
         "|---|---:|---:|---:|---:|",

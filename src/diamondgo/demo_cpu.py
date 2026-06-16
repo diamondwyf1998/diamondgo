@@ -12,7 +12,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from diamondgo.config import MCTSConfig, ModelConfig
+from diamondgo.config import MCTSConfig, ModelConfig, input_plane_count
 from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_SCORE_KOMI
 from diamondgo.mcts import run_mcts
 from diamondgo.model import PolicyValueNet
@@ -25,6 +25,7 @@ class CpuDemoConfig:
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
     input_komi: bool = True
+    history_moves: int = 0
     terminal_dead_stone_cleanup: bool = False
     score_margin_reward_scale: float = 0.0
     channels: int = 16
@@ -48,6 +49,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--komi", type=float, default=CpuDemoConfig.komi)
     parser.add_argument("--score-komi", type=float, default=CpuDemoConfig.score_komi)
     parser.add_argument("--input-komi", action=argparse.BooleanOptionalAction, default=CpuDemoConfig.input_komi)
+    parser.add_argument(
+        "--history-moves",
+        type=int,
+        default=CpuDemoConfig.history_moves,
+        help="Append this many previous-move location planes to the neural-network input.",
+    )
     parser.add_argument(
         "--terminal-dead-stone-cleanup",
         action=argparse.BooleanOptionalAction,
@@ -98,7 +105,7 @@ def make_model(config: CpuDemoConfig) -> PolicyValueNet:
     model = PolicyValueNet(
         config.board_size,
         model_config,
-        input_planes=4 if config.input_komi else 3,
+        input_planes=input_plane_count(config.input_komi, config.history_moves),
     )
     model.to(torch.device(config.device))
     model.eval()
@@ -121,6 +128,7 @@ def make_rules(config: CpuDemoConfig):
             komi=config.komi,
             score_komi=config.score_komi,
             input_komi=config.input_komi,
+            history_moves=config.history_moves,
             terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
             score_margin_reward_scale=config.score_margin_reward_scale,
         )
@@ -129,6 +137,7 @@ def make_rules(config: CpuDemoConfig):
         komi=config.komi,
         score_komi=config.score_komi,
         input_komi=config.input_komi,
+        history_moves=config.history_moves,
         terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
         score_margin_reward_scale=config.score_margin_reward_scale,
     )
@@ -160,7 +169,7 @@ def play_game(config: CpuDemoConfig, model: PolicyValueNet) -> tuple[list[dict[s
                 "features": features,
                 "policy": policy,
                 "player": player,
-                "top_actions": root.top_actions(config.board_size),
+                "top_actions": root.top_actions(config.board_size, limit=None),
                 "root_value": round(root.value, 4),
                 "chosen_action": action,
             }
@@ -1033,6 +1042,7 @@ def main() -> None:
         komi=args.komi,
         score_komi=args.score_komi,
         input_komi=args.input_komi,
+        history_moves=args.history_moves,
         terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
         score_margin_reward_scale=args.score_margin_reward_scale,
         simulations=args.simulations,

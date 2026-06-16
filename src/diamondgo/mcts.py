@@ -45,19 +45,49 @@ class SearchNode:
         visits = visits ** (1.0 / temperature)
         return visits / visits.sum()
 
-    def top_actions(self, board_size: int, limit: int = 5) -> list[dict[str, object]]:
+    def top_actions(self, board_size: int, limit: int | None = 5) -> list[dict[str, object]]:
+        total_child_visits = sum(child.visit_count for child in self.children.values())
         rows = []
         for action, child in self.children.items():
             move = "pass" if action == board_size * board_size else _action_to_gtp(action, board_size)
             rows.append(
                 {
+                    "action": int(action),
                     "move": move,
                     "visits": child.visit_count,
+                    "visit_pct": round(child.visit_count / max(total_child_visits, 1), 4),
                     "prior": round(child.prior, 4),
                     "value": round(child.value, 4),
                 }
             )
-        return sorted(rows, key=lambda item: item["visits"], reverse=True)[:limit]
+        rows = sorted(rows, key=lambda item: item["visits"], reverse=True)
+        return rows if limit is None else rows[:limit]
+
+    def root_analysis(
+        self,
+        board_size: int,
+        to_play: str,
+        limit: int | None = None,
+    ) -> dict[str, object]:
+        actions = self.top_actions(board_size, limit=limit)
+        child_visits = sum(child.visit_count for child in self.children.values())
+        black_value = float(self.value) if to_play == "b" else -float(self.value)
+        if black_value > 0.08:
+            favorite = "black"
+        elif black_value < -0.08:
+            favorite = "white"
+        else:
+            favorite = "even"
+        return {
+            "root_value": round(float(self.value), 4),
+            "black_value": round(black_value, 4),
+            "to_play": to_play,
+            "favorite": favorite,
+            "root_visits": int(self.visit_count),
+            "child_visits": int(child_visits),
+            "child_count": int(len(self.children)),
+            "actions": actions,
+        }
 
 
 def run_mcts(state, evaluator, simulations: int, c_puct: float, temperature: float) -> SearchNode:

@@ -73,6 +73,7 @@ class SimpleAreaRules:
         komi: float = DEFAULT_9X9_KOMI,
         score_komi: float = DEFAULT_9X9_SCORE_KOMI,
         input_komi: bool = True,
+        history_moves: int = 0,
         terminal_dead_stone_cleanup: bool = False,
         score_margin_reward_scale: float = 0.0,
     ) -> None:
@@ -80,12 +81,14 @@ class SimpleAreaRules:
         self.komi = komi
         self.score_komi = score_komi
         self.input_komi = input_komi
+        self.history_moves = max(0, int(history_moves))
         self.terminal_dead_stone_cleanup = terminal_dead_stone_cleanup
         self.score_margin_reward_scale = score_margin_reward_scale
         self.board = np.zeros((size, size), dtype=np.int8)
         self.to_play = BLACK
         self._passes = 0
         self._moves = 0
+        self._recent_actions: list[int] = []
         self._legal_actions_cache: np.ndarray | None = None
 
     @property
@@ -98,6 +101,7 @@ class SimpleAreaRules:
             self.komi,
             self.score_komi,
             self.input_komi,
+            self.history_moves,
             self.terminal_dead_stone_cleanup,
             self.score_margin_reward_scale,
         )
@@ -105,6 +109,7 @@ class SimpleAreaRules:
         clone.to_play = self.to_play
         clone._passes = self._passes
         clone._moves = self._moves
+        clone._recent_actions = list(self._recent_actions)
         clone._legal_actions_cache = (
             None if self._legal_actions_cache is None else self._legal_actions_cache.copy()
         )
@@ -129,6 +134,7 @@ class SimpleAreaRules:
             self.board[row, col] = 1 if self.to_play == BLACK else -1
             self._passes = 0
         self._moves += 1
+        self._remember_action(action)
         self.to_play = WHITE if self.to_play == BLACK else BLACK
         self._legal_actions_cache = None
 
@@ -141,6 +147,7 @@ class SimpleAreaRules:
             self.board[row, col] = 1 if self.to_play == BLACK else -1
             self._passes = 0
         self._moves += 1
+        self._remember_action(action)
         self.to_play = WHITE if self.to_play == BLACK else BLACK
         self._legal_actions_cache = None
 
@@ -151,9 +158,17 @@ class SimpleAreaRules:
         opp = (self.board == opp_value).astype(np.float32)
         to_play_plane = np.full((self.size, self.size), 1.0 if self.to_play == BLACK else 0.0)
         planes = [own, opp, to_play_plane]
+        planes.extend(_history_planes(self._recent_actions, self.history_moves, self.size))
         if self.input_komi:
             planes.append(np.full((self.size, self.size), self.komi / 10.0, dtype=np.float32))
         return np.stack(planes).astype(np.float32)
+
+    def _remember_action(self, action: int) -> None:
+        if self.history_moves <= 0:
+            return
+        self._recent_actions.append(int(action))
+        if len(self._recent_actions) > self.history_moves:
+            self._recent_actions = self._recent_actions[-self.history_moves :]
 
     def is_terminal(self) -> bool:
         return self._passes >= 2 or self._moves >= self.action_size + 1
@@ -185,6 +200,7 @@ class SgfmillRules:
         komi: float = DEFAULT_9X9_KOMI,
         score_komi: float = DEFAULT_9X9_SCORE_KOMI,
         input_komi: bool = True,
+        history_moves: int = 0,
         terminal_dead_stone_cleanup: bool = False,
         score_margin_reward_scale: float = 0.0,
     ) -> None:
@@ -200,6 +216,7 @@ class SgfmillRules:
         self.komi = komi
         self.score_komi = score_komi
         self.input_komi = input_komi
+        self.history_moves = max(0, int(history_moves))
         self.terminal_dead_stone_cleanup = terminal_dead_stone_cleanup
         self.score_margin_reward_scale = score_margin_reward_scale
         self._boards = boards
@@ -207,6 +224,7 @@ class SgfmillRules:
         self.board_array = np.zeros((size, size), dtype=np.int8)
         self.to_play = BLACK
         self._passes = 0
+        self._recent_actions: list[int] = []
         self._ko_forbidden: tuple[int, int] | None = None
         self._legal_actions_cache: np.ndarray | None = None
 
@@ -220,6 +238,7 @@ class SgfmillRules:
             self.komi,
             self.score_komi,
             self.input_komi,
+            self.history_moves,
             self.terminal_dead_stone_cleanup,
             self.score_margin_reward_scale,
         )
@@ -227,6 +246,7 @@ class SgfmillRules:
         clone.board_array = self.board_array.copy()
         clone.to_play = self.to_play
         clone._passes = self._passes
+        clone._recent_actions = list(self._recent_actions)
         clone._ko_forbidden = self._ko_forbidden
         clone._legal_actions_cache = (
             None if self._legal_actions_cache is None else self._legal_actions_cache.copy()
@@ -258,6 +278,7 @@ class SgfmillRules:
             self._ko_forbidden = self.board.play(row, col, self.to_play)
             self._sync_board_array()
             self._passes = 0
+        self._remember_action(action)
         self.to_play = WHITE if self.to_play == BLACK else BLACK
         self._legal_actions_cache = None
 
@@ -270,6 +291,7 @@ class SgfmillRules:
             self._ko_forbidden = self.board.play(row, col, self.to_play)
             self._sync_board_array()
             self._passes = 0
+        self._remember_action(action)
         self.to_play = WHITE if self.to_play == BLACK else BLACK
         self._legal_actions_cache = None
 
@@ -281,6 +303,7 @@ class SgfmillRules:
 
         to_play_plane = np.full((self.size, self.size), 1.0 if self.to_play == BLACK else 0.0)
         planes = [own, opp, to_play_plane]
+        planes.extend(_history_planes(self._recent_actions, self.history_moves, self.size))
         if self.input_komi:
             planes.append(np.full((self.size, self.size), self.komi / 10.0, dtype=np.float32))
         return np.stack(planes).astype(np.float32)
@@ -398,8 +421,29 @@ class SgfmillRules:
             return WHITE_VALUE
         return 0
 
+    def _remember_action(self, action: int) -> None:
+        if self.history_moves <= 0:
+            return
+        self._recent_actions.append(int(action))
+        if len(self._recent_actions) > self.history_moves:
+            self._recent_actions = self._recent_actions[-self.history_moves :]
+
 
 GomillRules = SgfmillRules
+
+
+def _history_planes(recent_actions: list[int], history_moves: int, size: int) -> list[np.ndarray]:
+    planes: list[np.ndarray] = []
+    action_size = size * size + 1
+    for offset in range(max(0, int(history_moves))):
+        plane = np.zeros((size, size), dtype=np.float32)
+        if offset < len(recent_actions):
+            action = int(recent_actions[-1 - offset])
+            if 0 <= action < action_size - 1:
+                row, col = divmod(action, size)
+                plane[row, col] = 1.0
+        planes.append(plane)
+    return planes
 
 
 def _terminal_value_from_margin(

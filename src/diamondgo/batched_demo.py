@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from diamondgo.config import ModelConfig
+from diamondgo.config import ModelConfig, input_plane_count
 from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES, DEFAULT_9X9_SCORE_KOMI
 from diamondgo.demo_cpu import (
     action_to_gtp,
@@ -32,6 +32,7 @@ class BatchedConfig:
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
     input_komi: bool = True
+    history_moves: int = 0
     terminal_dead_stone_cleanup: bool = False
     score_margin_reward_scale: float = 0.0
     channels: int = 32
@@ -60,6 +61,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--komi", type=float, default=BatchedConfig.komi)
     parser.add_argument("--score-komi", type=float, default=BatchedConfig.score_komi)
     parser.add_argument("--input-komi", action=argparse.BooleanOptionalAction, default=BatchedConfig.input_komi)
+    parser.add_argument(
+        "--history-moves",
+        type=int,
+        default=BatchedConfig.history_moves,
+        help="Append this many previous-move location planes to the neural-network input.",
+    )
     parser.add_argument(
         "--terminal-dead-stone-cleanup",
         action=argparse.BooleanOptionalAction,
@@ -100,7 +107,7 @@ def make_model(config: BatchedConfig) -> PolicyValueNet:
     model = PolicyValueNet(
         board_size=config.board_size,
         config=ModelConfig(channels=config.channels, residual_blocks=config.residual_blocks),
-        input_planes=4 if config.input_komi else 3,
+        input_planes=input_plane_count(config.input_komi, config.history_moves),
     )
     model.to(torch.device(config.device))
     model.eval()
@@ -300,7 +307,7 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
                     "features": features,
                     "policy": policy,
                     "player": player,
-                    "top_actions": root.top_actions(config.board_size),
+                    "top_actions": root.top_actions(config.board_size, limit=None),
                     "root_value": round(root.value, 4),
                     "chosen_action": action,
                     "game": state_index + 1,
@@ -489,6 +496,7 @@ def main() -> None:
         komi=args.komi,
         score_komi=args.score_komi,
         input_komi=args.input_komi,
+        history_moves=args.history_moves,
         terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
         score_margin_reward_scale=args.score_margin_reward_scale,
         simulations=args.simulations,

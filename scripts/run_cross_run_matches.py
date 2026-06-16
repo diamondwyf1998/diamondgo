@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from diamondgo import eval_checkpoints
 from diamondgo.batched_demo import BatchedConfig, run_batched_mcts
-from diamondgo.config import ModelConfig
+from diamondgo.config import ModelConfig, input_plane_count
 from diamondgo.demo_cpu import action_to_gtp, make_rules
 from diamondgo.model import PolicyValueNet
 
@@ -177,7 +177,7 @@ def model_from_checkpoint(path: Path, config: eval_checkpoints.MatchConfig) -> P
     model = PolicyValueNet(
         board_size=config.board_size,
         config=ModelConfig(channels=config.channels, residual_blocks=config.residual_blocks),
-        input_planes=4 if config.input_komi else 3,
+        input_planes=input_plane_count(config.input_komi, config.history_moves),
     )
     model.to(torch.device(config.device))
     model.eval()
@@ -255,7 +255,7 @@ def play_cross_match(
                     "action": int(action),
                     "move": action_to_gtp(int(action), state_config.board_size),
                     "root_value": round(root.value, 4),
-                    "top_actions": root.top_actions(state_config.board_size),
+                    "top_actions": root.top_actions(state_config.board_size, limit=None),
                 }
             )
             state.play_action(action)

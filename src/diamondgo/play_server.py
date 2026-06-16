@@ -34,10 +34,13 @@ def make_config(raw: dict[str, Any], device: str, simulations: int) -> BatchedCo
         "komi": float(raw.get("komi", DEFAULT_9X9_KOMI)),
         "score_komi": float(raw.get("score_komi", raw.get("komi", DEFAULT_9X9_SCORE_KOMI))),
         "input_komi": bool(raw.get("input_komi", True)),
+        "history_moves": int(raw.get("history_moves", 0)),
         "channels": int(raw.get("channels", 32)),
         "residual_blocks": int(raw.get("residual_blocks", 2)),
         "simulations": int(simulations),
         "max_moves": int(raw.get("max_moves", DEFAULT_9X9_MAX_MOVES)),
+        "terminal_dead_stone_cleanup": bool(raw.get("terminal_dead_stone_cleanup", False)),
+        "score_margin_reward_scale": float(raw.get("score_margin_reward_scale", 0.0)),
         "games": 1,
         "train_steps": 0,
         "batch_size": 256,
@@ -175,12 +178,19 @@ class PlayState:
                 "komi": self.config.komi,
                 "score_komi": getattr(self.config, "score_komi", self.config.komi),
                 "input_komi": self.config.input_komi,
+                "history_moves": getattr(self.config, "history_moves", 0),
                 "channels": self.config.channels,
                 "residual_blocks": self.config.residual_blocks,
                 "max_moves": self.config.max_moves,
                 "c_puct": self.config.c_puct,
                 "seed": self.config.seed,
                 "rules_backend": self.config.rules_backend,
+                "terminal_dead_stone_cleanup": getattr(
+                    self.config, "terminal_dead_stone_cleanup", False
+                ),
+                "score_margin_reward_scale": getattr(
+                    self.config, "score_margin_reward_scale", 0.0
+                ),
             },
             self.device,
             simulations,
@@ -202,6 +212,7 @@ class PlayState:
             "komi": float(self.config.komi),
             "score_komi": float(getattr(self.config, "score_komi", self.config.komi)),
             "input_komi": bool(self.config.input_komi),
+            "history_moves": int(getattr(self.config, "history_moves", 0)),
             "channels": int(self.config.channels),
             "residual_blocks": int(self.config.residual_blocks),
             "rules_backend": str(self.config.rules_backend),
@@ -233,6 +244,8 @@ class PlayState:
                 state.board[row, col] = WHITE_VALUE
         state.to_play = case["to_play"]
         state._passes = 0
+        if hasattr(state, "_recent_actions"):
+            state._recent_actions = []
         state._ko_forbidden = None
         state._legal_actions_cache = None
         if hasattr(state, "_sync_board_array"):
@@ -265,6 +278,7 @@ class PlayState:
             stats: dict[str, object] = {}
             root = run_batched_mcts(self.model, [state], search_config, stats=stats)[0]
             action, child = max(root.children.items(), key=lambda item: item[1].visit_count)
+            analysis = root.root_analysis(self.config.board_size, state.to_play, limit=None)
             return {
                 "action": int(action),
                 "move": action_to_gtp(int(action), self.config.board_size),
@@ -274,7 +288,8 @@ class PlayState:
                 "simulations": simulations,
                 "move_temperature": 0.0,
                 "move_selection": "max_visit",
-                "top_actions": root.top_actions(self.config.board_size, limit=8),
+                "top_actions": root.top_actions(self.config.board_size, limit=12),
+                "analysis": analysis,
                 "stats": {
                     key: round(float(value), 4)
                     for key, value in stats.items()
@@ -300,6 +315,7 @@ class PlayState:
             good_actions = [point_to_action(point, self.config.board_size) for point in case["good"]]
             bad_actions = [point_to_action(point, self.config.board_size) for point in case["bad"]]
             top1 = ranked[0] if ranked else None
+            analysis = root.root_analysis(self.config.board_size, state.to_play, limit=None)
             return {
                 "case": case["name"],
                 "category": case["category"],
@@ -314,7 +330,8 @@ class PlayState:
                 "good_legal": [bool(legal[action]) for action in good_actions],
                 "bad_legal": [bool(legal[action]) for action in bad_actions],
                 "top1": action_to_gtp(top1, self.config.board_size) if top1 is not None else None,
-                "top_actions": root.top_actions(self.config.board_size, limit=10),
+                "top_actions": root.top_actions(self.config.board_size, limit=12),
+                "analysis": analysis,
                 "note": case["note"],
                 "good_ranks": {
                     action_to_gtp(action, self.config.board_size): ranked.index(action) + 1

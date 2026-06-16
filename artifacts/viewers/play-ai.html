@@ -18,6 +18,12 @@
   .stat { border: 1px solid #e4e7eb; border-radius: 6px; padding: 8px; background: #fbfaf6; }
   .stat b { display: block; font-size: 12px; color: #627d98; margin-bottom: 3px; }
   ol { margin: 8px 0 14px; padding-left: 22px; }
+  .mcts-wrap { max-height: 360px; overflow: auto; border: 1px solid #e4e7eb; border-radius: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid #edf1f5; text-align: right; font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  th { position: sticky; top: 0; background: #fbfaf6; color: #52606d; font-size: 12px; z-index: 1; }
+  .muted { color: #627d98; font-size: 12px; }
   .moves { max-height: 300px; overflow: auto; border-top: 1px solid #e4e7eb; padding-top: 10px; line-height: 1.8; font-size: 13px; }
   .error { color: #9f1239; font-weight: 700; }
   @media (max-width: 880px) { main { grid-template-columns: 1fr; } }
@@ -41,12 +47,21 @@
       <div class="stat"><b>To play</b><span id="toPlay">-</span></div>
       <div class="stat"><b>Last move</b><span id="lastMove">-</span></div>
       <div class="stat"><b>Root value</b><span id="rootValue">-</span></div>
+      <div class="stat"><b>Black value</b><span id="blackValue">-</span></div>
+      <div class="stat"><b>Judgement</b><span id="judgement">-</span></div>
+      <div class="stat"><b>Search</b><span id="searchInfo">-</span></div>
       <div class="stat"><b>AI selection</b><span id="selection">max_visit / temp 0</span></div>
       <div class="stat"><b>Captures</b><span id="captures">B 0 / W 0</span></div>
       <div class="stat"><b>Model</b><span id="modelInfo">-</span></div>
     </div>
     <h3>AI top candidates</h3>
     <ol id="top"></ol>
+    <h3>Full root MCTS</h3>
+    <div class="mcts-wrap"><table>
+      <thead><tr><th>Move</th><th>Visits</th><th>Visit%</th><th>Prior</th><th>Value</th></tr></thead>
+      <tbody id="mctsRows"><tr><td colspan="5" class="muted">No search yet.</td></tr></tbody>
+    </table></div>
+    <p class="muted">Root value is from the side-to-play view; black value flips it to Black's view.</p>
     <div id="error" class="error"></div>
     <div class="moves" id="moves"></div>
   </aside>
@@ -68,6 +83,34 @@ function other(color) { return color === "b" ? "w" : "b"; }
 function actionPoint(action) { return action >= 81 ? null : { row: Math.floor(action / 9), col: action % 9 }; }
 function gtp(action) { const p = actionPoint(action); return p ? `${letters[p.col]}${9 - p.row}` : "pass"; }
 function actionFromPoint(row, col) { return row * 9 + col; }
+function fmt(value, digits = 4) { return Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : "-"; }
+function pct(value) { return Number.isFinite(Number(value)) ? `${(Number(value) * 100).toFixed(1)}%` : "-"; }
+function actionVisitPct(item, actions) {
+  if (Number.isFinite(Number(item.visit_pct))) return Number(item.visit_pct);
+  const total = actions.reduce((sum, action) => sum + Number(action.visits || 0), 0);
+  return Number(item.visits || 0) / Math.max(total, 1);
+}
+function judgementText(analysis) {
+  if (!analysis) return "-";
+  const favorite = analysis.favorite === "black" ? "Black better" : analysis.favorite === "white" ? "White better" : "Even-ish";
+  return `${favorite} (${fmt(analysis.black_value)})`;
+}
+function renderAnalysis(data) {
+  const analysis = data?.analysis || {};
+  const actions = analysis.actions || data?.top_actions || [];
+  document.querySelector("#rootValue").textContent = fmt(analysis.root_value ?? data?.root_value);
+  document.querySelector("#blackValue").textContent = fmt(analysis.black_value);
+  document.querySelector("#judgement").textContent = judgementText(analysis);
+  document.querySelector("#searchInfo").textContent = analysis.child_count !== undefined
+    ? `${analysis.child_visits || 0} child visits / ${analysis.child_count} moves`
+    : "-";
+  document.querySelector("#top").innerHTML = actions.slice(0, 8).map(x =>
+    `<li>${x.move} visits=${x.visits} (${pct(actionVisitPct(x, actions))}) prior=${x.prior} value=${x.value}</li>`
+  ).join("");
+  document.querySelector("#mctsRows").innerHTML = actions.length ? actions.map(x => `
+    <tr><td>${x.move}</td><td>${x.visits}</td><td>${pct(actionVisitPct(x, actions))}</td><td>${fmt(x.prior)}</td><td>${fmt(x.value)}</td></tr>
+  `).join("") : `<tr><td colspan="5" class="muted">No root children returned.</td></tr>`;
+}
 function neighbors(row, col) { return [[row-1,col],[row+1,col],[row,col-1],[row,col+1]].filter(([r,c]) => r>=0 && r<9 && c>=0 && c<9); }
 function groupAt(board, row, col) {
   const color = board[row][col], stones = [], seen = new Set([`${row},${col}`]), stack = [[row,col]];
@@ -160,9 +203,8 @@ async function aiMoveIfNeeded() {
     if (!response.ok) throw new Error(data.error || response.statusText);
     lastAi = data;
     history.push(data.action);
-    document.querySelector("#rootValue").textContent = Number(data.root_value || 0).toFixed(4);
     document.querySelector("#selection").textContent = `${data.move_selection || "max_visit"} / temp ${data.move_temperature ?? 0}`;
-    document.querySelector("#top").innerHTML = data.top_actions.slice(0, 5).map(x => `<li>${x.move} visits=${x.visits} prior=${x.prior} value=${x.value}</li>`).join("");
+    renderAnalysis(data);
     document.querySelector("#status").textContent = `AI played ${data.move}`;
   } catch (err) {
     document.querySelector("#error").textContent = err.message;
@@ -219,7 +261,18 @@ canvas.addEventListener("click", event => {
   if (row < 0 || row >= 9 || col < 0 || col >= 9) return;
   playHuman(actionFromPoint(row, col));
 });
-document.querySelector("#newGame").addEventListener("click", () => { history = []; lastAi = null; humanColor = document.querySelector("#humanColor").value; document.querySelector("#top").innerHTML = ""; document.querySelector("#rootValue").textContent = "-"; aiMoveIfNeeded(); });
+document.querySelector("#newGame").addEventListener("click", () => {
+  history = [];
+  lastAi = null;
+  humanColor = document.querySelector("#humanColor").value;
+  document.querySelector("#top").innerHTML = "";
+  document.querySelector("#rootValue").textContent = "-";
+  document.querySelector("#blackValue").textContent = "-";
+  document.querySelector("#judgement").textContent = "-";
+  document.querySelector("#searchInfo").textContent = "-";
+  document.querySelector("#mctsRows").innerHTML = `<tr><td colspan="5" class="muted">No search yet.</td></tr>`;
+  aiMoveIfNeeded();
+});
 document.querySelector("#undo").addEventListener("click", () => {
   if (busy) return;
   if (history.length) history.pop();

@@ -31,6 +31,7 @@ class MultiWorkerConfig:
     komi: float = DEFAULT_9X9_KOMI
     score_komi: float = DEFAULT_9X9_SCORE_KOMI
     input_komi: bool = True
+    history_moves: int = 0
     terminal_dead_stone_cleanup: bool = False
     score_margin_reward_scale: float = 0.0
     channels: int = 32
@@ -61,6 +62,9 @@ class MultiWorkerConfig:
     early_checkpoint_cycles: int = 50
     early_checkpoint_every: int = 5
     record_every: int = 10
+    full_trace_every: int = 0
+    full_trace_games: int = 0
+    trace_top_actions_limit: int = 5
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -74,6 +78,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--komi", type=float, default=MultiWorkerConfig.komi)
     parser.add_argument("--score-komi", type=float, default=MultiWorkerConfig.score_komi)
     parser.add_argument("--input-komi", action=argparse.BooleanOptionalAction, default=MultiWorkerConfig.input_komi)
+    parser.add_argument(
+        "--history-moves",
+        type=int,
+        default=MultiWorkerConfig.history_moves,
+        help="Append this many previous-move location planes to the neural-network input.",
+    )
     parser.add_argument(
         "--terminal-dead-stone-cleanup",
         action=argparse.BooleanOptionalAction,
@@ -110,6 +120,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--early-checkpoint-cycles", type=int, default=MultiWorkerConfig.early_checkpoint_cycles)
     parser.add_argument("--early-checkpoint-every", type=int, default=MultiWorkerConfig.early_checkpoint_every)
     parser.add_argument("--record-every", type=int, default=MultiWorkerConfig.record_every)
+    parser.add_argument("--full-trace-every", type=int, default=MultiWorkerConfig.full_trace_every)
+    parser.add_argument("--full-trace-games", type=int, default=MultiWorkerConfig.full_trace_games)
+    parser.add_argument(
+        "--trace-top-actions-limit",
+        type=int,
+        default=MultiWorkerConfig.trace_top_actions_limit,
+        help="Non-full trace records keep only this many root actions per move.",
+    )
     parser.add_argument("--json", action="store_true")
     return parser
 
@@ -120,6 +138,7 @@ def to_overnight_config(config: MultiWorkerConfig) -> OvernightConfig:
         komi=config.komi,
         score_komi=config.score_komi,
         input_komi=config.input_komi,
+        history_moves=config.history_moves,
         terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
         score_margin_reward_scale=config.score_margin_reward_scale,
         channels=config.channels,
@@ -149,6 +168,9 @@ def to_overnight_config(config: MultiWorkerConfig) -> OvernightConfig:
         early_checkpoint_cycles=config.early_checkpoint_cycles,
         early_checkpoint_every=config.early_checkpoint_every,
         record_every=config.record_every,
+        full_trace_every=config.full_trace_every,
+        full_trace_games=config.full_trace_games,
+        trace_top_actions_limit=config.trace_top_actions_limit,
     )
 
 
@@ -158,6 +180,7 @@ def make_selfplay_config(config: MultiWorkerConfig, seed: int) -> BatchedConfig:
         komi=config.komi,
         score_komi=config.score_komi,
         input_komi=config.input_komi,
+        history_moves=config.history_moves,
         terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
         score_margin_reward_scale=config.score_margin_reward_scale,
         channels=config.channels,
@@ -179,6 +202,30 @@ def make_selfplay_config(config: MultiWorkerConfig, seed: int) -> BatchedConfig:
         device=config.device,
         rules_backend=config.rules_backend,
     )
+
+
+def trace_examples_for_cycle(
+    examples: list[dict[str, object]],
+    cycle: int,
+    full_trace_every: int,
+    full_trace_games: int,
+    trace_top_actions_limit: int,
+) -> list[dict[str, object]]:
+    full_cycle = full_trace_every > 0 and cycle % full_trace_every == 0
+    full_games = max(0, int(full_trace_games)) if full_cycle else 0
+    default_limit = max(0, int(trace_top_actions_limit))
+    prepared: list[dict[str, object]] = []
+    for example in examples:
+        copy = dict(example)
+        top_actions = list(copy.get("top_actions", []))
+        game = int(copy.get("game", 0))
+        if game <= full_games:
+            copy["trace_top_actions_mode"] = "full"
+        else:
+            copy["top_actions"] = top_actions[:default_limit]
+            copy["trace_top_actions_mode"] = f"top-{default_limit}"
+        prepared.append(copy)
+    return prepared
 
 
 def cpu_state_dict(model: torch.nn.Module) -> dict[str, torch.Tensor]:
@@ -499,12 +546,27 @@ def run(config: MultiWorkerConfig, out_dir: Path, resume: str = "") -> dict[str,
 
         write_start = time.perf_counter()
         first_worker_config = make_selfplay_config(config, config.seed + cycle * 10_000 + 1)
-        cycle_trace = build_trace(first_worker_config, examples)
-        write_sgf(out_dir / "latest-cycle.sgf", first_worker_config, examples)
+        trace_examples = trace_examples_for_cycle(
+            examples,
+            cycle,
+            config.full_trace_every,
+            config.full_trace_games,
+            config.trace_top_actions_limit,
+        )
+        cycle_trace = build_trace(first_worker_config, trace_examples)
+        cycle_trace["trace_top_actions"] = {
+            "full_trace_every": config.full_trace_every,
+            "full_trace_games": config.full_trace_games,
+            "trace_top_actions_limit": config.trace_top_actions_limit,
+            "full_trace_this_cycle": bool(
+                config.full_trace_every > 0 and cycle % config.full_trace_every == 0
+            ),
+        }
+        write_sgf(out_dir / "latest-cycle.sgf", first_worker_config, trace_examples)
         write_json(out_dir / "latest-cycle-trace.json", cycle_trace)
         if config.record_every > 0 and cycle % config.record_every == 0:
             records_dir = out_dir / "cycle-records"
-            write_sgf(records_dir / f"cycle-{cycle:05d}.sgf", first_worker_config, examples)
+            write_sgf(records_dir / f"cycle-{cycle:05d}.sgf", first_worker_config, trace_examples)
             write_json(records_dir / f"cycle-{cycle:05d}-trace.json", cycle_trace)
         write_seconds = time.perf_counter() - write_start
         total_seconds = time.perf_counter() - cycle_start
@@ -578,6 +640,7 @@ def main() -> None:
         komi=args.komi,
         score_komi=args.score_komi,
         input_komi=args.input_komi,
+        history_moves=args.history_moves,
         terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
         score_margin_reward_scale=args.score_margin_reward_scale,
         workers=args.workers,
@@ -605,6 +668,9 @@ def main() -> None:
         early_checkpoint_cycles=args.early_checkpoint_cycles,
         early_checkpoint_every=args.early_checkpoint_every,
         record_every=args.record_every,
+        full_trace_every=args.full_trace_every,
+        full_trace_games=args.full_trace_games,
+        trace_top_actions_limit=args.trace_top_actions_limit,
     )
     summary = run(config, Path(args.out_dir), args.resume)
     if args.json:

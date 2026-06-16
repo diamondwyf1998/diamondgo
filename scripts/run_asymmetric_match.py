@@ -104,7 +104,7 @@ def play_asymmetric(
                     "action": int(action),
                     "move": action_to_gtp(int(action), base_config.board_size),
                     "root_value": round(root.value, 4),
-                    "top_actions": root.top_actions(base_config.board_size),
+                    "top_actions": root.top_actions(base_config.board_size, limit=None),
                 }
             )
             state.play_action(action)
