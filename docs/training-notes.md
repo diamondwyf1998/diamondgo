@@ -903,3 +903,39 @@ needs a shape/distribution metric before treating it as a measured result.
 - `Comparison caution`: because the input shape changes, compare this run by
   total positions/games/wall-clock plus eval results. Raw cycle IDs alone are
   not a clean proxy for equal training exposure.
+
+## 2026-06-22
+
+### Training Control: Score Komi Back To 6.5
+
+- `User request`: Change the active 4x64 history-2 training line from
+  `score_komi=7.5` back to `score_komi=6.5`.
+- `Technical operation`: Stopped the active score7.5 run, preserved its
+  `latest.pt`, cleaned orphan `multiprocessing.spawn` self-play workers that
+  continued holding GPU memory, then restarted from the preserved checkpoint
+  with only `score_komi` changed.
+- `Transition point`: the score7.5/temp0.7/600-sim segment had latest metric
+  cycle `836` at the stop point.
+- `Backup`:
+  `/root/autodl-tmp/diamondgo-checkpoint-backups/score7p5_to_score6p5_20260622-003019_cycle836_latest.pt`
+- `Previous run`:
+  `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-4x64-history2-score7p5-cleanup-margin0p2-600sims-max150-temp0p7-late0p2-30w-notimelimit-after-temp0p75-20260621-145816`
+- `New run`:
+  `/root/diamondgo/artifacts/multiworker-9x9-cont-dualgpu-4x64-history2-score6p5-cleanup-margin0p2-600sims-max150-temp0p7-late0p2-30w-notimelimit-after-score7p5-cycle836-20260622-003019`
+- `New PID file`:
+  `/root/diamondgo/artifacts/dualgpu_4x64_history2_score6p5_margin0p2_600sims_max150_temp0p7_late0p2_30w_notimelimit.train.pid`
+- `Preserved config`: `komi_metadata=0.5`, `input_komi=false`,
+  `terminal_dead_stone_cleanup=true`, `score_margin_reward_scale=0.2`, `4x64`,
+  `history_moves=2`, `600` self-play simulations, `30` workers, `8`
+  games/worker, `240` games/cycle, `max_moves=150`,
+  `train_steps_per_cycle=64`, `batch_size=256`, `replay_size=100000`,
+  `temperature=0.7` for the first `16` moves, `late_temperature=0.2`,
+  root Dirichlet noise `alpha=0.15` and fraction `0.25`,
+  `root_policy_temperature=1.1`, `record_every=5`, and full root traces every
+  `20` cycles for the first `5` games.
+- `Changed config`: `score_komi` changed from `7.5` to `6.5`.
+- `Immediate resource check`: the new process started successfully with
+  wrapper PID `181740` and training Python PID `181744`; GPU memory after
+  restart was about `12.3 GiB / 24 GiB` on GPU0 and `6.7 GiB / 24 GiB` on
+  GPU1. No OOM or traceback was observed before handing back to heartbeat
+  monitoring.
