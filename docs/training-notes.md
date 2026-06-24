@@ -1000,3 +1000,15 @@ needs a shape/distribution metric before treating it as a measured result.
 - `Changed config for the continuation`: `min_pass_move=120`; AdamW learning
   rate raised from `0.001` to `0.0015`. Other 13x13 defaults remain unchanged
   unless explicitly overridden by the launch script.
+
+### 13x13 Opening Temperature Change
+
+- `User request`: change sampling to `temperature=0.75` for the first `30`
+  moves, then `late_temperature=0.2`.
+- `Status before change`: latest completed metric was cycle `30`,
+  `score_komi=2.5`, `next_score_komi=2.5`, rolling dynamic-komi black win
+  rate over cycles `27-30` was `55.73%`, and pass masking was active with
+  `first_pass_move_min=121`.
+- `Technical operation`: stop the active min-pass 13x13 continuation, preserve
+  its latest checkpoint, and restart from that checkpoint with only the move
+  sampling temperature schedule changed.

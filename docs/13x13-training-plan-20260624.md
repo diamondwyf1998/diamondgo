@@ -27,7 +27,7 @@
 - MCTS：`c_puct=1.5`
 - 根节点噪声：Dirichlet `alpha=0.15`，fraction `0.25`
 - 根 policy 温度：`root_policy_temperature=1.1`
-- 落子采样：前 `16` 手 `temperature=0.7`，之后 `late_temperature=0.2`
+- 落子采样：前 `30` 手 `temperature=0.75`，之后 `late_temperature=0.2`
 - worker：正式默认 `30` workers，每 worker `8` games，即 `240` games/cycle
 - 最大手数：`max_moves=250`
 - 训练：`train_steps_per_cycle=64`，`batch_size=256`，`replay_size=100000`
@@ -95,3 +95,11 @@ TIME_LIMIT_MINUTES=10 SIMULATIONS=32 MAX_MOVES=60 WORKERS=30 GAMES_PER_WORKER=1 
   `0.0015`.
 - Caveat: this is a deliberate experiment-condition change. It should not be
   compared to the pre-mask cycles as if only training time changed.
+
+## 2026-06-25 Update: Opening Temperature
+
+- Changed the current continuation to use `temperature=0.75` for the first
+  `30` moves, then `late_temperature=0.2`.
+- This replaces the previous `temperature=0.7` for the first `16` moves.
+- Purpose: keep more early exploration after pass is masked, while preserving a
+  low late-game sampling temperature.
