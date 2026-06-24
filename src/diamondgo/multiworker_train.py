@@ -270,7 +270,8 @@ def update_dynamic_score_komi(
     if not ladder:
         return current_index, current_score_komi, {"enabled": False}
 
-    recent = history[-max(1, window) :]
+    window = max(1, window)
+    recent = history[-window:]
     games = sum(item["games"] for item in recent)
     black_wins = sum(item["black_wins"] for item in recent)
     white_wins = sum(item["white_wins"] for item in recent)
@@ -299,7 +300,7 @@ def update_dynamic_score_komi(
         {
             "enabled": True,
             "ladder": ladder,
-            "window": max(1, window),
+            "window": window,
             "threshold": threshold,
             "recent_cycles": [item["cycle"] for item in recent],
             "recent_games": games,

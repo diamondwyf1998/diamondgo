@@ -19,8 +19,8 @@
 - 参数量：约 `367,717`
 - 贴目逻辑：SGF/metadata `komi=0.5`，训练胜负判断从 `score_komi=2.5` 开始
 - 动态贴目阶梯：`2.5, 4.5, 6.5, 7.5, 8.5`
-- 动态贴目规则：最近若干 cycle 黑胜率超过 `70%`，下一 cycle 升一档贴目；白胜率超过 `70%`，下一 cycle 降一档贴目
-- 默认判断窗口：最近 `5` 个 cycle，可用 `SCORE_KOMI_ADJUST_WINDOW=1` 改成单 cycle 响应
+- 动态贴目规则：最近最多 `5` 个 cycle 的平均黑胜率超过 `70%`，下一 cycle 升一档贴目；平均白胜率超过 `70%`，下一 cycle 降一档贴目
+- 默认判断窗口：滚动最近 `5` 个 cycle；前 `5` 个 cycle 尚未凑满时，用已有 cycle 的平均值
 - 终局：`terminal_dead_stone_cleanup=true`
 - 价值目标：`score_margin_reward_scale=0.2`
 - 自对弈搜索：先用 `200` simulations

@@ -967,7 +967,7 @@ needs a shape/distribution metric before treating it as a measured result.
   `2.5,4.5,6.5,7.5,8.5`. If the rolling black win rate exceeds `70%`, move
   one ladder step upward for the next cycle; if the rolling white win rate
   exceeds `70%`, move one ladder step downward. The default rolling window is
-  `5` cycles.
+  the latest `5` cycles, using available completed cycles before cycle 5.
 - `Fresh-start caveat`: 9x9 checkpoints cannot be directly resumed because the
   action count changes from `82` to `170`; trunk-transfer would need a separate
   migration script and is not part of this first 13x13 run.
