@@ -939,3 +939,43 @@ needs a shape/distribution metric before treating it as a measured result.
   restart was about `12.3 GiB / 24 GiB` on GPU0 and `6.7 GiB / 24 GiB` on
   GPU1. No OOM or traceback was observed before handing back to heartbeat
   monitoring.
+
+## 2026-06-24
+
+### Preparing The First 13x13 Experiment
+
+- `User request`: stop the current 9x9 line and prepare a 13x13 experiment
+  while keeping the current architecture and core training tricks.
+- `Technical operation`: stopped the active 9x9 run at latest metric cycle
+  `1171`, preserved its `latest.pt`, and verified that no DiamondGo training
+  or self-play worker process remained alive.
+- `Backup`:
+  `/root/autodl-tmp/diamondgo-checkpoint-backups/9x9_score6p5_margin0p2_600sims_stop_for_13x13_20260624-201836_cycle1171_latest.pt`
+- `Code fix`: the lower-level configs already had `board_size`, but
+  `batched_demo.py`, `multiworker_train.py`, and
+  `multiworker_train_dualgpu.py` did not expose or pass through
+  `--board-size`. This is now wired through, so 13x13 runs can be launched
+  without editing source constants.
+- `Planned config`: fresh 13x13 start, `4x64`, `history_moves=2`,
+  `input_komi=false`, `komi=0.5` metadata, conservative terminal dead-stone
+  cleanup enabled, score-margin reward scale `0.2`, `200` self-play
+  simulations, `30` workers, `8` games per worker, `240` games/cycle,
+  `max_moves=250`, `temperature=0.7` for the first `16` moves,
+  `late_temperature=0.2`, same root noise and training batch settings as the
+  current 9x9 history-2 line.
+- `Dynamic score komi`: start from `score_komi=6.5` and choose among
+  `2.5,4.5,6.5,7.5,8.5`. If the rolling black win rate exceeds `75%`, move
+  one ladder step upward for the next cycle; if the rolling white win rate
+  exceeds `75%`, move one ladder step downward. The default rolling window is
+  `3` cycles.
+- `Fresh-start caveat`: 9x9 checkpoints cannot be directly resumed because the
+  action count changes from `82` to `170`; trunk-transfer would need a separate
+  migration script and is not part of this first 13x13 run.
+- `Debug result`: local CPU smoke tests and server dual-GPU smoke tests passed.
+  A 30-worker server stress test failed under the default open-file limit
+  `1024` with `Too many open files`; the same stress test passed after
+  setting `ulimit -n 65535`.
+- `Run script`:
+  `tools/server/run_fresh_dualgpu_13x13_4x64_history2_autokomi_margin0p2_200sims.sh`
+- `Human-facing plan`:
+  `docs/13x13-training-plan-20260624.md`

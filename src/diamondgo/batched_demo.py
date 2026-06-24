@@ -57,6 +57,7 @@ class BatchedConfig:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run batched 9x9 self-play with GPU leaf evaluation.")
+    parser.add_argument("--board-size", type=int, default=BatchedConfig.board_size)
     parser.add_argument("--games", type=int, default=BatchedConfig.games)
     parser.add_argument("--komi", type=float, default=BatchedConfig.komi)
     parser.add_argument("--score-komi", type=float, default=BatchedConfig.score_komi)
@@ -492,6 +493,7 @@ def run(config: BatchedConfig, sgf_path: str, trace_path: str, dashboard_path: s
 def main() -> None:
     args = build_parser().parse_args()
     config = BatchedConfig(
+        board_size=args.board_size,
         games=args.games,
         komi=args.komi,
         score_komi=args.score_komi,

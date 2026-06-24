@@ -19,9 +19,13 @@ from diamondgo.multiworker_train import (
     build_parser as build_multiworker_parser,
     cpu_state_dict,
     make_selfplay_config,
+    nearest_score_komi_index,
+    parse_score_komi_ladder,
+    score_komi_cycle_result,
     summarize_cycle,
     to_overnight_config,
     trace_examples_for_cycle,
+    update_dynamic_score_komi,
 )
 from diamondgo.overnight_train import (
     load_checkpoint,
@@ -115,12 +119,17 @@ def run(config: DualGpuConfig, out_dir: Path, resume: str = "") -> dict[str, obj
     metrics_path = out_dir / "metrics.jsonl"
     started = time.perf_counter()
     last_metrics: dict[str, object] = {}
-    base_config_dict = asdict(base)
+    score_komi_ladder = parse_score_komi_ladder(base.score_komi_ladder)
+    score_komi_index = nearest_score_komi_index(score_komi_ladder, base.score_komi)
+    current_score_komi = score_komi_ladder[score_komi_index] if score_komi_ladder else base.score_komi
+    score_komi_history: list[dict[str, int]] = []
 
     for cycle in range(start_cycle + 1, config.cycles + 1):
         if config.time_limit_minutes > 0 and (time.perf_counter() - started) >= config.time_limit_minutes * 60:
             break
 
+        active_base = replace(base, score_komi=current_score_komi)
+        base_config_dict = asdict(active_base)
         cycle_start = time.perf_counter()
         state_dict = cpu_state_dict(model)
         selfplay_start = time.perf_counter()
@@ -181,7 +190,7 @@ def run(config: DualGpuConfig, out_dir: Path, resume: str = "") -> dict[str, obj
         total_train_steps += len(train_history)
 
         write_start = time.perf_counter()
-        first_worker_config = make_selfplay_config(base, config.seed + cycle * 10_000 + 1)
+        first_worker_config = make_selfplay_config(active_base, config.seed + cycle * 10_000 + 1)
         trace_examples = trace_examples_for_cycle(
             examples,
             cycle,
@@ -224,12 +233,28 @@ def run(config: DualGpuConfig, out_dir: Path, resume: str = "") -> dict[str, obj
         for worker in metrics.get("workers", []):
             worker["device"] = device_by_worker.get(int(worker["worker_id"]), "")
         metrics["selfplay_devices"] = selfplay_devices
+        metrics["score_komi"] = current_score_komi
+        score_komi_history.append(score_komi_cycle_result(metrics))
+        (
+            next_score_komi_index,
+            next_score_komi,
+            score_komi_state,
+        ) = update_dynamic_score_komi(
+            ladder=score_komi_ladder,
+            current_index=score_komi_index,
+            current_score_komi=current_score_komi,
+            history=score_komi_history,
+            window=config.score_komi_adjust_window,
+            threshold=config.score_komi_adjust_threshold,
+        )
+        metrics["dynamic_score_komi"] = score_komi_state
+        metrics["next_score_komi"] = next_score_komi
         last_metrics = metrics
         with metrics_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(metrics) + "\n")
             handle.flush()
 
-        checkpoint_config = to_overnight_config(base)
+        checkpoint_config = to_overnight_config(replace(base, score_komi=next_score_komi))
         save_checkpoint(
             out_dir / "latest.pt",
             checkpoint_config,
@@ -257,6 +282,8 @@ def run(config: DualGpuConfig, out_dir: Path, resume: str = "") -> dict[str, obj
                 metrics,
             )
         print(json.dumps(metrics), flush=True)
+        score_komi_index = next_score_komi_index
+        current_score_komi = next_score_komi
 
     return {
         "out_dir": str(out_dir),
@@ -286,6 +313,7 @@ def build_parser():
 def main() -> None:
     args = build_parser().parse_args()
     config = DualGpuConfig(
+        board_size=args.board_size,
         channels=args.channels,
         residual_blocks=args.residual_blocks,
         simulations=args.simulations,
@@ -295,6 +323,9 @@ def main() -> None:
         history_moves=args.history_moves,
         terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
         score_margin_reward_scale=args.score_margin_reward_scale,
+        score_komi_ladder=args.score_komi_ladder,
+        score_komi_adjust_window=args.score_komi_adjust_window,
+        score_komi_adjust_threshold=args.score_komi_adjust_threshold,
         workers=args.workers,
         games_per_worker=args.games_per_worker,
         max_moves=args.max_moves,

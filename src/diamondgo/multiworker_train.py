@@ -6,7 +6,7 @@ import json
 import multiprocessing
 import random
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +34,9 @@ class MultiWorkerConfig:
     history_moves: int = 0
     terminal_dead_stone_cleanup: bool = False
     score_margin_reward_scale: float = 0.0
+    score_komi_ladder: str = ""
+    score_komi_adjust_window: int = 3
+    score_komi_adjust_threshold: float = 0.75
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 100
@@ -73,6 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--resume", default="")
     parser.add_argument("--cycles", type=int, default=MultiWorkerConfig.cycles)
     parser.add_argument("--time-limit-minutes", type=float, default=MultiWorkerConfig.time_limit_minutes)
+    parser.add_argument("--board-size", type=int, default=MultiWorkerConfig.board_size)
     parser.add_argument("--workers", type=int, default=MultiWorkerConfig.workers)
     parser.add_argument("--games-per-worker", type=int, default=MultiWorkerConfig.games_per_worker)
     parser.add_argument("--komi", type=float, default=MultiWorkerConfig.komi)
@@ -95,6 +99,23 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=MultiWorkerConfig.score_margin_reward_scale,
         help="Scale for the capped +/-0.6 score-margin component; enabled targets use +/-0.4 win/loss base.",
+    )
+    parser.add_argument(
+        "--score-komi-ladder",
+        default=MultiWorkerConfig.score_komi_ladder,
+        help="Comma-separated scoring komi ladder. If set, training moves one step up on high black win rate and one step down on high white win rate.",
+    )
+    parser.add_argument(
+        "--score-komi-adjust-window",
+        type=int,
+        default=MultiWorkerConfig.score_komi_adjust_window,
+        help="Number of recent cycles used for dynamic score-komi win-rate decisions.",
+    )
+    parser.add_argument(
+        "--score-komi-adjust-threshold",
+        type=float,
+        default=MultiWorkerConfig.score_komi_adjust_threshold,
+        help="Dynamic score-komi adjustment threshold; e.g. 0.75 means adjust only above 75% rolling win rate.",
     )
     parser.add_argument("--max-moves", type=int, default=MultiWorkerConfig.max_moves)
     parser.add_argument("--simulations", type=int, default=MultiWorkerConfig.simulations)
@@ -201,6 +222,96 @@ def make_selfplay_config(config: MultiWorkerConfig, seed: int) -> BatchedConfig:
         seed=seed,
         device=config.device,
         rules_backend=config.rules_backend,
+    )
+
+
+def parse_score_komi_ladder(raw_ladder: str) -> list[float]:
+    if not raw_ladder.strip():
+        return []
+    values: list[float] = []
+    for raw_item in raw_ladder.split(","):
+        item = raw_item.strip()
+        if not item:
+            continue
+        values.append(float(item))
+    unique_values = sorted(set(values))
+    if not unique_values:
+        return []
+    return unique_values
+
+
+def nearest_score_komi_index(ladder: list[float], score_komi: float) -> int:
+    if not ladder:
+        return -1
+    return min(range(len(ladder)), key=lambda index: abs(ladder[index] - score_komi))
+
+
+def score_komi_cycle_result(metrics: dict[str, object]) -> dict[str, int]:
+    behavior = metrics.get("game_behavior", {})
+    if not isinstance(behavior, dict):
+        behavior = {}
+    return {
+        "cycle": int(metrics.get("cycle", 0)),
+        "games": int(behavior.get("games", 0)),
+        "black_wins": int(behavior.get("black_wins", 0)),
+        "white_wins": int(behavior.get("white_wins", 0)),
+    }
+
+
+def update_dynamic_score_komi(
+    *,
+    ladder: list[float],
+    current_index: int,
+    current_score_komi: float,
+    history: list[dict[str, int]],
+    window: int,
+    threshold: float,
+) -> tuple[int, float, dict[str, object]]:
+    if not ladder:
+        return current_index, current_score_komi, {"enabled": False}
+
+    recent = history[-max(1, window) :]
+    games = sum(item["games"] for item in recent)
+    black_wins = sum(item["black_wins"] for item in recent)
+    white_wins = sum(item["white_wins"] for item in recent)
+    black_rate = black_wins / games if games else 0.0
+    white_rate = white_wins / games if games else 0.0
+
+    next_index = current_index
+    reason = "hold"
+    if games > 0 and black_rate > threshold:
+        if current_index < len(ladder) - 1:
+            next_index = current_index + 1
+            reason = "black_win_rate_high"
+        else:
+            reason = "black_win_rate_high_at_max_komi"
+    elif games > 0 and white_rate > threshold:
+        if current_index > 0:
+            next_index = current_index - 1
+            reason = "white_win_rate_high"
+        else:
+            reason = "white_win_rate_high_at_min_komi"
+
+    next_score_komi = ladder[next_index]
+    return (
+        next_index,
+        next_score_komi,
+        {
+            "enabled": True,
+            "ladder": ladder,
+            "window": max(1, window),
+            "threshold": threshold,
+            "recent_cycles": [item["cycle"] for item in recent],
+            "recent_games": games,
+            "recent_black_wins": black_wins,
+            "recent_white_wins": white_wins,
+            "recent_black_win_rate": round(black_rate, 4),
+            "recent_white_win_rate": round(white_rate, 4),
+            "score_komi": current_score_komi,
+            "next_score_komi": next_score_komi,
+            "adjusted": next_index != current_index,
+            "reason": reason,
+        },
     )
 
 
@@ -484,15 +595,20 @@ def run(config: MultiWorkerConfig, out_dir: Path, resume: str = "") -> dict[str,
     metrics_path = out_dir / "metrics.jsonl"
     started = time.perf_counter()
     last_metrics: dict[str, object] = {}
+    score_komi_ladder = parse_score_komi_ladder(config.score_komi_ladder)
+    score_komi_index = nearest_score_komi_index(score_komi_ladder, config.score_komi)
+    current_score_komi = score_komi_ladder[score_komi_index] if score_komi_ladder else config.score_komi
+    score_komi_history: list[dict[str, int]] = []
 
     for cycle in range(start_cycle + 1, config.cycles + 1):
         if config.time_limit_minutes > 0 and (time.perf_counter() - started) >= config.time_limit_minutes * 60:
             break
 
+        active_config = replace(config, score_komi=current_score_komi)
         cycle_start = time.perf_counter()
         state_dict = cpu_state_dict(model)
         selfplay_start = time.perf_counter()
-        config_dict = asdict(config)
+        config_dict = asdict(active_config)
         context = multiprocessing.get_context("spawn")
         with concurrent.futures.ProcessPoolExecutor(
             max_workers=config.workers,
@@ -545,7 +661,7 @@ def run(config: MultiWorkerConfig, out_dir: Path, resume: str = "") -> dict[str,
         total_train_steps += len(train_history)
 
         write_start = time.perf_counter()
-        first_worker_config = make_selfplay_config(config, config.seed + cycle * 10_000 + 1)
+        first_worker_config = make_selfplay_config(active_config, config.seed + cycle * 10_000 + 1)
         trace_examples = trace_examples_for_cycle(
             examples,
             cycle,
@@ -584,12 +700,28 @@ def run(config: MultiWorkerConfig, out_dir: Path, resume: str = "") -> dict[str,
             total_train_steps=total_train_steps,
             worker_summaries=worker_results,
         )
+        metrics["score_komi"] = current_score_komi
+        score_komi_history.append(score_komi_cycle_result(metrics))
+        (
+            next_score_komi_index,
+            next_score_komi,
+            score_komi_state,
+        ) = update_dynamic_score_komi(
+            ladder=score_komi_ladder,
+            current_index=score_komi_index,
+            current_score_komi=current_score_komi,
+            history=score_komi_history,
+            window=config.score_komi_adjust_window,
+            threshold=config.score_komi_adjust_threshold,
+        )
+        metrics["dynamic_score_komi"] = score_komi_state
+        metrics["next_score_komi"] = next_score_komi
         last_metrics = metrics
         with metrics_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(metrics) + "\n")
             handle.flush()
 
-        checkpoint_config = to_overnight_config(config)
+        checkpoint_config = to_overnight_config(replace(config, score_komi=next_score_komi))
         save_checkpoint(
             out_dir / "latest.pt",
             checkpoint_config,
@@ -617,6 +749,8 @@ def run(config: MultiWorkerConfig, out_dir: Path, resume: str = "") -> dict[str,
                 metrics,
             )
         print(json.dumps(metrics), flush=True)
+        score_komi_index = next_score_komi_index
+        current_score_komi = next_score_komi
 
     return {
         "out_dir": str(out_dir),
@@ -634,6 +768,7 @@ def run(config: MultiWorkerConfig, out_dir: Path, resume: str = "") -> dict[str,
 def main() -> None:
     args = build_parser().parse_args()
     config = MultiWorkerConfig(
+        board_size=args.board_size,
         channels=args.channels,
         residual_blocks=args.residual_blocks,
         simulations=args.simulations,
@@ -643,6 +778,9 @@ def main() -> None:
         history_moves=args.history_moves,
         terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
         score_margin_reward_scale=args.score_margin_reward_scale,
+        score_komi_ladder=args.score_komi_ladder,
+        score_komi_adjust_window=args.score_komi_adjust_window,
+        score_komi_adjust_threshold=args.score_komi_adjust_threshold,
         workers=args.workers,
         games_per_worker=args.games_per_worker,
         max_moves=args.max_moves,
