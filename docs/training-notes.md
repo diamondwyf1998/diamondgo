@@ -963,11 +963,11 @@ needs a shape/distribution metric before treating it as a measured result.
   `max_moves=250`, `temperature=0.7` for the first `16` moves,
   `late_temperature=0.2`, same root noise and training batch settings as the
   current 9x9 history-2 line.
-- `Dynamic score komi`: start from `score_komi=6.5` and choose among
-  `2.5,4.5,6.5,7.5,8.5`. If the rolling black win rate exceeds `75%`, move
+- `Dynamic score komi`: start from `score_komi=2.5` and choose among
+  `2.5,4.5,6.5,7.5,8.5`. If the rolling black win rate exceeds `70%`, move
   one ladder step upward for the next cycle; if the rolling white win rate
-  exceeds `75%`, move one ladder step downward. The default rolling window is
-  `3` cycles.
+  exceeds `70%`, move one ladder step downward. The default rolling window is
+  `5` cycles.
 - `Fresh-start caveat`: 9x9 checkpoints cannot be directly resumed because the
   action count changes from `82` to `170`; trunk-transfer would need a separate
   migration script and is not part of this first 13x13 run.

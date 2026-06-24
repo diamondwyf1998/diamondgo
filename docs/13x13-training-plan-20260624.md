@@ -7,7 +7,7 @@
 - 13x13 需要 fresh start。9x9 的 policy head 是 `82` 个动作，13x13 是 `170` 个动作，不能直接 resume 9x9 checkpoint。
 - 已修复一类“代码已经支持但命令行没暴露”的问题：`multiworker_train.py`、`multiworker_train_dualgpu.py`、`batched_demo.py` 现在都能接收 `--board-size`。
 - 13x13 smoke 和 30-worker stress 已通过。30 worker 需要先设置 `ulimit -n 65535`，否则默认 `1024` 会触发 PyTorch multiprocessing 的 `Too many open files`。
-- 根据最新要求，正式默认搜索量从 `600` sims 下调到 `200` sims，并启用动态贴目阶梯。
+- 根据最新要求，正式默认搜索量从 `600` sims 下调到 `200` sims，并启用动态贴目阶梯。启动贴目改为 `2.5`，贴目调整阈值改为 `70%`，检测窗口改为 `5` cycles。
 
 ## 计划配置
 
@@ -17,10 +17,10 @@
 - 输入：`history_moves=2`，`input_komi=false`
 - 输入平面：己方棋子、对方棋子、执黑方、上一手、上上手，共 `5` planes
 - 参数量：约 `367,717`
-- 贴目逻辑：SGF/metadata `komi=0.5`，训练胜负判断从 `score_komi=6.5` 开始
+- 贴目逻辑：SGF/metadata `komi=0.5`，训练胜负判断从 `score_komi=2.5` 开始
 - 动态贴目阶梯：`2.5, 4.5, 6.5, 7.5, 8.5`
-- 动态贴目规则：最近若干 cycle 黑胜率超过 `75%`，下一 cycle 升一档贴目；白胜率超过 `75%`，下一 cycle 降一档贴目
-- 默认判断窗口：最近 `3` 个 cycle，可用 `SCORE_KOMI_ADJUST_WINDOW=1` 改成单 cycle 响应
+- 动态贴目规则：最近若干 cycle 黑胜率超过 `70%`，下一 cycle 升一档贴目；白胜率超过 `70%`，下一 cycle 降一档贴目
+- 默认判断窗口：最近 `5` 个 cycle，可用 `SCORE_KOMI_ADJUST_WINDOW=1` 改成单 cycle 响应
 - 终局：`terminal_dead_stone_cleanup=true`
 - 价值目标：`score_margin_reward_scale=0.2`
 - 自对弈搜索：先用 `200` simulations
