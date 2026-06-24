@@ -31,7 +31,7 @@
 - worker：正式默认 `30` workers，每 worker `8` games，即 `240` games/cycle
 - 最大手数：`max_moves=250`
 - 训练：`train_steps_per_cycle=64`，`batch_size=256`，`replay_size=100000`
-- 优化器：AdamW，learning rate `0.001`，weight decay `0.0001`
+- 优化器：AdamW，learning rate `0.0015`，weight decay `0.0001`
 - 数据增强：dihedral augmentation enabled
 - checkpoint：前 `50` cycle 每 `5` cycle 存一次，之后每 `10` cycle
 - 棋谱：每 `5` cycle 记录完整 SGF/trace
@@ -78,3 +78,20 @@
 TIME_LIMIT_MINUTES=10 SIMULATIONS=32 MAX_MOVES=60 WORKERS=30 GAMES_PER_WORKER=1 \
   bash tools/server/run_fresh_dualgpu_13x13_4x64_history2_autokomi_margin0p2_200sims.sh
 ```
+
+## 2026-06-25 Update: Early-Pass Mask
+
+- The first 13x13 auto-komi run was stopped at latest metric cycle `26`.
+- Symptom: early pass dominated the games. Latest metric had `pass_move_fraction`
+  about `0.3255`, first-pass median about `6`, and all `240` games ended by
+  pass.
+- New optional control: `min_pass_move=120`.
+- Semantics: while a game has fewer than `120` played moves, pass is removed
+  from MCTS legal actions. This affects root expansion, leaf expansion, policy
+  targets, and final action sampling consistently.
+- Safety edge case: if no board point is legal, pass remains legal so MCTS
+  does not create an empty root.
+- Optimizer change for the continuation: learning rate raised from `0.001` to
+  `0.0015`.
+- Caveat: this is a deliberate experiment-condition change. It should not be
+  compared to the pre-mask cycles as if only training time changed.

@@ -39,6 +39,7 @@ class BatchedConfig:
     residual_blocks: int = 2
     simulations: int = 64
     max_moves: int = DEFAULT_9X9_MAX_MOVES
+    min_pass_move: int = 0
     games: int = 16
     train_steps: int = 16
     batch_size: int = 256
@@ -82,6 +83,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--simulations", type=int, default=BatchedConfig.simulations)
     parser.add_argument("--max-moves", type=int, default=BatchedConfig.max_moves)
+    parser.add_argument(
+        "--min-pass-move",
+        type=int,
+        default=BatchedConfig.min_pass_move,
+        help="Mask pass from MCTS legal actions while the current game has fewer played moves.",
+    )
     parser.add_argument("--train-steps", type=int, default=BatchedConfig.train_steps)
     parser.add_argument("--batch-size", type=int, default=BatchedConfig.batch_size)
     parser.add_argument("--channels", type=int, default=BatchedConfig.channels)
@@ -196,7 +203,7 @@ def run_batched_mcts(
     priors_batch, values = evaluate_batch(model, states, stats)
     for root, state, priors, value in zip(roots, states, priors_batch, values):
         legal_start = time.perf_counter()
-        legal_actions = state.legal_actions()
+        legal_actions = legal_actions_for_state(state, config)
         stats["legal_actions_seconds"] = float(stats.get("legal_actions_seconds", 0.0)) + (
             time.perf_counter() - legal_start
         )
@@ -217,7 +224,7 @@ def run_batched_mcts(
         priors_batch, values = evaluate_batch(model, leaf_states, stats)
         for (_, path, node), priors, value, leaf_state in zip(pending, priors_batch, values, leaf_states):
             legal_start = time.perf_counter()
-            legal_actions = leaf_state.legal_actions()
+            legal_actions = legal_actions_for_state(leaf_state, config)
             stats["legal_actions_seconds"] = float(stats.get("legal_actions_seconds", 0.0)) + (
                 time.perf_counter() - legal_start
             )
@@ -240,6 +247,14 @@ def temperature_for_move(config: BatchedConfig, played_moves: int) -> float:
     if config.temperature_moves <= 0:
         return config.temperature
     return config.temperature if played_moves < config.temperature_moves else config.late_temperature
+
+
+def legal_actions_for_state(state: object, config: BatchedConfig) -> np.ndarray:
+    legal_actions = state.legal_actions()
+    played_moves = int(getattr(state, "_moves", 0))
+    if config.min_pass_move > 0 and played_moves < config.min_pass_move and bool(legal_actions[:-1].any()):
+        legal_actions[-1] = False
+    return legal_actions
 
 
 def add_root_dirichlet_noise(root: SearchNode, alpha: float, fraction: float) -> None:
@@ -503,6 +518,7 @@ def main() -> None:
         score_margin_reward_scale=args.score_margin_reward_scale,
         simulations=args.simulations,
         max_moves=args.max_moves,
+        min_pass_move=args.min_pass_move,
         train_steps=args.train_steps,
         batch_size=args.batch_size,
         channels=args.channels,

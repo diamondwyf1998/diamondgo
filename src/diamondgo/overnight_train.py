@@ -30,6 +30,7 @@ class OvernightConfig:
     simulations: int = 64
     games_per_cycle: int = 16
     max_moves: int = DEFAULT_9X9_MAX_MOVES
+    min_pass_move: int = 0
     train_steps_per_cycle: int = 64
     batch_size: int = 256
     replay_size: int = 50_000
@@ -85,6 +86,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Scale for the capped +/-0.6 score-margin component; enabled targets use +/-0.4 win/loss base.",
     )
     parser.add_argument("--max-moves", type=int, default=OvernightConfig.max_moves)
+    parser.add_argument(
+        "--min-pass-move",
+        type=int,
+        default=OvernightConfig.min_pass_move,
+        help="Mask pass from MCTS legal actions while the current game has fewer played moves.",
+    )
     parser.add_argument("--simulations", type=int, default=OvernightConfig.simulations)
     parser.add_argument("--train-steps-per-cycle", type=int, default=OvernightConfig.train_steps_per_cycle)
     parser.add_argument("--batch-size", type=int, default=OvernightConfig.batch_size)
@@ -150,6 +157,7 @@ def make_selfplay_config(config: OvernightConfig, seed: int) -> BatchedConfig:
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,
         max_moves=config.max_moves,
+        min_pass_move=config.min_pass_move,
         games=config.games_per_cycle,
         train_steps=0,
         batch_size=config.batch_size,
@@ -485,6 +493,7 @@ def main() -> None:
         score_margin_reward_scale=args.score_margin_reward_scale,
         games_per_cycle=args.games_per_cycle,
         max_moves=args.max_moves,
+        min_pass_move=args.min_pass_move,
         train_steps_per_cycle=args.train_steps_per_cycle,
         batch_size=args.batch_size,
         replay_size=args.replay_size,

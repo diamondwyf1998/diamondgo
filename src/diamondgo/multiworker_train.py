@@ -43,6 +43,7 @@ class MultiWorkerConfig:
     workers: int = 8
     games_per_worker: int = 4
     max_moves: int = DEFAULT_9X9_MAX_MOVES
+    min_pass_move: int = 0
     train_steps_per_cycle: int = 64
     batch_size: int = 256
     replay_size: int = 50_000
@@ -118,6 +119,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Dynamic score-komi adjustment threshold; e.g. 0.75 means adjust only above 75% rolling win rate.",
     )
     parser.add_argument("--max-moves", type=int, default=MultiWorkerConfig.max_moves)
+    parser.add_argument(
+        "--min-pass-move",
+        type=int,
+        default=MultiWorkerConfig.min_pass_move,
+        help="Mask pass from MCTS legal actions while the current game has fewer played moves.",
+    )
     parser.add_argument("--simulations", type=int, default=MultiWorkerConfig.simulations)
     parser.add_argument("--train-steps-per-cycle", type=int, default=MultiWorkerConfig.train_steps_per_cycle)
     parser.add_argument("--batch-size", type=int, default=MultiWorkerConfig.batch_size)
@@ -167,6 +174,7 @@ def to_overnight_config(config: MultiWorkerConfig) -> OvernightConfig:
         simulations=config.simulations,
         games_per_cycle=config.workers * config.games_per_worker,
         max_moves=config.max_moves,
+        min_pass_move=config.min_pass_move,
         train_steps_per_cycle=config.train_steps_per_cycle,
         batch_size=config.batch_size,
         replay_size=config.replay_size,
@@ -208,6 +216,7 @@ def make_selfplay_config(config: MultiWorkerConfig, seed: int) -> BatchedConfig:
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,
         max_moves=config.max_moves,
+        min_pass_move=config.min_pass_move,
         games=config.games_per_worker,
         train_steps=0,
         batch_size=config.batch_size,
@@ -785,6 +794,7 @@ def main() -> None:
         workers=args.workers,
         games_per_worker=args.games_per_worker,
         max_moves=args.max_moves,
+        min_pass_move=args.min_pass_move,
         train_steps_per_cycle=args.train_steps_per_cycle,
         batch_size=args.batch_size,
         replay_size=args.replay_size,

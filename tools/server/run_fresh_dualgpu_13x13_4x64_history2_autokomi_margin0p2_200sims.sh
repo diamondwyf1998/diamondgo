@@ -15,12 +15,14 @@ SCORE_KOMI_ADJUST_WINDOW="${SCORE_KOMI_ADJUST_WINDOW:-5}"
 SCORE_KOMI_ADJUST_THRESHOLD="${SCORE_KOMI_ADJUST_THRESHOLD:-0.70}"
 SIMULATIONS="${SIMULATIONS:-200}"
 MAX_MOVES="${MAX_MOVES:-250}"
+MIN_PASS_MOVE="${MIN_PASS_MOVE:-120}"
 WORKERS="${WORKERS:-30}"
 GAMES_PER_WORKER="${GAMES_PER_WORKER:-8}"
 TIME_LIMIT_MINUTES="${TIME_LIMIT_MINUTES:-0}"
 TRAIN_STEPS_PER_CYCLE="${TRAIN_STEPS_PER_CYCLE:-64}"
 BATCH_SIZE="${BATCH_SIZE:-256}"
 REPLAY_SIZE="${REPLAY_SIZE:-100000}"
+LEARNING_RATE="${LEARNING_RATE:-0.0015}"
 TEMPERATURE="${TEMPERATURE:-0.7}"
 TEMPERATURE_MOVES="${TEMPERATURE_MOVES:-16}"
 LATE_TEMPERATURE="${LATE_TEMPERATURE:-0.2}"
@@ -32,7 +34,8 @@ RESUME="${RESUME:-}"
 SCORE_LABEL="${SCORE_KOMI//./p}"
 TEMP_LABEL="${TEMPERATURE//./p}"
 LATE_TEMP_LABEL="${LATE_TEMPERATURE//./p}"
-TRAIN_OUT="${TRAIN_OUT:-artifacts/multiworker-13x13-fresh-dualgpu-4x64-history2-autokomi-start${SCORE_LABEL}-cleanup-margin0p2-${SIMULATIONS}sims-max${MAX_MOVES}-temp${TEMP_LABEL}-late${LATE_TEMP_LABEL}-${WORKERS}w-${RUN_ID}}"
+LR_LABEL="${LEARNING_RATE//./p}"
+TRAIN_OUT="${TRAIN_OUT:-artifacts/multiworker-13x13-fresh-dualgpu-4x64-history2-autokomi-start${SCORE_LABEL}-minpass${MIN_PASS_MOVE}-lr${LR_LABEL}-cleanup-margin0p2-${SIMULATIONS}sims-max${MAX_MOVES}-temp${TEMP_LABEL}-late${LATE_TEMP_LABEL}-${WORKERS}w-${RUN_ID}}"
 LOG="$TRAIN_OUT/train.log"
 MONITOR="$TRAIN_OUT/gpu_monitor.csv"
 STATUS_LOG="$TRAIN_OUT/status_3h.log"
@@ -42,7 +45,7 @@ cat > "$TRAIN_OUT/run_notes.md" <<NOTES
 # Fresh Dual-GPU 13x13 4x64, History-2, Auto-Komi Start $SCORE_KOMI, Cleanup, Margin Reward 0.2
 
 - created_time: $(date --iso-8601=seconds)
-- source_commit: $(git rev-parse --short HEAD 2>/dev/null || cat SOURCE_COMMIT 2>/dev/null || echo unknown)
+- source_commit: ${SOURCE_COMMIT:-$(git rev-parse --short HEAD 2>/dev/null || cat SOURCE_COMMIT 2>/dev/null || echo unknown)}
 - purpose: first 13x13 experiment while preserving the current 4x64 history-2 training architecture and core tricks
 - fresh_start: $([ -z "$RESUME" ] && echo true || echo false)
 - resume_checkpoint: ${RESUME:-none}
@@ -72,10 +75,12 @@ cat > "$TRAIN_OUT/run_notes.md" <<NOTES
 - games_per_cycle: $((WORKERS * GAMES_PER_WORKER))
 - max_moves: $MAX_MOVES
 - selfplay_simulations: $SIMULATIONS
+- min_pass_move: $MIN_PASS_MOVE
+- pass_mask_policy: pass is removed from MCTS legal actions while played_moves is below min_pass_move; search tree, policy target, and sampled action all see the same mask
 - train_steps_per_cycle: $TRAIN_STEPS_PER_CYCLE
 - batch_size: $BATCH_SIZE
 - replay_size: $REPLAY_SIZE
-- optimizer: AdamW, learning rate 0.001, weight decay 0.0001
+- optimizer: AdamW, learning rate $LEARNING_RATE, weight decay 0.0001
 - c_puct: 1.5
 - root_noise: Dirichlet alpha $ROOT_DIRICHLET_ALPHA, fraction $ROOT_NOISE_FRACTION
 - root_policy_temperature: $ROOT_POLICY_TEMPERATURE
@@ -154,13 +159,14 @@ args=(
   --workers "$WORKERS"
   --games-per-worker "$GAMES_PER_WORKER"
   --max-moves "$MAX_MOVES"
+  --min-pass-move "$MIN_PASS_MOVE"
   --simulations "$SIMULATIONS"
   --train-steps-per-cycle "$TRAIN_STEPS_PER_CYCLE"
   --batch-size "$BATCH_SIZE"
   --replay-size "$REPLAY_SIZE"
   --channels 64
   --residual-blocks 4
-  --learning-rate 0.001
+  --learning-rate "$LEARNING_RATE"
   --weight-decay 0.0001
   --c-puct 1.5
   --temperature "$TEMPERATURE"

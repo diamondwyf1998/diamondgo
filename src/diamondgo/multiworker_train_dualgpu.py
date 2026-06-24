@@ -329,6 +329,7 @@ def main() -> None:
         workers=args.workers,
         games_per_worker=args.games_per_worker,
         max_moves=args.max_moves,
+        min_pass_move=args.min_pass_move,
         train_steps_per_cycle=args.train_steps_per_cycle,
         batch_size=args.batch_size,
         replay_size=args.replay_size,

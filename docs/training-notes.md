@@ -979,3 +979,24 @@ needs a shape/distribution metric before treating it as a measured result.
   `tools/server/run_fresh_dualgpu_13x13_4x64_history2_autokomi_margin0p2_200sims.sh`
 - `Human-facing plan`:
   `docs/13x13-training-plan-20260624.md`
+
+### 13x13 Early-Pass Intervention
+
+- `User observation/request`: the initial 13x13 run had an early-pass failure
+  mode; manually mask pass within the first `120` moves and consider a modest
+  learning-rate increase.
+- `Agent measurement`: before the intervention, the active 13x13 auto-komi run
+  was stopped at latest metric cycle `26`. The latest cycle had
+  `score_komi=8.5`, black win rate `1.0`, `pass_move_fraction=0.3255`,
+  first-pass median about `6`, and all `240` games ended by pass.
+- `Backup`:
+  `/root/autodl-tmp/diamondgo-checkpoint-backups/13x13_autokomi_pre_passmask_lr_20260624-231552_cycleunknown_latest.pt`
+- `Technical operation`: added optional `min_pass_move`. When positive, pass is
+  removed from MCTS legal actions while the current game has fewer than that
+  many played moves. The mask is applied before root and leaf expansion, so the
+  search tree, policy target, and sampled action use the same action set.
+- `Safety detail`: pass is not masked if no board point is legal, preventing an
+  empty MCTS root in small-board or full-board edge cases.
+- `Changed config for the continuation`: `min_pass_move=120`; AdamW learning
+  rate raised from `0.001` to `0.0015`. Other 13x13 defaults remain unchanged
+  unless explicitly overridden by the launch script.

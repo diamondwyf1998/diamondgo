@@ -224,6 +224,7 @@ class SgfmillRules:
         self.board_array = np.zeros((size, size), dtype=np.int8)
         self.to_play = BLACK
         self._passes = 0
+        self._moves = 0
         self._recent_actions: list[int] = []
         self._ko_forbidden: tuple[int, int] | None = None
         self._legal_actions_cache: np.ndarray | None = None
@@ -246,6 +247,7 @@ class SgfmillRules:
         clone.board_array = self.board_array.copy()
         clone.to_play = self.to_play
         clone._passes = self._passes
+        clone._moves = self._moves
         clone._recent_actions = list(self._recent_actions)
         clone._ko_forbidden = self._ko_forbidden
         clone._legal_actions_cache = (
@@ -278,6 +280,7 @@ class SgfmillRules:
             self._ko_forbidden = self.board.play(row, col, self.to_play)
             self._sync_board_array()
             self._passes = 0
+        self._moves += 1
         self._remember_action(action)
         self.to_play = WHITE if self.to_play == BLACK else BLACK
         self._legal_actions_cache = None
@@ -291,6 +294,7 @@ class SgfmillRules:
             self._ko_forbidden = self.board.play(row, col, self.to_play)
             self._sync_board_array()
             self._passes = 0
+        self._moves += 1
         self._remember_action(action)
         self.to_play = WHITE if self.to_play == BLACK else BLACK
         self._legal_actions_cache = None
