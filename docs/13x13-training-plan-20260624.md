@@ -139,3 +139,66 @@ TIME_LIMIT_MINUTES=10 SIMULATIONS=32 MAX_MOVES=60 WORKERS=30 GAMES_PER_WORKER=1 
   - `artifacts/local-smoke-13x13-final-board-head.json`
   - `artifacts/visualizations/local-smoke-13x13-final-board-head.html`
   - `artifacts/visualizations/local-smoke-13x13-final-board-head.svg`
+
+## 2026-06-25 Server Run: Final-Board Head, Fresh 13x13, 32 Workers
+
+- User request: push the final-board prediction change to the server, clear
+  stale training workers, and restart with `workers=32`.
+- Server: `connect.westc.seetacloud.com:45955`.
+- Before restart, the old no-final-board fresh 13x13 line was stopped and its
+  output directory was preserved.
+- Stale self-play worker cleanup: after the old main process was stopped,
+  orphan CUDA worker PIDs from the old line were still holding GPU memory. They
+  were killed from the `nvidia-smi --query-compute-apps=pid` list.
+- Server dirty source backup before overwrite:
+  `/root/autodl-tmp/diamondgo-source-backups/before_final_board_20260625-205900.diff.patch`
+- GitHub commit after local commit/push:
+  `e7087a2 Add final board prediction head`.
+- New run output:
+  `/root/diamondgo/artifacts/multiworker-13x13-fresh-dualgpu-4x64-history2-autokomi-start2p5-minpass120-lr0p0015-cleanup-margin0p2-200sims-max250-temp0p7-moves30-mid0p3-until100-late0p2-32w-20260625-210133`
+- PID file:
+  `/root/diamondgo/artifacts/dualgpu_13x13_finalboard_32w.train.pid`
+- Actual Python train PID at launch verification: `10523`.
+- Config highlights:
+  - board size: `13`
+  - model: `4x64`, `history_moves=2`, `input_komi=false`
+  - self-play devices: `cuda:0,cuda:1`
+  - trainer device: `cuda:0`
+  - workers: `32`
+  - games per worker: `8`
+  - games per cycle: `256`
+  - self-play simulations: `200`
+  - max moves: `250`
+  - min pass move: `120`
+  - score komi start: `2.5`
+  - dynamic komi ladder: `2.5,4.5,6.5,7.5,8.5`
+  - terminal dead-stone cleanup: `true`
+  - score margin reward scale: `0.2`
+  - final board loss weight: `0.25`
+  - temperature schedule: `0.7` for moves `[0,30)`, `0.3` for `[30,100)`,
+    `0.2` afterwards
+- Server verification before launch:
+  - compile passed with `python -m compileall -q src scripts tests`
+  - model forward shape smoke: policy `(2,170)`, value `(2,)`, final board
+    `(2,169)`
+  - targeted pytest passed: `16 passed`
+- First cycle result:
+  - cycle seconds: `552.081`
+  - self-play seconds: `544.724`
+  - train seconds: `1.687`
+  - positions: `50035`
+  - positions per second: `91.854`
+  - latest loss: `5.530139`
+  - policy loss: `5.118330`
+  - value loss: `0.214607`
+  - final board loss: `0.788811`
+  - final board target mean: `0.0138`
+  - final board target black fraction: `0.4725`
+  - final board target white fraction: `0.4587`
+  - black win rate: `0.4883`
+  - white win rate: `0.5117`
+  - terminal cleanup stones: black `206`, white `295`
+- First-cycle comparison note: the previous no-final-board 30-worker line had
+  cycle time about `541.6s` for `240` games; this 32-worker final-board line
+  used about `552.1s` for `256` games, so throughput was slightly higher in
+  positions per second despite the auxiliary head.
