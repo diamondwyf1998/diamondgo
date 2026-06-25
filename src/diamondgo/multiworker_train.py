@@ -34,6 +34,7 @@ class MultiWorkerConfig:
     history_moves: int = 0
     terminal_dead_stone_cleanup: bool = False
     score_margin_reward_scale: float = 0.0
+    final_board_loss_weight: float = 0.25
     score_komi_ladder: str = ""
     score_komi_adjust_window: int = 3
     score_komi_adjust_threshold: float = 0.75
@@ -52,6 +53,8 @@ class MultiWorkerConfig:
     c_puct: float = 1.5
     temperature: float = 1.0
     temperature_moves: int = 0
+    mid_temperature: float = -1.0
+    mid_temperature_until: int = 0
     late_temperature: float = 1.0
     root_dirichlet_alpha: float = 0.0
     root_noise_fraction: float = 0.0
@@ -102,6 +105,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Scale for the capped +/-0.6 score-margin component; enabled targets use +/-0.4 win/loss base.",
     )
     parser.add_argument(
+        "--final-board-loss-weight",
+        type=float,
+        default=MultiWorkerConfig.final_board_loss_weight,
+        help="Auxiliary loss weight for predicting the final black/white ownership board.",
+    )
+    parser.add_argument(
         "--score-komi-ladder",
         default=MultiWorkerConfig.score_komi_ladder,
         help="Comma-separated scoring komi ladder. If set, training moves one step up on high black win rate and one step down on high white win rate.",
@@ -139,6 +148,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--root-noise-fraction", type=float, default=MultiWorkerConfig.root_noise_fraction)
     parser.add_argument("--root-policy-temperature", type=float, default=MultiWorkerConfig.root_policy_temperature)
     parser.add_argument("--temperature-moves", type=int, default=MultiWorkerConfig.temperature_moves)
+    parser.add_argument(
+        "--mid-temperature",
+        type=float,
+        default=MultiWorkerConfig.mid_temperature,
+        help="Optional middle-game move sampling temperature. Enabled when non-negative and --mid-temperature-until is after --temperature-moves.",
+    )
+    parser.add_argument(
+        "--mid-temperature-until",
+        type=int,
+        default=MultiWorkerConfig.mid_temperature_until,
+        help="Use --mid-temperature for moves in [temperature_moves, mid_temperature_until); later moves use --late-temperature.",
+    )
     parser.add_argument("--late-temperature", type=float, default=MultiWorkerConfig.late_temperature)
     parser.add_argument("--augment-dihedral", action="store_true", default=MultiWorkerConfig.augment_dihedral)
     parser.add_argument("--seed", type=int, default=MultiWorkerConfig.seed)
@@ -169,6 +190,7 @@ def to_overnight_config(config: MultiWorkerConfig) -> OvernightConfig:
         history_moves=config.history_moves,
         terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
         score_margin_reward_scale=config.score_margin_reward_scale,
+        final_board_loss_weight=config.final_board_loss_weight,
         channels=config.channels,
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,
@@ -183,6 +205,8 @@ def to_overnight_config(config: MultiWorkerConfig) -> OvernightConfig:
         c_puct=config.c_puct,
         temperature=config.temperature,
         temperature_moves=config.temperature_moves,
+        mid_temperature=config.mid_temperature,
+        mid_temperature_until=config.mid_temperature_until,
         late_temperature=config.late_temperature,
         root_dirichlet_alpha=config.root_dirichlet_alpha,
         root_noise_fraction=config.root_noise_fraction,
@@ -212,6 +236,7 @@ def make_selfplay_config(config: MultiWorkerConfig, seed: int) -> BatchedConfig:
         history_moves=config.history_moves,
         terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
         score_margin_reward_scale=config.score_margin_reward_scale,
+        final_board_loss_weight=config.final_board_loss_weight,
         channels=config.channels,
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,
@@ -224,6 +249,8 @@ def make_selfplay_config(config: MultiWorkerConfig, seed: int) -> BatchedConfig:
         c_puct=config.c_puct,
         temperature=config.temperature,
         temperature_moves=config.temperature_moves,
+        mid_temperature=config.mid_temperature,
+        mid_temperature_until=config.mid_temperature_until,
         late_temperature=config.late_temperature,
         root_dirichlet_alpha=config.root_dirichlet_alpha,
         root_noise_fraction=config.root_noise_fraction,
@@ -400,6 +427,11 @@ def summarize_cycle(
     policies = [np.asarray(item["policy"], dtype=np.float32) for item in examples]
     entropies = [float(-(policy * np.log(np.clip(policy, 1e-9, 1.0))).sum()) for policy in policies]
     value_targets = [float(item["value_target"]) for item in examples]
+    final_board_targets = [
+        np.asarray(item["final_board_target"], dtype=np.float32)
+        for item in examples
+        if "final_board_target" in item
+    ]
     game_summaries = [
         game
         for worker in worker_summaries
@@ -443,6 +475,21 @@ def summarize_cycle(
         "value_target_mean": round(float(np.mean(value_targets)), 4) if value_targets else 0.0,
         "value_target_min": round(min(value_targets), 4) if value_targets else 0.0,
         "value_target_max": round(max(value_targets), 4) if value_targets else 0.0,
+        "final_board_target_mean": round(float(np.mean(final_board_targets)), 4)
+        if final_board_targets
+        else 0.0,
+        "final_board_target_black_fraction": round(
+            float(np.mean(np.concatenate(final_board_targets) > 0.5)),
+            4,
+        )
+        if final_board_targets
+        else 0.0,
+        "final_board_target_white_fraction": round(
+            float(np.mean(np.concatenate(final_board_targets) < -0.5)),
+            4,
+        )
+        if final_board_targets
+        else 0.0,
         "game_behavior": summarize_game_behavior(game_summaries, examples),
         "selfplay_timing": selfplay_timing,
         "selfplay": {
@@ -666,6 +713,7 @@ def run(config: MultiWorkerConfig, out_dir: Path, resume: str = "") -> dict[str,
             steps=config.train_steps_per_cycle,
             batch_size=config.batch_size,
             augment_dihedral=config.augment_dihedral,
+            final_board_loss_weight=config.final_board_loss_weight,
         )
         train_seconds = time.perf_counter() - train_start
         total_train_steps += len(train_history)
@@ -788,6 +836,7 @@ def main() -> None:
         history_moves=args.history_moves,
         terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
         score_margin_reward_scale=args.score_margin_reward_scale,
+        final_board_loss_weight=args.final_board_loss_weight,
         score_komi_ladder=args.score_komi_ladder,
         score_komi_adjust_window=args.score_komi_adjust_window,
         score_komi_adjust_threshold=args.score_komi_adjust_threshold,
@@ -803,6 +852,8 @@ def main() -> None:
         c_puct=args.c_puct,
         temperature=args.temperature,
         temperature_moves=args.temperature_moves,
+        mid_temperature=args.mid_temperature,
+        mid_temperature_until=args.mid_temperature_until,
         late_temperature=args.late_temperature,
         root_dirichlet_alpha=args.root_dirichlet_alpha,
         root_noise_fraction=args.root_noise_fraction,

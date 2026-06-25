@@ -17,10 +17,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from diamondgo import eval_checkpoints
+
+RETURN_NAV_SCRIPT = '<script src="/viewers/return-nav.js" defer></script>'
 from diamondgo.batched_demo import BatchedConfig, run_batched_mcts
 from diamondgo.config import ModelConfig, input_plane_count
 from diamondgo.demo_cpu import action_to_gtp, make_rules
-from diamondgo.model import PolicyValueNet
+from diamondgo.model import PolicyValueNet, load_model_state_dict
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -182,13 +184,22 @@ def model_from_checkpoint(path: Path, config: eval_checkpoints.MatchConfig) -> P
     model.to(torch.device(config.device))
     model.eval()
     payload = eval_checkpoints.load_checkpoint_payload(path, config.device)
-    model.load_state_dict(payload["model_state_dict"])
+    load_model_state_dict(model, payload["model_state_dict"])
     model.eval()
     return model
 
 
 def batched_config(config: eval_checkpoints.MatchConfig, active_games: int) -> BatchedConfig:
     return eval_checkpoints.batched_config(replace(config, games=active_games), active_games)
+
+
+def adapt_state_for_model(state: object, config: eval_checkpoints.MatchConfig) -> object:
+    """Copy a shared match state but expose the input planes expected by one model."""
+    clone = state.copy()
+    clone.input_komi = config.input_komi
+    clone.history_moves = config.history_moves
+    clone.komi = config.komi
+    return clone
 
 
 def play_cross_match(
@@ -233,7 +244,7 @@ def play_cross_match(
                 continue
             model = candidate_model if key == "candidate" else opponent_model
             config = candidate_config if key == "candidate" else opponent_config
-            group_states = [states[index] for index in indices]
+            group_states = [adapt_state_for_model(states[index], config) for index in indices]
             roots = run_batched_mcts(model, group_states, batched_config(config, len(indices)), stats[key])
             roots_by_index.update(zip(indices, roots))
 
@@ -327,7 +338,8 @@ def render_summary(results: list[dict[str, Any]], config: eval_checkpoints.Match
 <h1>DiamondGo cross-run matches</h1>
 <p class='note'>Games per pair: {results[0]['games'] if results else 0}. Environment: score komi {config.score_komi}, max moves {config.max_moves}, rules {config.rules_backend}. Candidate/opponent pairings are explicit; this is not necessarily same-cycle matching.</p>
 <p><a href='games_dashboard.html'>Open game replay dashboard</a></p>
-<table><thead><tr><th>pair</th><th>candidate</th><th>opponent</th><th>wins</th><th>black</th><th>white</th><th>win rate</th><th>early pass <=40</th></tr></thead><tbody>{''.join(rows)}</tbody></table>"""
+<table><thead><tr><th>pair</th><th>candidate</th><th>opponent</th><th>wins</th><th>black</th><th>white</th><th>win rate</th><th>early pass <=40</th></tr></thead><tbody>{''.join(rows)}</tbody></table>
+{RETURN_NAV_SCRIPT}"""
 
 
 def main() -> None:
@@ -359,6 +371,8 @@ def main() -> None:
             max_moves=args.max_moves,
             simulations=max(args.candidate_sims, args.opponent_sims),
             opening_temperature_moves=args.opening_temperature_moves,
+            input_komi=candidate_config.input_komi or opponent_config.input_komi,
+            history_moves=max(candidate_config.history_moves, opponent_config.history_moves),
             seed=args.seed + index,
         )
         candidate_config = replace(candidate_config, seed=args.seed + index)

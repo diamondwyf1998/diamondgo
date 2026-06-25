@@ -15,7 +15,7 @@ import torch.nn.functional as F
 from diamondgo.config import MCTSConfig, ModelConfig, input_plane_count
 from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_SCORE_KOMI
 from diamondgo.mcts import run_mcts
-from diamondgo.model import PolicyValueNet
+from diamondgo.model import PolicyValueNet, policy_value, policy_value_final_board
 from diamondgo.rules import SgfmillRules, SimpleAreaRules
 
 
@@ -28,6 +28,7 @@ class CpuDemoConfig:
     history_moves: int = 0
     terminal_dead_stone_cleanup: bool = False
     score_margin_reward_scale: float = 0.0
+    final_board_loss_weight: float = 0.25
     channels: int = 16
     residual_blocks: int = 1
     simulations: int = 8
@@ -66,6 +67,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=CpuDemoConfig.score_margin_reward_scale,
         help="Scale for the capped +/-0.6 score-margin component; enabled targets use +/-0.4 win/loss base.",
+    )
+    parser.add_argument(
+        "--final-board-loss-weight",
+        type=float,
+        default=CpuDemoConfig.final_board_loss_weight,
+        help="Auxiliary loss weight for predicting the final black/white ownership board.",
     )
     parser.add_argument("--simulations", type=int, default=CpuDemoConfig.simulations)
     parser.add_argument("--max-moves", type=int, default=CpuDemoConfig.max_moves)
@@ -116,7 +123,7 @@ def evaluate_with_model(model: PolicyValueNet, state: SimpleAreaRules) -> tuple[
     device = next(model.parameters()).device
     features = torch.from_numpy(state.encode()).unsqueeze(0).to(device)
     with torch.no_grad():
-        logits, value = model(features)
+        logits, value = policy_value(model(features))
     priors = torch.softmax(logits[0], dim=0).detach().cpu().numpy()
     return priors, float(value.item())
 
@@ -179,8 +186,10 @@ def play_game(config: CpuDemoConfig, model: PolicyValueNet) -> tuple[list[dict[s
     outcome_for_to_play = state.terminal_value()
     winner_value_by_player = {state.to_play: outcome_for_to_play}
     winner_value_by_player["w" if state.to_play == "b" else "b"] = -outcome_for_to_play
+    final_board_target = np.asarray(state.terminal_ownership(), dtype=np.float32).reshape(-1)
     for example in examples:
         example["value_target"] = winner_value_by_player[example["player"]]
+        example["final_board_target"] = final_board_target
     return examples, float(outcome_for_to_play)
 
 
@@ -198,12 +207,21 @@ def train_steps(
         features = torch.tensor(np.stack([item["features"] for item in batch]), dtype=torch.float32).to(device)
         policy_targets = torch.tensor(np.stack([item["policy"] for item in batch]), dtype=torch.float32).to(device)
         value_targets = torch.tensor([item["value_target"] for item in batch], dtype=torch.float32).to(device)
+        final_board_targets = torch.tensor(
+            np.stack([item["final_board_target"] for item in batch]),
+            dtype=torch.float32,
+        ).to(device)
 
         optimizer.zero_grad(set_to_none=True)
-        logits, values = model(features)
+        logits, values, final_board = policy_value_final_board(model(features))
         policy_loss = -(policy_targets * F.log_softmax(logits, dim=1)).sum(dim=1).mean()
         value_loss = F.mse_loss(values, value_targets)
-        loss = policy_loss + value_loss
+        final_board_loss = (
+            F.mse_loss(final_board, final_board_targets)
+            if final_board is not None and config.final_board_loss_weight > 0.0
+            else torch.zeros((), dtype=torch.float32, device=device)
+        )
+        loss = policy_loss + value_loss + config.final_board_loss_weight * final_board_loss
         loss.backward()
         optimizer.step()
 
@@ -213,6 +231,8 @@ def train_steps(
                 "loss": round(float(loss.item()), 6),
                 "policy_loss": round(float(policy_loss.item()), 6),
                 "value_loss": round(float(value_loss.item()), 6),
+                "final_board_loss": round(float(final_board_loss.item()), 6),
+                "final_board_loss_weight": round(float(config.final_board_loss_weight), 6),
             }
         )
     return history
@@ -1045,6 +1065,7 @@ def main() -> None:
         history_moves=args.history_moves,
         terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
         score_margin_reward_scale=args.score_margin_reward_scale,
+        final_board_loss_weight=args.final_board_loss_weight,
         simulations=args.simulations,
         max_moves=args.max_moves,
         train_steps=args.train_steps,

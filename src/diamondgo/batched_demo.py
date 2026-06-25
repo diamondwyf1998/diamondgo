@@ -23,7 +23,7 @@ from diamondgo.demo_cpu import (
     write_sgf,
 )
 from diamondgo.mcts import SearchNode, play_search_action, select_child
-from diamondgo.model import PolicyValueNet
+from diamondgo.model import PolicyValueNet, policy_value
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,7 @@ class BatchedConfig:
     history_moves: int = 0
     terminal_dead_stone_cleanup: bool = False
     score_margin_reward_scale: float = 0.0
+    final_board_loss_weight: float = 0.25
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 64
@@ -47,6 +48,8 @@ class BatchedConfig:
     c_puct: float = 1.5
     temperature: float = 1.0
     temperature_moves: int = 0
+    mid_temperature: float = -1.0
+    mid_temperature_until: int = 0
     late_temperature: float = 1.0
     root_dirichlet_alpha: float = 0.0
     root_noise_fraction: float = 0.0
@@ -81,6 +84,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=BatchedConfig.score_margin_reward_scale,
         help="Scale for the capped +/-0.6 score-margin component; enabled targets use +/-0.4 win/loss base.",
     )
+    parser.add_argument(
+        "--final-board-loss-weight",
+        type=float,
+        default=BatchedConfig.final_board_loss_weight,
+        help="Auxiliary loss weight for predicting the final black/white ownership board.",
+    )
     parser.add_argument("--simulations", type=int, default=BatchedConfig.simulations)
     parser.add_argument("--max-moves", type=int, default=BatchedConfig.max_moves)
     parser.add_argument(
@@ -99,6 +108,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--root-noise-fraction", type=float, default=BatchedConfig.root_noise_fraction)
     parser.add_argument("--root-policy-temperature", type=float, default=BatchedConfig.root_policy_temperature)
     parser.add_argument("--temperature-moves", type=int, default=BatchedConfig.temperature_moves)
+    parser.add_argument(
+        "--mid-temperature",
+        type=float,
+        default=BatchedConfig.mid_temperature,
+        help="Optional middle-game move sampling temperature. Enabled when non-negative and --mid-temperature-until is after --temperature-moves.",
+    )
+    parser.add_argument(
+        "--mid-temperature-until",
+        type=int,
+        default=BatchedConfig.mid_temperature_until,
+        help="Use --mid-temperature for moves in [temperature_moves, mid_temperature_until); later moves use --late-temperature.",
+    )
     parser.add_argument("--late-temperature", type=float, default=BatchedConfig.late_temperature)
     parser.add_argument("--seed", type=int, default=BatchedConfig.seed)
     parser.add_argument("--device", default=BatchedConfig.device)
@@ -138,7 +159,7 @@ def evaluate_batch(
         torch.cuda.synchronize()
     start = time.perf_counter()
     with torch.no_grad():
-        logits, values = model(features)
+        logits, values = policy_value(model(features))
     if device.type == "cuda":
         torch.cuda.synchronize()
     elapsed = time.perf_counter() - start
@@ -246,7 +267,15 @@ def apply_policy_temperature(priors: np.ndarray, temperature: float) -> np.ndarr
 def temperature_for_move(config: BatchedConfig, played_moves: int) -> float:
     if config.temperature_moves <= 0:
         return config.temperature
-    return config.temperature if played_moves < config.temperature_moves else config.late_temperature
+    if played_moves < config.temperature_moves:
+        return config.temperature
+    if (
+        config.mid_temperature >= 0.0
+        and config.mid_temperature_until > config.temperature_moves
+        and played_moves < config.mid_temperature_until
+    ):
+        return config.mid_temperature
+    return config.late_temperature
 
 
 def legal_actions_for_state(state: object, config: BatchedConfig) -> np.ndarray:
@@ -350,11 +379,13 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
                 active[state_index] = False
 
     terminal_values_by_game = {}
+    terminal_board_targets_by_game = {}
     game_summaries = []
     for game_index, state in enumerate(states, start=1):
         value_for_to_play = float(state.terminal_value())
         terminal_values_by_game[(game_index, state.to_play)] = value_for_to_play
         terminal_values_by_game[(game_index, "w" if state.to_play == "b" else "b")] = -value_for_to_play
+        terminal_board_targets_by_game[game_index] = _terminal_ownership(state).reshape(-1)
         black_margin = _black_score_margin(state)
         cleanup_counts = _terminal_cleanup_counts(state)
         winner = "b" if black_margin > 0 else "w"
@@ -380,6 +411,7 @@ def play_batched_games(config: BatchedConfig, model: PolicyValueNet) -> tuple[li
 
     for example in examples:
         example["value_target"] = terminal_values_by_game[(int(example["game"]), example["player"])]
+        example["final_board_target"] = terminal_board_targets_by_game[int(example["game"])]
     batch_sizes = list(stats.get("batch_sizes", []))
     stats["average_batch_size"] = round(float(np.mean(batch_sizes)), 3) if batch_sizes else 0.0
     stats["max_batch_size"] = int(max(batch_sizes)) if batch_sizes else 0
@@ -446,6 +478,29 @@ def _terminal_cleanup_counts(state: object) -> dict[str, int]:
         raw_counts = counts()
         return {"b": int(raw_counts.get("b", 0)), "w": int(raw_counts.get("w", 0))}
     return {"b": 0, "w": 0}
+
+
+def _terminal_ownership(state: object) -> np.ndarray:
+    terminal_ownership = getattr(state, "terminal_ownership", None)
+    if callable(terminal_ownership):
+        return np.asarray(terminal_ownership(), dtype=np.float32)
+    board_array = getattr(state, "board_array", None)
+    if board_array is not None:
+        return np.asarray(board_array, dtype=np.float32)
+    board = getattr(state, "board", None)
+    size = int(getattr(state, "size"))
+    ownership = np.zeros((size, size), dtype=np.float32)
+    get = getattr(board, "get", None)
+    if get is not None:
+        for row in range(size):
+            for col in range(size):
+                colour = get(row, col)
+                if colour == "b":
+                    ownership[row, col] = 1.0
+                elif colour == "w":
+                    ownership[row, col] = -1.0
+        return ownership
+    return np.asarray(board, dtype=np.float32)
 
 
 def run(config: BatchedConfig, sgf_path: str, trace_path: str, dashboard_path: str, overview_svg_path: str) -> dict[str, object]:
@@ -516,6 +571,7 @@ def main() -> None:
         history_moves=args.history_moves,
         terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
         score_margin_reward_scale=args.score_margin_reward_scale,
+        final_board_loss_weight=args.final_board_loss_weight,
         simulations=args.simulations,
         max_moves=args.max_moves,
         min_pass_move=args.min_pass_move,
@@ -526,6 +582,8 @@ def main() -> None:
         c_puct=args.c_puct,
         temperature=args.temperature,
         temperature_moves=args.temperature_moves,
+        mid_temperature=args.mid_temperature,
+        mid_temperature_until=args.mid_temperature_until,
         late_temperature=args.late_temperature,
         root_dirichlet_alpha=args.root_dirichlet_alpha,
         root_noise_fraction=args.root_noise_fraction,

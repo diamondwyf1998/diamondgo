@@ -22,6 +22,8 @@ def test_terminal_cleanup_removes_enclosed_single_eye_group() -> None:
 
     assert with_cleanup.terminal_cleanup_counts() == {"b": 8, "w": 0}
     assert with_cleanup.terminal_score_margin() < without_cleanup.terminal_score_margin()
+    assert with_cleanup.terminal_ownership().shape == board.shape
+    assert np.all(with_cleanup.terminal_ownership() == -1.0)
 
 
 def test_terminal_cleanup_keeps_two_eye_group_and_edge_group() -> None:
@@ -80,6 +82,7 @@ def test_sgfmill_terminal_cleanup_uses_board_array_for_scoring() -> None:
     assert with_cleanup.terminal_cleanup_counts() == {"b": 8, "w": 0}
     assert with_cleanup.terminal_score_margin() == -25.0
     assert with_cleanup.terminal_score_margin() < float(board.sum())
+    assert np.all(with_cleanup.terminal_ownership() == -1.0)
 
 
 def test_score_margin_reward_adds_signed_fourth_root_bonus() -> None:

@@ -15,6 +15,7 @@ import torch
 from diamondgo.batched_demo import BatchedConfig, make_model, run_batched_mcts
 from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES, DEFAULT_9X9_SCORE_KOMI
 from diamondgo.demo_cpu import action_to_gtp
+from diamondgo.model import load_model_state_dict
 from diamondgo.rules import BLACK, WHITE, SgfmillRules
 
 
@@ -114,7 +115,7 @@ def load_model(checkpoint: Path, device: str, simulations: int) -> tuple[Batched
     payload = torch.load(checkpoint, map_location=torch.device(device))
     config = make_config(dict(payload["config"]), device, simulations)
     model = make_model(config)
-    model.load_state_dict(payload["model_state_dict"])
+    load_model_state_dict(model, payload["model_state_dict"])
     model.eval()
     return config, model
 

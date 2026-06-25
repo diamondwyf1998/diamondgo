@@ -185,6 +185,7 @@ def run(config: DualGpuConfig, out_dir: Path, resume: str = "") -> dict[str, obj
             steps=config.train_steps_per_cycle,
             batch_size=config.batch_size,
             augment_dihedral=config.augment_dihedral,
+            final_board_loss_weight=config.final_board_loss_weight,
         )
         train_seconds = time.perf_counter() - train_start
         total_train_steps += len(train_history)
@@ -323,6 +324,7 @@ def main() -> None:
         history_moves=args.history_moves,
         terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
         score_margin_reward_scale=args.score_margin_reward_scale,
+        final_board_loss_weight=args.final_board_loss_weight,
         score_komi_ladder=args.score_komi_ladder,
         score_komi_adjust_window=args.score_komi_adjust_window,
         score_komi_adjust_threshold=args.score_komi_adjust_threshold,
@@ -338,6 +340,8 @@ def main() -> None:
         c_puct=args.c_puct,
         temperature=args.temperature,
         temperature_moves=args.temperature_moves,
+        mid_temperature=args.mid_temperature,
+        mid_temperature_until=args.mid_temperature_until,
         late_temperature=args.late_temperature,
         root_dirichlet_alpha=args.root_dirichlet_alpha,
         root_noise_fraction=args.root_noise_fraction,

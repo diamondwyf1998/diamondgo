@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from diamondgo.batched_demo import BatchedConfig, make_model, play_batched_games
 from diamondgo.demo_cpu import build_trace
+from diamondgo.model import load_model_state_dict
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -97,7 +98,7 @@ def main() -> None:
         np.random.seed(config.seed)
         torch.manual_seed(config.seed)
         model = make_model(config)
-        model.load_state_dict(payload["model_state_dict"])
+        load_model_state_dict(model, payload["model_state_dict"])
         model.eval()
         examples, stats = play_batched_games(config, model)
         trace = build_trace(config, examples)

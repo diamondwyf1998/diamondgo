@@ -23,8 +23,11 @@ TRAIN_STEPS_PER_CYCLE="${TRAIN_STEPS_PER_CYCLE:-64}"
 BATCH_SIZE="${BATCH_SIZE:-256}"
 REPLAY_SIZE="${REPLAY_SIZE:-100000}"
 LEARNING_RATE="${LEARNING_RATE:-0.0015}"
+FINAL_BOARD_LOSS_WEIGHT="${FINAL_BOARD_LOSS_WEIGHT:-0.25}"
 TEMPERATURE="${TEMPERATURE:-0.75}"
 TEMPERATURE_MOVES="${TEMPERATURE_MOVES:-30}"
+MID_TEMPERATURE="${MID_TEMPERATURE:-0.35}"
+MID_TEMPERATURE_UNTIL="${MID_TEMPERATURE_UNTIL:-100}"
 LATE_TEMPERATURE="${LATE_TEMPERATURE:-0.2}"
 ROOT_DIRICHLET_ALPHA="${ROOT_DIRICHLET_ALPHA:-0.15}"
 ROOT_NOISE_FRACTION="${ROOT_NOISE_FRACTION:-0.25}"
@@ -33,9 +36,10 @@ RESUME="${RESUME:-}"
 
 SCORE_LABEL="${SCORE_KOMI//./p}"
 TEMP_LABEL="${TEMPERATURE//./p}"
+MID_TEMP_LABEL="${MID_TEMPERATURE//./p}"
 LATE_TEMP_LABEL="${LATE_TEMPERATURE//./p}"
 LR_LABEL="${LEARNING_RATE//./p}"
-TRAIN_OUT="${TRAIN_OUT:-artifacts/multiworker-13x13-fresh-dualgpu-4x64-history2-autokomi-start${SCORE_LABEL}-minpass${MIN_PASS_MOVE}-lr${LR_LABEL}-cleanup-margin0p2-${SIMULATIONS}sims-max${MAX_MOVES}-temp${TEMP_LABEL}-late${LATE_TEMP_LABEL}-${WORKERS}w-${RUN_ID}}"
+TRAIN_OUT="${TRAIN_OUT:-artifacts/multiworker-13x13-fresh-dualgpu-4x64-history2-autokomi-start${SCORE_LABEL}-minpass${MIN_PASS_MOVE}-lr${LR_LABEL}-cleanup-margin0p2-${SIMULATIONS}sims-max${MAX_MOVES}-temp${TEMP_LABEL}-moves${TEMPERATURE_MOVES}-mid${MID_TEMP_LABEL}-until${MID_TEMPERATURE_UNTIL}-late${LATE_TEMP_LABEL}-${WORKERS}w-${RUN_ID}}"
 LOG="$TRAIN_OUT/train.log"
 MONITOR="$TRAIN_OUT/gpu_monitor.csv"
 STATUS_LOG="$TRAIN_OUT/status_3h.log"
@@ -65,6 +69,9 @@ cat > "$TRAIN_OUT/run_notes.md" <<NOTES
 - cleanup_scope: conservative obvious-dead cleanup only; not full life-and-death solving
 - score_margin_reward_scale: 0.2
 - value_target_formula_when_margin_reward_enabled: sign(score_margin) * (2/5 + min(abs(score_margin) ** 0.25 / 5 * scale, 3/5))
+- final_board_prediction_head: true
+- final_board_target: terminal black/white ownership board after the configured terminal cleanup rule
+- final_board_loss_weight: $FINAL_BOARD_LOSS_WEIGHT
 - channels: 64
 - residual_blocks: 4
 - parameters_expected_13x13: about 367717
@@ -84,7 +91,9 @@ cat > "$TRAIN_OUT/run_notes.md" <<NOTES
 - c_puct: 1.5
 - root_noise: Dirichlet alpha $ROOT_DIRICHLET_ALPHA, fraction $ROOT_NOISE_FRACTION
 - root_policy_temperature: $ROOT_POLICY_TEMPERATURE
-- move_temperature: $TEMPERATURE for first $TEMPERATURE_MOVES moves, then $LATE_TEMPERATURE
+- move_temperature_opening: $TEMPERATURE for moves [0, $TEMPERATURE_MOVES)
+- move_temperature_middle: $MID_TEMPERATURE for moves [$TEMPERATURE_MOVES, $MID_TEMPERATURE_UNTIL)
+- move_temperature_late: $LATE_TEMPERATURE for moves [$MID_TEMPERATURE_UNTIL, end)
 - augmentation: random dihedral board symmetries during training
 - checkpoint_every: 10 cycles after the early dense window
 - early_checkpoint_cycles: 50
@@ -151,6 +160,7 @@ args=(
   --history-moves 2
   --terminal-dead-stone-cleanup
   --score-margin-reward-scale 0.2
+  --final-board-loss-weight "$FINAL_BOARD_LOSS_WEIGHT"
   --score-komi-ladder "$SCORE_KOMI_LADDER"
   --score-komi-adjust-window "$SCORE_KOMI_ADJUST_WINDOW"
   --score-komi-adjust-threshold "$SCORE_KOMI_ADJUST_THRESHOLD"
@@ -171,6 +181,8 @@ args=(
   --c-puct 1.5
   --temperature "$TEMPERATURE"
   --temperature-moves "$TEMPERATURE_MOVES"
+  --mid-temperature "$MID_TEMPERATURE"
+  --mid-temperature-until "$MID_TEMPERATURE_UNTIL"
   --late-temperature "$LATE_TEMPERATURE"
   --root-dirichlet-alpha "$ROOT_DIRICHLET_ALPHA"
   --root-noise-fraction "$ROOT_NOISE_FRACTION"

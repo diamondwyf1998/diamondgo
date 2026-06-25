@@ -103,3 +103,39 @@ TIME_LIMIT_MINUTES=10 SIMULATIONS=32 MAX_MOVES=60 WORKERS=30 GAMES_PER_WORKER=1 
 - This replaces the previous `temperature=0.7` for the first `16` moves.
 - Purpose: keep more early exploration after pass is masked, while preserving a
   low late-game sampling temperature.
+
+## 2026-06-25 Update: Final-Board Prediction Head
+
+- User request: imitate the KataGo-style auxiliary prediction idea and add a
+  head that predicts the terminal board distribution.
+- Implemented target: black-perspective terminal ownership, one value per
+  board point:
+  - `+1`: black stone or black surrounded territory at the configured terminal
+    scoring state.
+  - `-1`: white stone or white surrounded territory at the configured terminal
+    scoring state.
+  - `0`: neutral/unsettled point under the current simple area ownership
+    extraction.
+- The target is generated after the configured terminal cleanup rule. This is
+  not a full life-and-death solver; it mirrors the current conservative cleanup
+  and area-scoring logic.
+- Model change: `PolicyValueNet.forward()` now returns
+  `(policy_logits, value, final_board)`.
+- Loss change: training now uses
+  `policy_loss + value_loss + final_board_loss_weight * final_board_loss`.
+- Current default `final_board_loss_weight`: `0.25`.
+- Data augmentation change: dihedral augmentation now applies the same board
+  transform to `final_board_target` as to the input planes and policy board.
+- Backward compatibility: old checkpoints without the new head can still be
+  loaded for eval/play; the new head is randomly initialized in that case.
+- Local smoke passed on Windows CPU:
+  - 13x13 model output shapes: policy `170`, final board `169`.
+  - ownership target and dihedral target transform checked by direct smoke.
+  - command completed:
+    `python -m diamondgo.batched_demo --json --board-size 13 --device cpu --rules sgfmill --games 1 --simulations 2 --max-moves 8 --min-pass-move 6 --train-steps 1 --channels 8 --residual-blocks 1 --no-input-komi --history-moves 2 --terminal-dead-stone-cleanup --score-margin-reward-scale 0.2 --final-board-loss-weight 0.25 ...`
+  - observed final training metrics included `final_board_loss: 0.109844`.
+- Local artifact paths:
+  - `artifacts/local-smoke-13x13-final-board-head.sgf`
+  - `artifacts/local-smoke-13x13-final-board-head.json`
+  - `artifacts/visualizations/local-smoke-13x13-final-board-head.html`
+  - `artifacts/visualizations/local-smoke-13x13-final-board-head.svg`

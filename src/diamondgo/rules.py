@@ -58,6 +58,9 @@ class GoRules(Protocol):
     def terminal_cleanup_counts(self) -> dict[str, int]:
         ...
 
+    def terminal_ownership(self) -> np.ndarray:
+        ...
+
 
 class SimpleAreaRules:
     """Tiny CPU-demo rules backend.
@@ -189,6 +192,10 @@ class SimpleAreaRules:
         if not self.terminal_dead_stone_cleanup:
             return {"b": 0, "w": 0}
         return _dead_stone_counts(self.board)
+
+    def terminal_ownership(self) -> np.ndarray:
+        board = _cleaned_terminal_board(self.board) if self.terminal_dead_stone_cleanup else self.board
+        return _ownership_from_array(board)
 
 
 class SgfmillRules:
@@ -334,6 +341,14 @@ class SgfmillRules:
         if not self.terminal_dead_stone_cleanup:
             return {"b": 0, "w": 0}
         return _dead_stone_counts(self.board_array)
+
+    def terminal_ownership(self) -> np.ndarray:
+        board = (
+            _cleaned_terminal_board(self.board_array)
+            if self.terminal_dead_stone_cleanup
+            else self.board_array
+        )
+        return _ownership_from_array(board)
 
     def _is_legal_point(
         self,
@@ -499,6 +514,28 @@ def _area_score_from_array(board: np.ndarray) -> float:
             elif border_colours == {WHITE_VALUE}:
                 score -= len(region)
     return score
+
+
+def _ownership_from_array(board: np.ndarray) -> np.ndarray:
+    board_array = np.asarray(board, dtype=np.int8)
+    ownership = np.zeros_like(board_array, dtype=np.float32)
+    ownership[board_array == BLACK_VALUE] = 1.0
+    ownership[board_array == WHITE_VALUE] = -1.0
+    visited = np.zeros_like(board_array, dtype=np.bool_)
+    for start_row in range(board_array.shape[0]):
+        for start_col in range(board_array.shape[1]):
+            if board_array[start_row, start_col] != 0 or visited[start_row, start_col]:
+                continue
+            region, border_colours = _empty_region(board_array, [(start_row, start_col)])
+            for row, col in region:
+                visited[row, col] = True
+            if border_colours == {BLACK_VALUE}:
+                for row, col in region:
+                    ownership[row, col] = 1.0
+            elif border_colours == {WHITE_VALUE}:
+                for row, col in region:
+                    ownership[row, col] = -1.0
+    return ownership
 
 
 def _obvious_dead_stone_mask(board: np.ndarray) -> np.ndarray:

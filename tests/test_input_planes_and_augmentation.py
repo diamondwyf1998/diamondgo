@@ -2,7 +2,11 @@ import numpy as np
 
 from diamondgo.config import input_plane_count
 from diamondgo.multiworker_train import trace_examples_for_cycle
-from diamondgo.overnight_train import apply_dihedral_transform
+from diamondgo.overnight_train import (
+    apply_board_target_transform,
+    apply_dihedral_transform,
+    prepare_training_batch,
+)
 from diamondgo.rules import SimpleAreaRules
 
 
@@ -99,3 +103,43 @@ def test_dihedral_policy_transform_preserves_pass_probability() -> None:
     assert transformed_policy.shape == policy.shape
     assert transformed_policy[-1] == policy[-1]
     assert np.isclose(transformed_policy[:-1].sum(), policy[:-1].sum())
+
+
+def test_final_board_target_transform_matches_board_transform() -> None:
+    final_board_target = np.arange(9, dtype=np.float32)
+
+    transformed = apply_board_target_transform(final_board_target, board_size=3, transform=5)
+
+    expected = np.flip(np.rot90(final_board_target.reshape(3, 3), k=1), axis=-1).reshape(-1)
+    assert np.array_equal(transformed, expected)
+
+
+def test_prepare_training_batch_transforms_final_board_targets() -> None:
+    features = np.arange(3 * 3 * 3, dtype=np.float32).reshape(3, 3, 3)
+    policy = np.arange(10, dtype=np.float32)
+    policy = policy / policy.sum()
+    final_board_target = np.arange(9, dtype=np.float32)
+
+    import random
+
+    original_randrange = random.randrange
+    try:
+        random.randrange = lambda _upper: 5
+        features_batch, policy_batch, final_board_batch = prepare_training_batch(
+            [
+                {
+                    "features": features,
+                    "policy": policy,
+                    "final_board_target": final_board_target,
+                }
+            ],
+            augment_dihedral=True,
+        )
+    finally:
+        random.randrange = original_randrange
+
+    expected_board = np.flip(np.rot90(final_board_target.reshape(3, 3), k=1), axis=-1).reshape(-1)
+    assert features_batch.shape == (1, 3, 3, 3)
+    assert policy_batch.shape == (1, 10)
+    assert final_board_batch is not None
+    assert np.array_equal(final_board_batch[0], expected_board)

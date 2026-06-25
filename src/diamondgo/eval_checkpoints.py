@@ -16,7 +16,7 @@ from diamondgo.batched_demo import BatchedConfig, run_batched_mcts
 from diamondgo.config import ModelConfig, input_plane_count
 from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES, DEFAULT_9X9_SCORE_KOMI
 from diamondgo.demo_cpu import action_to_gtp, make_rules
-from diamondgo.model import PolicyValueNet
+from diamondgo.model import PolicyValueNet, load_model_state_dict
 
 
 @dataclass(frozen=True)
@@ -64,7 +64,7 @@ def cycle_from_path(path: Path) -> int:
 
 
 def load_checkpoint_payload(path: Path, device: str) -> dict[str, object]:
-    return torch.load(path, map_location=torch.device(device))
+    return torch.load(path, map_location=torch.device(device), weights_only=False)
 
 
 def config_from_payload(payload: dict[str, object], device: str, simulations: int, games: int, max_moves: int) -> MatchConfig:
@@ -108,7 +108,7 @@ def make_initial_model(config: MatchConfig) -> PolicyValueNet:
 def make_checkpoint_model(config: MatchConfig, checkpoint_path: Path) -> PolicyValueNet:
     model = make_eval_model(config)
     payload = load_checkpoint_payload(checkpoint_path, config.device)
-    model.load_state_dict(payload["model_state_dict"])
+    load_model_state_dict(model, payload["model_state_dict"])
     model.eval()
     return model
 
@@ -611,22 +611,28 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     .modal-backdrop[hidden] {{ display: none; }}
     .modal-backdrop {{
       position: fixed;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      padding: 20px;
-      background: rgba(32, 48, 51, 0.48);
+      right: 18px;
+      bottom: 18px;
+      display: block;
+      padding: 0;
+      background: transparent;
       z-index: 10;
+      pointer-events: none;
     }}
     .modal-card {{
-      width: min(520px, 100%);
+      width: min(520px, calc(100vw - 36px));
+      max-height: calc(100vh - 36px);
+      overflow: auto;
       padding: 18px;
       border: 1px solid #dbe2df;
       border-radius: 8px;
       background: #fbfcfb;
       box-shadow: 0 18px 48px rgba(32, 48, 51, 0.24);
+      pointer-events: auto;
     }}
-    .modal-card h2 {{ margin: 0 0 14px; font-size: 18px; }}
+    .modal-card.is-dragging {{ user-select: none; }}
+    .modal-card h2 {{ margin: -6px -6px 14px; padding: 6px; font-size: 18px; cursor: grab; }}
+    .modal-card.is-dragging h2 {{ cursor: grabbing; }}
     .modal-grid {{ display: grid; gap: 12px; }}
     .modal-grid label {{ display: grid; gap: 4px; font-size: 13px; color: #657174; }}
     .modal-grid input, .modal-grid select, .modal-grid textarea {{ width: 100%; box-sizing: border-box; }}
@@ -742,8 +748,8 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     </section>
   </main>
   <div id="puzzle-modal" class="modal-backdrop" hidden>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="puzzle-modal-title">
-      <h2 id="puzzle-modal-title">Save puzzle</h2>
+    <div class="modal-card" role="dialog" aria-modal="false" aria-labelledby="puzzle-modal-title">
+      <h2 id="puzzle-modal-title" title="Drag to move">Save puzzle</h2>
       <div class="modal-grid">
         <label>Name <input id="modal-puzzle-name" type="text"></label>
         <label>Category
@@ -799,6 +805,61 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     const confirmPuzzleSaveButton = document.getElementById("confirm-puzzle-save");
     const puzzleStorageKey = "diamondgo-puzzle-author-v1";
     let pendingPuzzleCase = null;
+
+    function clampPuzzleModalPosition(left, top) {{
+      const card = puzzleModal.querySelector(".modal-card");
+      const rect = card.getBoundingClientRect();
+      const margin = 8;
+      const maxLeft = Math.max(margin, window.innerWidth - rect.width - margin);
+      const maxTop = Math.max(margin, window.innerHeight - rect.height - margin);
+      return {{
+        left: Math.min(Math.max(left, margin), maxLeft),
+        top: Math.min(Math.max(top, margin), maxTop)
+      }};
+    }}
+
+    function installPuzzleModalDrag() {{
+      const handle = document.getElementById("puzzle-modal-title");
+      const card = puzzleModal.querySelector(".modal-card");
+      let drag = null;
+      handle.addEventListener("pointerdown", event => {{
+        if (event.button !== 0) return;
+        const rect = card.getBoundingClientRect();
+        drag = {{
+          offsetX: event.clientX - rect.left,
+          offsetY: event.clientY - rect.top,
+          pointerId: event.pointerId
+        }};
+        puzzleModal.style.left = `${{rect.left}}px`;
+        puzzleModal.style.top = `${{rect.top}}px`;
+        puzzleModal.style.right = "auto";
+        puzzleModal.style.bottom = "auto";
+        card.classList.add("is-dragging");
+        handle.setPointerCapture?.(event.pointerId);
+        event.preventDefault();
+      }});
+      window.addEventListener("pointermove", event => {{
+        if (!drag) return;
+        const next = clampPuzzleModalPosition(event.clientX - drag.offsetX, event.clientY - drag.offsetY);
+        puzzleModal.style.left = `${{next.left}}px`;
+        puzzleModal.style.top = `${{next.top}}px`;
+      }});
+      function finishDrag(event) {{
+        if (!drag) return;
+        handle.releasePointerCapture?.(drag.pointerId);
+        drag = null;
+        card.classList.remove("is-dragging");
+      }}
+      window.addEventListener("pointerup", finishDrag);
+      window.addEventListener("pointercancel", finishDrag);
+      window.addEventListener("resize", () => {{
+        if (puzzleModal.hidden || !puzzleModal.style.left) return;
+        const rect = card.getBoundingClientRect();
+        const next = clampPuzzleModalPosition(rect.left, rect.top);
+        puzzleModal.style.left = `${{next.left}}px`;
+        puzzleModal.style.top = `${{next.top}}px`;
+      }});
+    }}
 
     function makeSvg(name, attributes = {{}}, text = "") {{
       const node = document.createElementNS("http://www.w3.org/2000/svg", name);
@@ -1283,11 +1344,9 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     prevButton.addEventListener("click", () => render(Number(slider.value) - 1));
     nextButton.addEventListener("click", () => render(Number(slider.value) + 1));
     savePuzzleButton.addEventListener("click", openPuzzleModal);
+    installPuzzleModalDrag();
     confirmPuzzleSaveButton.addEventListener("click", savePendingPuzzle);
     cancelPuzzleSaveButton.addEventListener("click", closePuzzleModal);
-    puzzleModal.addEventListener("click", (event) => {{
-      if (event.target === puzzleModal) closePuzzleModal();
-    }});
     window.addEventListener("keydown", (event) => {{
       if (event.key === "Escape" && !puzzleModal.hidden) closePuzzleModal();
     }});
@@ -1297,6 +1356,7 @@ def render_eval_dashboard(results: list[dict[str, object]], board_size: int = 9)
     populateMatches();
     populateGames();
   </script>
+  <script src="/viewers/return-nav.js" defer></script>
 </body>
 </html>
 """

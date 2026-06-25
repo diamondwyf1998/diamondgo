@@ -13,7 +13,10 @@ import torch
 from diamondgo.batched_demo import BatchedConfig, make_model, run_batched_mcts
 from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES, DEFAULT_9X9_SCORE_KOMI
 from diamondgo.demo_cpu import action_to_gtp, make_rules
+from diamondgo.model import load_model_state_dict
 from diamondgo.rules import BLACK, BLACK_VALUE, WHITE, WHITE_VALUE, GoRules
+
+MAX_UI_SIMULATIONS = 2000
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -58,7 +61,7 @@ def load_model(checkpoint: Path, device: str, simulations: int) -> tuple[Batched
     payload = torch.load(checkpoint, map_location=torch.device(device))
     config = make_config(dict(payload["config"]), device, simulations)
     model = make_model(config)
-    model.load_state_dict(payload["model_state_dict"])
+    load_model_state_dict(model, payload["model_state_dict"])
     model.eval()
     return config, model
 
@@ -270,7 +273,10 @@ class PlayState:
     def ai_move(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
             history = [int(item) for item in payload.get("history", [])]
-            simulations = max(1, min(400, int(payload.get("simulations", self.default_simulations))))
+            simulations = max(
+                1,
+                min(MAX_UI_SIMULATIONS, int(payload.get("simulations", self.default_simulations))),
+            )
             state = self.state_from_history(history)
             if state.is_terminal():
                 return {"terminal": True, "to_play": state.to_play, "value": float(state.terminal_value())}
@@ -299,7 +305,10 @@ class PlayState:
 
     def evaluate_case(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
-            simulations = max(1, min(400, int(payload.get("simulations", self.default_simulations))))
+            simulations = max(
+                1,
+                min(MAX_UI_SIMULATIONS, int(payload.get("simulations", self.default_simulations))),
+            )
             case = normalize_case(dict(payload["case"]), self.config.board_size)
             state = self.state_from_case(case)
             legal = state.legal_actions()
@@ -387,6 +396,16 @@ def make_handler(play_state: PlayState, static_root: Path):
                 return
             super().do_GET()
 
+        def do_OPTIONS(self) -> None:
+            if self.path.startswith("/api/"):
+                self.send_response(204)
+                self._write_cors_headers()
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                self.end_headers()
+                return
+            super().do_OPTIONS()
+
         def do_POST(self) -> None:
             if self.path not in {
                 "/api/ai_move",
@@ -417,10 +436,14 @@ def make_handler(play_state: PlayState, static_root: Path):
         def _write_json(self, status: int, payload: dict[str, Any]) -> None:
             body = json.dumps(payload).encode("utf-8")
             self.send_response(status)
+            self._write_cors_headers()
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+
+        def _write_cors_headers(self) -> None:
+            self.send_header("Access-Control-Allow-Origin", "*")
 
     return Handler
 

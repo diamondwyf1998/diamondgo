@@ -14,6 +14,7 @@ import torch.nn.functional as F
 from diamondgo.batched_demo import BatchedConfig, make_model, play_batched_games
 from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES, DEFAULT_9X9_SCORE_KOMI
 from diamondgo.demo_cpu import build_trace, write_json, write_sgf
+from diamondgo.model import load_model_state_dict, policy_value_final_board
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,7 @@ class OvernightConfig:
     history_moves: int = 0
     terminal_dead_stone_cleanup: bool = False
     score_margin_reward_scale: float = 0.0
+    final_board_loss_weight: float = 0.25
     channels: int = 32
     residual_blocks: int = 2
     simulations: int = 64
@@ -39,6 +41,8 @@ class OvernightConfig:
     c_puct: float = 1.5
     temperature: float = 1.0
     temperature_moves: int = 0
+    mid_temperature: float = -1.0
+    mid_temperature_until: int = 0
     late_temperature: float = 1.0
     root_dirichlet_alpha: float = 0.0
     root_noise_fraction: float = 0.0
@@ -85,6 +89,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=OvernightConfig.score_margin_reward_scale,
         help="Scale for the capped +/-0.6 score-margin component; enabled targets use +/-0.4 win/loss base.",
     )
+    parser.add_argument(
+        "--final-board-loss-weight",
+        type=float,
+        default=OvernightConfig.final_board_loss_weight,
+        help="Auxiliary loss weight for predicting the final black/white ownership board.",
+    )
     parser.add_argument("--max-moves", type=int, default=OvernightConfig.max_moves)
     parser.add_argument(
         "--min-pass-move",
@@ -106,6 +116,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--root-noise-fraction", type=float, default=OvernightConfig.root_noise_fraction)
     parser.add_argument("--root-policy-temperature", type=float, default=OvernightConfig.root_policy_temperature)
     parser.add_argument("--temperature-moves", type=int, default=OvernightConfig.temperature_moves)
+    parser.add_argument(
+        "--mid-temperature",
+        type=float,
+        default=OvernightConfig.mid_temperature,
+        help="Optional middle-game move sampling temperature. Enabled when non-negative and --mid-temperature-until is after --temperature-moves.",
+    )
+    parser.add_argument(
+        "--mid-temperature-until",
+        type=int,
+        default=OvernightConfig.mid_temperature_until,
+        help="Use --mid-temperature for moves in [temperature_moves, mid_temperature_until); later moves use --late-temperature.",
+    )
     parser.add_argument("--late-temperature", type=float, default=OvernightConfig.late_temperature)
     parser.add_argument("--augment-dihedral", action="store_true", default=OvernightConfig.augment_dihedral)
     parser.add_argument("--seed", type=int, default=OvernightConfig.seed)
@@ -153,6 +175,7 @@ def make_selfplay_config(config: OvernightConfig, seed: int) -> BatchedConfig:
         history_moves=config.history_moves,
         terminal_dead_stone_cleanup=config.terminal_dead_stone_cleanup,
         score_margin_reward_scale=config.score_margin_reward_scale,
+        final_board_loss_weight=config.final_board_loss_weight,
         channels=config.channels,
         residual_blocks=config.residual_blocks,
         simulations=config.simulations,
@@ -165,6 +188,8 @@ def make_selfplay_config(config: OvernightConfig, seed: int) -> BatchedConfig:
         c_puct=config.c_puct,
         temperature=config.temperature,
         temperature_moves=config.temperature_moves,
+        mid_temperature=config.mid_temperature,
+        mid_temperature_until=config.mid_temperature_until,
         late_temperature=config.late_temperature,
         root_dirichlet_alpha=config.root_dirichlet_alpha,
         root_noise_fraction=config.root_noise_fraction,
@@ -206,22 +231,27 @@ def train_from_replay(
     steps: int,
     batch_size: int,
     augment_dihedral: bool = False,
+    final_board_loss_weight: float = 0.25,
 ) -> list[dict[str, float]]:
     model.train()
     device = next(model.parameters()).device
     history: list[dict[str, float]] = []
     for step in range(1, steps + 1):
         batch = [random.choice(replay) for _ in range(min(batch_size, len(replay)))]
-        features_np, policies_np = prepare_training_batch(batch, augment_dihedral)
+        features_np, policies_np, final_board_np = prepare_training_batch(batch, augment_dihedral)
         features = torch.tensor(features_np, dtype=torch.float32).to(device)
         policy_targets = torch.tensor(policies_np, dtype=torch.float32).to(device)
         value_targets = torch.tensor([item["value_target"] for item in batch], dtype=torch.float32).to(device)
 
         optimizer.zero_grad(set_to_none=True)
-        logits, values = model(features)
+        logits, values, final_board = policy_value_final_board(model(features))
         policy_loss = -(policy_targets * F.log_softmax(logits, dim=1)).sum(dim=1).mean()
         value_loss = F.mse_loss(values, value_targets)
-        loss = policy_loss + value_loss
+        final_board_loss = torch.zeros((), dtype=torch.float32, device=device)
+        if final_board_np is not None and final_board is not None and final_board_loss_weight > 0.0:
+            final_board_targets = torch.tensor(final_board_np, dtype=torch.float32).to(device)
+            final_board_loss = F.mse_loss(final_board, final_board_targets)
+        loss = policy_loss + value_loss + float(final_board_loss_weight) * final_board_loss
         loss.backward()
         optimizer.step()
         history.append(
@@ -230,6 +260,8 @@ def train_from_replay(
                 "loss": round(float(loss.item()), 6),
                 "policy_loss": round(float(policy_loss.item()), 6),
                 "value_loss": round(float(value_loss.item()), 6),
+                "final_board_loss": round(float(final_board_loss.item()), 6),
+                "final_board_loss_weight": round(float(final_board_loss_weight), 6),
             }
         )
     model.eval()
@@ -239,18 +271,34 @@ def train_from_replay(
 def prepare_training_batch(
     batch: list[dict[str, object]],
     augment_dihedral: bool,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
     features_rows = []
     policy_rows = []
+    final_board_rows = []
+    has_final_board_targets = all("final_board_target" in item for item in batch)
     for item in batch:
         features = np.asarray(item["features"], dtype=np.float32)
         policy = np.asarray(item["policy"], dtype=np.float32)
+        final_board_target = (
+            np.asarray(item["final_board_target"], dtype=np.float32)
+            if has_final_board_targets
+            else None
+        )
         if augment_dihedral:
             transform = random.randrange(8)
             features, policy = apply_dihedral_transform(features, policy, transform)
+            if final_board_target is not None:
+                final_board_target = apply_board_target_transform(
+                    final_board_target,
+                    int(features.shape[-1]),
+                    transform,
+                )
         features_rows.append(features)
         policy_rows.append(policy)
-    return np.stack(features_rows), np.stack(policy_rows)
+        if final_board_target is not None:
+            final_board_rows.append(final_board_target)
+    final_boards = np.stack(final_board_rows) if has_final_board_targets else None
+    return np.stack(features_rows), np.stack(policy_rows), final_boards
 
 
 def apply_dihedral_transform(
@@ -273,6 +321,20 @@ def apply_dihedral_transform(
         [transformed_policy_board.reshape(-1), policy[-1:]],
     ).astype(np.float32)
     return np.ascontiguousarray(transformed_features), np.ascontiguousarray(transformed_policy)
+
+
+def apply_board_target_transform(
+    final_board_target: np.ndarray,
+    board_size: int,
+    transform: int,
+) -> np.ndarray:
+    board = np.asarray(final_board_target, dtype=np.float32).reshape(board_size, board_size)
+    rotations = transform % 4
+    flip = transform >= 4
+    transformed = np.rot90(board, k=rotations, axes=(0, 1))
+    if flip:
+        transformed = np.flip(transformed, axis=-1)
+    return np.ascontiguousarray(transformed.reshape(-1), dtype=np.float32)
 
 
 def save_checkpoint(
@@ -306,8 +368,12 @@ def load_checkpoint(
     optimizer: torch.optim.Optimizer,
 ) -> tuple[int, int, int]:
     checkpoint = torch.load(path, map_location=next(model.parameters()).device)
-    model.load_state_dict(checkpoint["model_state_dict"])
-    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    incompatible = load_model_state_dict(model, checkpoint["model_state_dict"])
+    try:
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    except ValueError:
+        if incompatible is None:
+            raise
     return (
         int(checkpoint.get("cycle", 0)),
         int(checkpoint.get("total_positions", 0)),
@@ -329,6 +395,11 @@ def summarize_cycle(
     policies = [np.asarray(item["policy"], dtype=np.float32) for item in examples]
     entropies = [float(-(policy * np.log(np.clip(policy, 1e-9, 1.0))).sum()) for policy in policies]
     value_targets = [float(item["value_target"]) for item in examples]
+    final_board_targets = [
+        np.asarray(item["final_board_target"], dtype=np.float32)
+        for item in examples
+        if "final_board_target" in item
+    ]
     compact_selfplay_stats = {
         key: value for key, value in selfplay_stats.items() if key != "batch_sizes"
     }
@@ -345,6 +416,21 @@ def summarize_cycle(
         "value_target_mean": round(float(np.mean(value_targets)), 4) if value_targets else 0.0,
         "value_target_min": round(min(value_targets), 4) if value_targets else 0.0,
         "value_target_max": round(max(value_targets), 4) if value_targets else 0.0,
+        "final_board_target_mean": round(float(np.mean(final_board_targets)), 4)
+        if final_board_targets
+        else 0.0,
+        "final_board_target_black_fraction": round(
+            float(np.mean(np.concatenate(final_board_targets) > 0.5)),
+            4,
+        )
+        if final_board_targets
+        else 0.0,
+        "final_board_target_white_fraction": round(
+            float(np.mean(np.concatenate(final_board_targets) < -0.5)),
+            4,
+        )
+        if final_board_targets
+        else 0.0,
         "selfplay": compact_selfplay_stats,
     }
 
@@ -398,6 +484,7 @@ def run(config: OvernightConfig, out_dir: Path, resume: str = "") -> dict[str, o
             steps=config.train_steps_per_cycle,
             batch_size=config.batch_size,
             augment_dihedral=config.augment_dihedral,
+            final_board_loss_weight=config.final_board_loss_weight,
         )
         total_train_steps += len(train_history)
 
@@ -491,6 +578,7 @@ def main() -> None:
         history_moves=args.history_moves,
         terminal_dead_stone_cleanup=args.terminal_dead_stone_cleanup,
         score_margin_reward_scale=args.score_margin_reward_scale,
+        final_board_loss_weight=args.final_board_loss_weight,
         games_per_cycle=args.games_per_cycle,
         max_moves=args.max_moves,
         min_pass_move=args.min_pass_move,
@@ -502,6 +590,8 @@ def main() -> None:
         c_puct=args.c_puct,
         temperature=args.temperature,
         temperature_moves=args.temperature_moves,
+        mid_temperature=args.mid_temperature,
+        mid_temperature_until=args.mid_temperature_until,
         late_temperature=args.late_temperature,
         root_dirichlet_alpha=args.root_dirichlet_alpha,
         root_noise_fraction=args.root_noise_fraction,
