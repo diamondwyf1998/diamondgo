@@ -258,3 +258,51 @@ TIME_LIMIT_MINUTES=10 SIMULATIONS=32 MAX_MOVES=60 WORKERS=30 GAMES_PER_WORKER=1 
 - Comparison caveat: cycle numbers after this point are continuation cycles in
   a new output directory with a different search budget. Compare by wall-clock,
   positions, and eval/play strength rather than cycle number alone.
+
+## 2026-06-26 Update: Continue From Cycle 95 With 1000 Simulations
+
+- User request: raise MCTS/self-play simulations to `1000`.
+- Previous 600-sim continuation stopped cleanly:
+  `/root/diamondgo/artifacts/multiworker-13x13-cont-dualgpu-4x64-history2-autokomi-start8p5-ladder10p5-minpass120-lr0p0015-cleanup-finalboard-margin0p2-600sims-max250-temp0p7-moves30-mid0p3-until100-late0p2-32w-after-cycle80-20260626-111154`
+- Previous latest metric before the switch:
+  - cycle: `95`
+  - score_komi: `8.5`
+  - black_win_rate: `0.5859`
+  - recent_black_win_rate: `0.5797`
+  - final_board_loss: `0.530826`
+  - positions_per_second: about `22.128`
+- Backup preserved before stopping:
+  `/root/autodl-tmp/diamondgo-checkpoint-backups/13x13_finalboard_600sims_to1000_cycle95_20260626-210628`
+- Orphan CUDA self-play workers were cleaned after stopping the old main
+  process.
+- New continuation output:
+  `/root/diamondgo/artifacts/multiworker-13x13-cont-dualgpu-4x64-history2-autokomi-start8p5-ladder10p5-minpass120-lr0p0015-cleanup-finalboard-margin0p2-1000sims-max250-temp0p7-moves30-mid0p3-until100-late0p2-32w-after-cycle95-20260626-210628`
+- New PID file:
+  `/root/diamondgo/artifacts/dualgpu_13x13_finalboard_32w_1000sims.train.pid`
+- Actual Python train PID at launch verification: `269481`.
+- Resume checkpoint:
+  previous 600-sim run `latest.pt` from cycle `95`.
+- Hyperparameter changes:
+  - self-play simulations changed from `600` to `1000`
+- Unchanged major settings:
+  - score_komi start: `8.5`
+  - score komi ladder: `2.5,4.5,6.5,7.5,8.5,9.5,10.5`
+  - board size: `13`
+  - model: `4x64`
+  - history_moves: `2`
+  - input_komi: `false`
+  - terminal_dead_stone_cleanup: `true`
+  - score_margin_reward_scale: `0.2`
+  - final_board_loss_weight: `0.25`
+  - workers: `32`
+  - games_per_worker: `8`
+  - games_per_cycle: `256`
+  - max_moves: `250`
+  - min_pass_move: `120`
+  - train_steps_per_cycle: `64`
+  - batch_size: `256`
+  - temperature schedule: `0.7` for moves `[0,30)`, `0.3` for `[30,100)`,
+    `0.2` afterwards
+- Launch sanity check: Python training process started successfully and spawned
+  CUDA workers. The first 1000-sim cycle is expected to take about `65-75`
+  minutes, so lack of immediate metrics is not itself a stall signal.
