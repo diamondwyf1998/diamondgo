@@ -202,3 +202,59 @@ TIME_LIMIT_MINUTES=10 SIMULATIONS=32 MAX_MOVES=60 WORKERS=30 GAMES_PER_WORKER=1 
   cycle time about `541.6s` for `240` games; this 32-worker final-board line
   used about `552.1s` for `256` games, so throughput was slightly higher in
   positions per second despite the auxiliary head.
+
+## 2026-06-26 Update: Continue From Cycle 80 With 600 Simulations
+
+- User request: slightly extend the score komi range and raise self-play MCTS
+  simulations to `600`.
+- Reason: the final-board 13x13 run reached the old maximum score komi `8.5`,
+  but black was still strongly favored.
+- Previous run stopped cleanly:
+  `/root/diamondgo/artifacts/multiworker-13x13-fresh-dualgpu-4x64-history2-autokomi-start2p5-minpass120-lr0p0015-cleanup-margin0p2-200sims-max250-temp0p7-moves30-mid0p3-until100-late0p2-32w-20260625-210133`
+- Previous latest metric before the switch:
+  - cycle: `80`
+  - score_komi: `8.5`
+  - black_win_rate: `0.8164`
+  - recent_black_win_rate: `0.8117`
+  - final_board_loss: `0.469776`
+  - positions_per_second: `71.815`
+- Backup preserved before stopping:
+  `/root/autodl-tmp/diamondgo-checkpoint-backups/13x13_finalboard_200sims_to600_cycle80_20260626-111154`
+- Orphan CUDA self-play workers were cleaned after stopping the old main
+  process.
+- New continuation output:
+  `/root/diamondgo/artifacts/multiworker-13x13-cont-dualgpu-4x64-history2-autokomi-start8p5-ladder10p5-minpass120-lr0p0015-cleanup-finalboard-margin0p2-600sims-max250-temp0p7-moves30-mid0p3-until100-late0p2-32w-after-cycle80-20260626-111154`
+- New PID file:
+  `/root/diamondgo/artifacts/dualgpu_13x13_finalboard_32w_600sims.train.pid`
+- Actual Python train PID at launch verification: `215704`.
+- Resume checkpoint:
+  previous run `latest.pt` from cycle `80`.
+- Hyperparameter changes:
+  - `score_komi` start changed from the script default `2.5` to current-line
+    continuation value `8.5`
+  - score komi ladder changed from `2.5,4.5,6.5,7.5,8.5` to
+    `2.5,4.5,6.5,7.5,8.5,9.5,10.5`
+  - self-play simulations changed from `200` to `600`
+- Unchanged major settings:
+  - board size: `13`
+  - model: `4x64`
+  - history_moves: `2`
+  - input_komi: `false`
+  - terminal_dead_stone_cleanup: `true`
+  - score_margin_reward_scale: `0.2`
+  - final_board_loss_weight: `0.25`
+  - workers: `32`
+  - games_per_worker: `8`
+  - games_per_cycle: `256`
+  - max_moves: `250`
+  - min_pass_move: `120`
+  - train_steps_per_cycle: `64`
+  - batch_size: `256`
+  - temperature schedule: `0.7` for moves `[0,30)`, `0.3` for `[30,100)`,
+    `0.2` afterwards
+- Launch sanity check: Python training process started successfully and spawned
+  CUDA workers; GPU memory at launch was about `13.1GB` on GPU0 and `7.1GB` on
+  GPU1.
+- Comparison caveat: cycle numbers after this point are continuation cycles in
+  a new output directory with a different search budget. Compare by wall-clock,
+  positions, and eval/play strength rather than cycle number alone.
