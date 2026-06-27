@@ -15,7 +15,7 @@ import torch
 
 from diamondgo.batched_demo import BatchedConfig, make_model, play_batched_games
 from diamondgo.defaults import DEFAULT_9X9_KOMI, DEFAULT_9X9_MAX_MOVES, DEFAULT_9X9_SCORE_KOMI
-from diamondgo.demo_cpu import build_trace, write_json, write_sgf
+from diamondgo.demo_cpu import build_trace, lightweight_top_search_tree, write_json, write_sgf
 from diamondgo.overnight_train import (
     OvernightConfig,
     load_checkpoint,
@@ -365,10 +365,14 @@ def trace_examples_for_cycle(
     prepared: list[dict[str, object]] = []
     for example in examples:
         copy = dict(example)
+        copy.pop("top5_search_tree", None)
         top_actions = list(copy.get("top_actions", []))
         game = int(copy.get("game", 0))
-        if game <= full_games:
+        if 1 <= game <= full_games:
             copy["trace_top_actions_mode"] = "full"
+            light_tree = lightweight_top_search_tree(top_actions, default_limit)
+            if light_tree is not None:
+                copy["top5_search_tree"] = light_tree
         else:
             copy["top_actions"] = top_actions[:default_limit]
             copy["trace_top_actions_mode"] = f"top-{default_limit}"
@@ -732,6 +736,8 @@ def run(config: MultiWorkerConfig, out_dir: Path, resume: str = "") -> dict[str,
             "full_trace_every": config.full_trace_every,
             "full_trace_games": config.full_trace_games,
             "trace_top_actions_limit": config.trace_top_actions_limit,
+            "full_trace_light_tree_key": "top5_search_tree",
+            "full_trace_light_tree_min_root_search_visits": 2,
             "full_trace_this_cycle": bool(
                 config.full_trace_every > 0 and cycle % config.full_trace_every == 0
             ),

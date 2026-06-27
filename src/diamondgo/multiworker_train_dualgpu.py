@@ -204,6 +204,8 @@ def run(config: DualGpuConfig, out_dir: Path, resume: str = "") -> dict[str, obj
             "full_trace_every": config.full_trace_every,
             "full_trace_games": config.full_trace_games,
             "trace_top_actions_limit": config.trace_top_actions_limit,
+            "full_trace_light_tree_key": "top5_search_tree",
+            "full_trace_light_tree_min_root_search_visits": 2,
             "full_trace_this_cycle": bool(
                 config.full_trace_every > 0 and cycle % config.full_trace_every == 0
             ),

@@ -309,25 +309,51 @@ def build_trace(config: CpuDemoConfig, examples: list[dict[str, object]]) -> dic
         action = int(example["chosen_action"])
         policy = np.asarray(example["policy"], dtype=np.float32)
         entropy = float(-(policy * np.log(np.clip(policy, 1e-9, 1.0))).sum())
-        moves.append(
-            {
-                "move_number": index,
-                "game": int(example.get("game", 1)),
-                "worker_id": int(example.get("worker_id", 1)),
-                "local_game": int(example.get("local_game", example.get("game", 1))),
-                "move_in_game": int(example.get("move_in_game", index)),
-                "player": example["player"],
-                "chosen_action": action,
-                "chosen_move": action_to_gtp(action, config.board_size),
-                "root_value": example["root_value"],
-                "value_target": example["value_target"],
-                "policy_entropy": round(entropy, 4),
-                "top_actions": example["top_actions"],
-                "is_pass": bool(example.get("is_pass", False)),
-                "captures": int(example.get("captures", 0)),
-            }
-        )
+        move = {
+            "move_number": index,
+            "game": int(example.get("game", 1)),
+            "worker_id": int(example.get("worker_id", 1)),
+            "local_game": int(example.get("local_game", example.get("game", 1))),
+            "move_in_game": int(example.get("move_in_game", index)),
+            "player": example["player"],
+            "chosen_action": action,
+            "chosen_move": action_to_gtp(action, config.board_size),
+            "root_value": example["root_value"],
+            "value_target": example["value_target"],
+            "policy_entropy": round(entropy, 4),
+            "top_actions": example["top_actions"],
+            "is_pass": bool(example.get("is_pass", False)),
+            "captures": int(example.get("captures", 0)),
+        }
+        if "top5_search_tree" in example:
+            move["top5_search_tree"] = example["top5_search_tree"]
+        moves.append(move)
     return {"config": asdict(config), "moves": moves}
+
+
+def root_search_visits_from_top_actions(top_actions: list[object]) -> int:
+    visits = 0
+    for item in top_actions:
+        if not isinstance(item, dict):
+            continue
+        try:
+            visits += int(item.get("visits", 0))
+        except (TypeError, ValueError):
+            continue
+    return visits
+
+
+def lightweight_top_search_tree(
+    top_actions: list[object],
+    limit: int,
+) -> dict[str, object] | None:
+    root_search_visits = root_search_visits_from_top_actions(top_actions)
+    if limit <= 0 or root_search_visits <= 1:
+        return None
+    return {
+        "root_search_visits": root_search_visits,
+        "actions": top_actions[:limit],
+    }
 
 
 def write_json(path: str | Path, payload: dict[str, object]) -> None:
