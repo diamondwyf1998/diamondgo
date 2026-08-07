@@ -1,3 +1,9 @@
 *.sh text eol=lf
 artifacts/play-ai-checkpoints/*.pt filter=lfs diff=lfs merge=lfs -text
 artifacts/checkpoint-archive/**/*.pt filter=lfs diff=lfs merge=lfs -text
+artifacts/training-data-archive/**/*.tgz filter=lfs diff=lfs merge=lfs -text
+artifacts/training-data-archive/**/*-trace.json filter=lfs diff=lfs merge=lfs -text
+artifacts/training-data-archive/**/*.jsonl filter=lfs diff=lfs merge=lfs -text
+artifacts/training-data-archive/**/*.sgf filter=lfs diff=lfs merge=lfs -text
+artifacts/training-data-archive/**/*.log filter=lfs diff=lfs merge=lfs -text
+artifacts/training-data-archive/**/*.csv filter=lfs diff=lfs merge=lfs -text

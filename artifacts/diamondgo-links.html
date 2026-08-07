@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <meta charset="utf-8">
 <title>DiamondGo links</title>
 <style>
@@ -29,12 +29,98 @@
   <div>常用展示入口集中在这里，之后不用每次重新找。</div>
 </header>
 <main>
+<!-- latest-training-status:start -->
+  <section>
+    <h2>最新训练状况</h2>
+    <div class="grid">
+      <a class="card" href="/training-status-13x13-b6c96-simsched-split-target-cycle232-20260807/index.html">
+        <b>训练状态总览</b>
+        <span>run-13x13-b6c96-simsched-margin0p6-cycle232-20260807：训练状态、异常指标、中心/边线/pass 分布与入口集合。</span>
+      </a>
+      <a class="card" href="/training-curves-archive-20260619/index.html">
+        <b>训练曲线归档</b>
+        <span>所有 metrics.jsonl 曲线，默认按最近更新时间排序。</span>
+      </a>
+      <a class="card" href="/viewers/selfplay-catalog-viewer.html?dataset=selfplay-status-13x13-b6c96-simsched-split-target-cycle232-20260807&amp;cycle=232&amp;game=1">
+        <b>最新自对弈记录</b>
+        <span>直接载入本轮最新 checkpoint 的记录对局，含 MCTS 候选。</span>
+      </a>
+      <a class="card" href="http://127.0.0.1:8787/viewers/play-ai.html?checkpoint=13x13-b6c96-simsched-split-target-cycle-00232-latest&amp;v=training-status">
+        <b>和最新 checkpoint 对弈</b>
+        <span>打开 8787 play server，可选择权重和搜索量。</span>
+      </a>
+      <a class="card" href="/selfplay-recorded-every20-5games-b6c96-split-target-20260807/index.html">
+        <b>收尾抽样：每 20 cycle 5 盘</b>
+        <span>cycle20 到 cycle220 每 20 代，加 cycle230；每个 checkpoint 保留训练时真实记录的前 5 盘。</span>
+      </a>
+    </div>
+  </section>
+<!-- latest-training-status:end -->
+<!-- latest-training-status:start -->
+<section>
+    <h2>Latest full MCTS</h2>
+    <div class="grid">
+      <a class="card" href="/full-mcts-13x13-b6c96-simsched-margin0p6-cycle320-20260716/index.html">
+        <b>13x13 B6C96 cycle320 full MCTS</b>
+        <span>本轮最近的完整 root candidate list：Game 1-5，最多 169 个候选含 pass，可看 visit 热力图、chosen rank、prior/value 和根节点判断。</span>
+      </a>
+      <a class="card" href="/viewers/selfplay-catalog-viewer.html?dataset=selfplay-full-mcts-13x13-b6c96-simsched-margin0p6-cycle320-20260716&amp;cycle=320&amp;game=1">
+        <b>Open cycle320 full-search game</b>
+        <span>进入统一 self-play viewer，用拖动条逐手查看完整候选、搜索分布和落子选择。</span>
+      </a>
+    </div>
+  </section>
+  <section>
+    <h2>Compare experiments</h2>
+    <div class="grid">
+      <a class="card" href="/compare-b6c96-cycle221-vs-old4x64-latest-score5p5-800sims-10games-20260712/games_dashboard.html">
+        <b>B6C96 cycle221 vs old 4x64 latest</b>
+        <span>13x13, score komi 5.5, 800 sims each, 10 games. B6C96 won 1/10; use this as the current cross-architecture anchor.</span>
+      </a>
+      <a class="card" href="/compare-b6c96-cycle221-vs-old4x64-latest-score5p5-800sims-10games-20260712/dashboard.html">
+        <b>B6C96 vs 4x64 summary</b>
+        <span>Compact table for the same 800-sim comparison, with black/white split and early-pass metric.</span>
+      </a>
+      <a class="card" href="/version-update-strength-eval-13x13-ce800-cycle150-210-400sims-6rounds-20260704/dashboard.html">
+        <b>13x13 cycle150-210 version eval</b>
+        <span>Adjacent 10-cycle checkpoint matches, 400 sims, 10 games per pair. Includes 160vs150 through 210CEvs200CE.</span>
+      </a>
+      <a class="card" href="/version-update-strength-eval-13x13-ce800-cycle150-210-400sims-6rounds-20260704/games_dashboard.html">
+        <b>13x13 cycle150-210 games</b>
+        <span>Replay dashboard for the same six-round evaluation, with all saved MCTS candidate details from the match records.</span>
+      </a>
+      <a class="card" href="/version-update-strength-eval-score6p5-cycle600-1000-20260623/games_dashboard.html">
+        <b>Version update strength eval</b>
+        <span>Adjacent 50-cycle checkpoint matches from 600 to 1000, 400 sims, 10 games per pair, score komi 6.5. Includes replay and MCTS top actions.</span>
+      </a>
+      <a class="card" href="/version-update-strength-eval-score6p5-cycle600-1000-20260623/dashboard.html">
+        <b>Version update summary</b>
+        <span>Compact table for the same 600-1000 adjacent-version strength evaluation.</span>
+      </a>
+      <a class="card" href="/version-update-strength-eval-score6p5-cycle1000-vs-history-20260623/games_dashboard.html">
+        <b>Latest vs history anchors</b>
+        <span>Cycle1000 against 600/650/700/750/800/850/900/950, 400 sims, 10 games per pair, score komi 6.5.</span>
+      </a>
+      <a class="card" href="/compare-experiment-old2x96-vs-history2-20260621/index.html">
+        <b>old 2x96 cycle930 vs history2</b>
+        <span>Summary of the 50-sim sweep, 300-sim bracket, and 10-game formal matches. Closest level is history2 cycle510-520.</span>
+      </a>
+      <a class="card" href="/compare-experiment-old2x96-vs-history2-cycle520-300sims-20260621/games_dashboard.html">
+        <b>cycle520 formal games</b>
+        <span>300 sims, 10 games, history2 cycle520 vs old 2x96 cycle930.</span>
+      </a>
+      <a class="card" href="/compare-experiment-old2x96-vs-history2-cycle510-300sims-20260621/games_dashboard.html">
+        <b>cycle510 formal games</b>
+        <span>300 sims, 10 games, history2 cycle510 vs old 2x96 cycle930.</span>
+      </a>
+    </div>
+  </section>
   <section>
     <h2>Play</h2>
     <div class="grid">
-      <a class="card" href="/viewers/play-ai.html">
+      <a class="card" href="http://127.0.0.1:8787/viewers/play-ai.html">
         <b>和 AI 对弈</b>
-        <span>当前服务默认载入最新 catalog checkpoint，可在顶部下拉切换搜索量和版本。</span>
+        <span>需要 8787 play server；默认载入当前 catalog checkpoint，可在顶部下拉切换权重和搜索量。</span>
       </a>
     </div>
   </section>
@@ -112,3 +198,6 @@
   </section>
   <p class="note">本页位于 <code>artifacts/diamondgo-links.html</code>，只依赖本地 8765 静态服务。</p>
 </main>
+
+<script src="/viewers/return-nav.js" defer></script>
+

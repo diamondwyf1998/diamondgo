@@ -1,0 +1,47 @@
+# 13x13 final-board CE fresh b6c96 run
+
+- created_time: 2026-08-03T19:25:57+08:00
+- source_commit: local-dirty-20260803-policy-split-entropies
+- purpose: start a larger 13x13 final-board CE model after preserving the previous 4x64 checkpoint
+- previous_checkpoint_backup: 
+- resume_checkpoint: 
+- board_size: 13
+- model: 6 residual blocks x 96 channels
+- history_moves: 2
+- input_komi: false
+- komi_metadata: 0.5
+- score_komi: 8.5
+- score_komi_ladder: 2.5,4.5,6.5,7.5,8.5,9.5,10.5
+- score_komi_adjust_window: 5
+- score_komi_adjust_threshold: 0.70
+- terminal_dead_stone_cleanup: true
+- score_margin_reward_scale: 0.6
+- final_board_loss: per-point cross entropy over black, neutral, white classes
+- final_board_loss_weight: 0.25
+- simulations: 800
+- simulation_schedule: 1:200,100:400,200:800
+- workers: 16
+- games_per_worker: 8
+- games_per_cycle: 128
+- selfplay_devices: cuda:0
+- max_moves: 250
+- min_pass_move: 120
+- train_steps_per_cycle: 512
+- batch_size: 256
+- replay_size: 100000
+- learning_rate: 0.005
+- c_puct: 1.5
+- policy_target_temperature: 1.0 (raw MCTS visit proportions)
+- root_dirichlet_alpha: 0.15
+- root_noise_fraction: 0.25
+- root_policy_temperature: 1.1
+- move_temperature_opening: 0.8 for moves [0, 30)
+- move_temperature_middle: 0.6 for moves [30, 100)
+- move_temperature_late: 0.2 for moves [100, end)
+- entropy_metrics: raw_visit_entropy_mean, sampled_policy_entropy_mean, network_prior_entropy_mean
+- checkpoint_every: 10
+- record_every: 5
+- full_trace_every: 20
+- full_trace_games: 5
+- trace_top_actions_limit: 5
+- full_trace_light_top5_search_tree: true, stored as top5_search_tree when root_search_visits >= 2

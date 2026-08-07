@@ -1,0 +1,89 @@
+{
+  "archive_name": "13x13-b6c96-simsched-split-target-20260807",
+  "source_run_dir": "/root/autodl-tmp/diamondgo-runs/13x13-ce-simsched-lr0p005-margin0p6-b6c96-16w-4090d-fresh-20260803-192533",
+  "created_at": "2026-08-07T04:39:07.503832+00:00",
+  "latest_cycle": 232,
+  "latest_metrics": {
+    "simulations": 800,
+    "score_komi": 9.5,
+    "loss": 3.292196,
+    "policy_loss": 3.112983,
+    "value_loss": 0.057372,
+    "final_board_loss": 0.487361,
+    "black_win_rate": 0.875,
+    "white_win_rate": 0.125,
+    "black_score_margin_mean": 68.141,
+    "moves_mean": 225.141,
+    "first_pass_move_median": 171.5,
+    "pass_move_fraction": 0.031,
+    "positions_per_second": 9.935,
+    "dynamic_score_komi_reason": "black_win_rate_high"
+  },
+  "selfplay_subset": {
+    "dataset": "artifacts/selfplay-recorded-every20-5games-b6c96-split-target-20260807",
+    "cycles": [
+      20,
+      40,
+      60,
+      80,
+      100,
+      120,
+      140,
+      160,
+      180,
+      200,
+      220,
+      230
+    ],
+    "games_per_cycle": 5,
+    "total_games": 60,
+    "total_moves": 13857
+  },
+  "entries": [
+    {
+      "path": "artifacts/training-data-archive/13x13-b6c96-simsched-split-target-20260807/config.json",
+      "bytes": 1322,
+      "sha256": "e6012db66043c76b0b5b105685c3f4d89b430c91940277b2f96e2e7362fe6a3f"
+    },
+    {
+      "path": "artifacts/training-data-archive/13x13-b6c96-simsched-split-target-20260807/gpu_monitor.csv",
+      "bytes": 436514,
+      "sha256": "d79a78587e461f8cadacbeba8823c81da11a6ced91162d551c1c59ab453a3aec"
+    },
+    {
+      "path": "artifacts/training-data-archive/13x13-b6c96-simsched-split-target-20260807/latest-cycle-00232-trace.json",
+      "bytes": 39750835,
+      "sha256": "c9a8c5ce19e857de3f8bbab826549d07c8126aa29e94ca84d5e977566cbc5329"
+    },
+    {
+      "path": "artifacts/training-data-archive/13x13-b6c96-simsched-split-target-20260807/latest-cycle-00232.sgf",
+      "bytes": 7653781,
+      "sha256": "53ef141ca7c2981e5a991a364792b090d4570fe61644e43d8a576d8ce0a2fed5"
+    },
+    {
+      "path": "artifacts/training-data-archive/13x13-b6c96-simsched-split-target-20260807/metrics.jsonl",
+      "bytes": 13080793,
+      "sha256": "c1e671a5018c317a48d860a11c0d270312843660b0bec52f5e418f0f927814eb"
+    },
+    {
+      "path": "artifacts/training-data-archive/13x13-b6c96-simsched-split-target-20260807/run_notes.md",
+      "bytes": 1635,
+      "sha256": "8c96ca73b610248d2df29f599760a0688e16f1af5fff7b967214d435171e68d9"
+    },
+    {
+      "path": "artifacts/training-data-archive/13x13-b6c96-simsched-split-target-20260807/selected-cycle-records-raw.tgz",
+      "bytes": 49918884,
+      "sha256": "f140107009f54da7ea9a20981831bf4bf925f347a43016c5f8b83ce38215d7fd"
+    },
+    {
+      "path": "artifacts/training-data-archive/13x13-b6c96-simsched-split-target-20260807/selfplay-recorded-every20-5games.tgz",
+      "bytes": 10671546,
+      "sha256": "1467331dbf1ba7875cdca29fd9d62379e7a429fc7021478737180159d0fc2cd3"
+    },
+    {
+      "path": "artifacts/training-data-archive/13x13-b6c96-simsched-split-target-20260807/status_3h.log",
+      "bytes": 1683206,
+      "sha256": "53aec9d919508845bcda39c3bf231c2a27e3875bc7289bdf5d05ff82c2b4ac30"
+    }
+  ]
+}
