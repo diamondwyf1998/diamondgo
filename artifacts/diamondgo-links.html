@@ -33,25 +33,25 @@
   <section>
     <h2>最新训练状况</h2>
     <div class="grid">
-      <a class="card" href="/training-status-13x13-b6c96-simsched-split-target-cycle232-20260807/index.html">
+      <a class="card" href="/training-status-13x13-b6c96-simsched-split-target-cycle314-20260810/index.html">
         <b>训练状态总览</b>
-        <span>run-13x13-b6c96-simsched-margin0p6-cycle232-20260807：训练状态、异常指标、中心/边线/pass 分布与入口集合。</span>
+        <span>run-13x13-b6c96-simsched-split-target-cycle314-20260810：训练状态、异常指标、中心/边线/pass 分布与入口集合。</span>
       </a>
       <a class="card" href="/training-curves-archive-20260619/index.html">
         <b>训练曲线归档</b>
         <span>所有 metrics.jsonl 曲线，默认按最近更新时间排序。</span>
       </a>
-      <a class="card" href="/viewers/selfplay-catalog-viewer.html?dataset=selfplay-status-13x13-b6c96-simsched-split-target-cycle232-20260807&amp;cycle=232&amp;game=1">
+      <a class="card" href="/viewers/selfplay-catalog-viewer.html?dataset=selfplay-status-13x13-b6c96-simsched-split-target-cycle314-20260810&amp;cycle=314&amp;game=1">
         <b>最新自对弈记录</b>
         <span>直接载入本轮最新 checkpoint 的记录对局，含 MCTS 候选。</span>
       </a>
-      <a class="card" href="http://127.0.0.1:8787/viewers/play-ai.html?checkpoint=13x13-b6c96-simsched-split-target-cycle-00232-latest&amp;v=training-status">
+      <a class="card" href="/selfplay-recorded-every20-5games-b6c96-split-target-20260810/index.html">
+        <b>每 20 cycle 抽样对局</b>
+        <span>cycle 20 到 310，每个 checkpoint 保留 5 盘记录对局，用统一 viewer 快速查看策略演化。</span>
+      </a>
+      <a class="card" href="http://127.0.0.1:8787/viewers/play-ai.html?checkpoint=13x13-b6c96-simsched-split-target-cycle-00314-latest&amp;v=training-status">
         <b>和最新 checkpoint 对弈</b>
         <span>打开 8787 play server，可选择权重和搜索量。</span>
-      </a>
-      <a class="card" href="/selfplay-recorded-every20-5games-b6c96-split-target-20260807/index.html">
-        <b>收尾抽样：每 20 cycle 5 盘</b>
-        <span>cycle20 到 cycle220 每 20 代，加 cycle230；每个 checkpoint 保留训练时真实记录的前 5 盘。</span>
       </a>
     </div>
   </section>

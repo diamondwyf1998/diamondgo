@@ -1,0 +1,123 @@
+{
+  "archive": "13x13-b6c96-simsched-split-target-20260810",
+  "created_at": "2026-08-10T04:24:52.894239+00:00",
+  "source_server_run": "/root/autodl-tmp/diamondgo-runs/13x13-ce-simsched-lr0p005-margin0p6-b6c96-16w-4090d-fresh-20260803-192533",
+  "latest_cycle": 314,
+  "latest_pt_cycle": 314,
+  "sampled_checkpoint_cycles": [
+    20,
+    40,
+    60,
+    80,
+    100,
+    120,
+    140,
+    160,
+    180,
+    200,
+    220,
+    240,
+    260,
+    280,
+    300,
+    310
+  ],
+  "note": "Every 20 cycles through 300, plus cycle 310 and latest.pt from cycle 314. Metrics are stored in the matching training-data archive.",
+  "files": [
+    {
+      "path": "checkpoints/cycle-00020.pt",
+      "bytes": 16135543,
+      "sha256": "bed2cea7c2b7c40dd5cf81d3c59e44ab40bbaaa32fc7f981e7cc7803f313053f"
+    },
+    {
+      "path": "checkpoints/cycle-00040.pt",
+      "bytes": 16135479,
+      "sha256": "75a1c4b9360e4f826c4c4d42427fbec4e0a889875630fcfe7d4cbb47eb9b5f47"
+    },
+    {
+      "path": "checkpoints/cycle-00060.pt",
+      "bytes": 16135479,
+      "sha256": "be8150b13ea046d30a5619cea529ab15a7340ebaa7778f8a68ace25592f9f431"
+    },
+    {
+      "path": "checkpoints/cycle-00080.pt",
+      "bytes": 16135479,
+      "sha256": "0506d8ac16e65d4a026c39991801e9c1f8d324267ba800fbbb59199571613857"
+    },
+    {
+      "path": "checkpoints/cycle-00100.pt",
+      "bytes": 16135479,
+      "sha256": "477c8ea5863e685deec549412e3d0b115fb5e5ed807b0c1af0ddae56d5e06c3a"
+    },
+    {
+      "path": "checkpoints/cycle-00120.pt",
+      "bytes": 16135479,
+      "sha256": "2378292e32d983932125a1e9d9e18584c795d2d530d7e27918cd2553a7fdf7c6"
+    },
+    {
+      "path": "checkpoints/cycle-00140.pt",
+      "bytes": 16135543,
+      "sha256": "f0ea84a4b9281244074d6e6fe177d17c9486d95fab7155259bae63e3f6ab2899"
+    },
+    {
+      "path": "checkpoints/cycle-00160.pt",
+      "bytes": 16135543,
+      "sha256": "c7ea7a31ce7126e0d2f7771539d81cc3e6e47b253ddc0ebf0e899ad9b3203148"
+    },
+    {
+      "path": "checkpoints/cycle-00180.pt",
+      "bytes": 16135543,
+      "sha256": "f698d0c0a8f443f60713f1032bbb66d347c8a30080047bda75a919e3403c3aaa"
+    },
+    {
+      "path": "checkpoints/cycle-00200.pt",
+      "bytes": 16135543,
+      "sha256": "957d458e9dea9c94522544ec37d2948188189abc8ec4fe8668acbad1e0d53007"
+    },
+    {
+      "path": "checkpoints/cycle-00220.pt",
+      "bytes": 16135543,
+      "sha256": "bc3c15ddd85b3b88d6fd0f76c8747ada79499c9805f900bd0db0129f33693dd9"
+    },
+    {
+      "path": "checkpoints/cycle-00240.pt",
+      "bytes": 16135543,
+      "sha256": "d350882fa761b9c41ef5fdd2fef1b3682308e139f7afba05f287feb54338d393"
+    },
+    {
+      "path": "checkpoints/cycle-00260.pt",
+      "bytes": 16135543,
+      "sha256": "cee429f8f85527c66bbf6fb67dcc37037abd29210fe68077e01eb5043fa949d2"
+    },
+    {
+      "path": "checkpoints/cycle-00280.pt",
+      "bytes": 16135543,
+      "sha256": "305787884d3ec6aabf9567b0da37f3448e66a9efaf2c07f41fc3adfbd119d5b2"
+    },
+    {
+      "path": "checkpoints/cycle-00300.pt",
+      "bytes": 16135543,
+      "sha256": "ef4c0e73660eb666274962b6af21edb955863c8786b6eeb39d322a104764a4fc"
+    },
+    {
+      "path": "checkpoints/cycle-00310.pt",
+      "bytes": 16135543,
+      "sha256": "e6b42b6901d6354437e09b6be7261e90e392644f49f33fc660054d7c492d92d9"
+    },
+    {
+      "path": "config.json",
+      "bytes": 1322,
+      "sha256": "e6012db66043c76b0b5b105685c3f4d89b430c91940277b2f96e2e7362fe6a3f"
+    },
+    {
+      "path": "latest.pt",
+      "bytes": 16129545,
+      "sha256": "d45f918c25206091a3440fbf2bf9b1b60c628112542ac25807fe875e4355ff75"
+    },
+    {
+      "path": "README.md",
+      "bytes": 506,
+      "sha256": "95c188619cb12f85128abaaeaad35afc7bc6a75eb41698f2116047b7c936b418"
+    }
+  ]
+}

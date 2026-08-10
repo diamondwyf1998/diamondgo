@@ -1,0 +1,145 @@
+{
+  "archive": "13x13-b6c96-simsched-split-target-20260810",
+  "created_at": "2026-08-10T04:57:50.792075+00:00",
+  "source_server_run": "/root/autodl-tmp/diamondgo-runs/13x13-ce-simsched-lr0p005-margin0p6-b6c96-16w-4090d-fresh-20260803-192533",
+  "latest_cycle": 314,
+  "sampled_selfplay_cycles": [
+    20,
+    40,
+    60,
+    80,
+    100,
+    120,
+    140,
+    160,
+    180,
+    200,
+    220,
+    240,
+    260,
+    280,
+    300,
+    310
+  ],
+  "sampled_games_per_cycle": 5,
+  "display_urls": {
+    "status": "http://127.0.0.1:8765/training-status-13x13-b6c96-simsched-split-target-cycle314-20260810/index.html",
+    "selfplay_latest": "http://127.0.0.1:8765/viewers/selfplay-catalog-viewer.html?dataset=selfplay-status-13x13-b6c96-simsched-split-target-cycle314-20260810&cycle=314&game=1",
+    "recorded_subset": "http://127.0.0.1:8765/selfplay-recorded-every20-5games-b6c96-split-target-20260810/index.html",
+    "curves": "http://127.0.0.1:8765/training-curves-archive-20260619/index.html",
+    "play_ai": "http://127.0.0.1:8787/viewers/play-ai.html?checkpoint=13x13-b6c96-simsched-split-target-cycle-00314-latest&v=training-status"
+  },
+  "latest_summary": {
+    "cycle": 314,
+    "score_komi": 8.5,
+    "next_score_komi": 9.5,
+    "dynamic_score_komi": {
+      "enabled": true,
+      "ladder": [
+        2.5,
+        4.5,
+        6.5,
+        7.5,
+        8.5,
+        9.5,
+        10.5
+      ],
+      "window": 5,
+      "threshold": 0.7,
+      "recent_cycles": [
+        310,
+        311,
+        312,
+        313,
+        314
+      ],
+      "recent_games": 640,
+      "recent_black_wins": 518,
+      "recent_white_wins": 122,
+      "recent_black_win_rate": 0.8094,
+      "recent_white_win_rate": 0.1906,
+      "score_komi": 8.5,
+      "next_score_komi": 9.5,
+      "adjusted": true,
+      "reason": "black_win_rate_high"
+    },
+    "simulations": 800,
+    "loss": {
+      "step": 512,
+      "loss": 3.278198,
+      "policy_loss": 3.082732,
+      "value_loss": 0.06904,
+      "final_board_loss": 0.505707,
+      "final_board_loss_weight": 0.25
+    },
+    "black_win_rate": 0.7734,
+    "white_win_rate": 0.2266,
+    "black_score_margin_mean": 44.258,
+    "abs_score_margin_mean": 73.703,
+    "first_pass_move_median": 172.0,
+    "ended_by_pass": 63,
+    "ended_by_max_moves": 65,
+    "positions_per_second": 10.117,
+    "raw_visit_entropy_mean": 2.7438,
+    "sampled_policy_entropy_mean": 1.4783,
+    "network_prior_entropy_mean": 3.1709
+  },
+  "files": [
+    {
+      "path": "config.json",
+      "bytes": 1322,
+      "sha256": "e6012db66043c76b0b5b105685c3f4d89b430c91940277b2f96e2e7362fe6a3f"
+    },
+    {
+      "path": "gpu_monitor.csv",
+      "bytes": 780667,
+      "sha256": "7c2ff65da1fcf5ef291004ba05475b031e604dc566d95f53229846b1647286b2"
+    },
+    {
+      "path": "latest-cycle-00314-trace.json",
+      "bytes": 39718310,
+      "sha256": "ea5d0b4d0711a18730df127fbac18ed34521cbdc86deef996b167c6cf7540e55"
+    },
+    {
+      "path": "latest-cycle-00314.sgf",
+      "bytes": 7650950,
+      "sha256": "a34be838be2d855dc3f61615b615d65a497335bb9795f79de2dfd9ff53414c6a"
+    },
+    {
+      "path": "latest-summary.json",
+      "bytes": 1231,
+      "sha256": "7ac82721baca1cf78b76dcfb3c579b593f725d96b4e903b5a9ae5a4a73389a79"
+    },
+    {
+      "path": "metrics.jsonl",
+      "bytes": 17703692,
+      "sha256": "5e417f8a275a94c89cae32a0744a8f0c410068fd4fb509c64bb5229a48241a04"
+    },
+    {
+      "path": "README.md",
+      "bytes": 1139,
+      "sha256": "7e2ababdaf76b61206c354ae14bd572014220db6e0bbdf2eb3f60026445a9b8d"
+    },
+    {
+      "path": "run_notes.md",
+      "bytes": 1635,
+      "sha256": "8c96ca73b610248d2df29f599760a0688e16f1af5fff7b967214d435171e68d9"
+    },
+    {
+      "path": "selected-cycle-records-raw.tgz",
+      "bytes": 66531239,
+      "sha256": "d93780b4f92af2f1a424dfc82d857a358b4c6ec7f367c30660fdb684f6b90cb8"
+    },
+    {
+      "path": "status_3h.log",
+      "bytes": 3017849,
+      "sha256": "fcb525a21759ff0455a2f4267e5fcfc80f252bd3d935b8fe074cee64c575b40d"
+    },
+    {
+      "path": "train.log",
+      "bytes": 17703692,
+      "sha256": "5e417f8a275a94c89cae32a0744a8f0c410068fd4fb509c64bb5229a48241a04"
+    }
+  ],
+  "note": "Raw selected traces are archived; the lightweight local viewer subset can be rebuilt with scripts/build_recorded_selfplay_subset.py."
+}

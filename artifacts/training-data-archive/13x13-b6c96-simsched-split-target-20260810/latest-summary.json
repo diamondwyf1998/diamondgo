@@ -1,0 +1,55 @@
+{
+  "cycle": 314,
+  "score_komi": 8.5,
+  "next_score_komi": 9.5,
+  "dynamic_score_komi": {
+    "enabled": true,
+    "ladder": [
+      2.5,
+      4.5,
+      6.5,
+      7.5,
+      8.5,
+      9.5,
+      10.5
+    ],
+    "window": 5,
+    "threshold": 0.7,
+    "recent_cycles": [
+      310,
+      311,
+      312,
+      313,
+      314
+    ],
+    "recent_games": 640,
+    "recent_black_wins": 518,
+    "recent_white_wins": 122,
+    "recent_black_win_rate": 0.8094,
+    "recent_white_win_rate": 0.1906,
+    "score_komi": 8.5,
+    "next_score_komi": 9.5,
+    "adjusted": true,
+    "reason": "black_win_rate_high"
+  },
+  "simulations": 800,
+  "loss": {
+    "step": 512,
+    "loss": 3.278198,
+    "policy_loss": 3.082732,
+    "value_loss": 0.06904,
+    "final_board_loss": 0.505707,
+    "final_board_loss_weight": 0.25
+  },
+  "black_win_rate": 0.7734,
+  "white_win_rate": 0.2266,
+  "black_score_margin_mean": 44.258,
+  "abs_score_margin_mean": 73.703,
+  "first_pass_move_median": 172.0,
+  "ended_by_pass": 63,
+  "ended_by_max_moves": 65,
+  "positions_per_second": 10.117,
+  "raw_visit_entropy_mean": 2.7438,
+  "sampled_policy_entropy_mean": 1.4783,
+  "network_prior_entropy_mean": 3.1709
+}
